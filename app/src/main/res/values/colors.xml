@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="sol_midnight">#051226</color>
+    <color name="sol_navy_surface">#0B1D3A</color>
+    <color name="sol_cyan">#65E4FF</color>
+    <color name="sol_amber">#FFB84D</color>
+</resources>

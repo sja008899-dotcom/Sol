@@ -1,0 +1,6 @@
+{
+  "name": "Sol",
+  "description": "Standalone offline-first Persian voice and life assistant with local Room memory, command brain, contacts, communication confirmation, and device controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

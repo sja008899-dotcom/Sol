@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">Sol</string>
+    <string name="sol_subtitle">دستیار مستقل و آفلاین فارسی</string>
+    <string name="nav_home">دستیار</string>
+    <string name="nav_memory">حافظه</string>
+    <string name="nav_contacts">مخاطبین</string>
+    <string name="nav_history">سوابق</string>
+    <string name="nav_settings">تنظیمات</string>
+    <string name="command_hint">فرمانت را به فارسی بنویس یا بگو…</string>
+    <string name="send_command">ارسال فرمان</string>
+    <string name="speak_with_sol">صحبت با Sol</string>
+    <string name="stop_listening">توقف شنود</string>
+    <string name="offline_badge">کاملاً آفلاین • بدون اینترنت</string>
+</resources>
