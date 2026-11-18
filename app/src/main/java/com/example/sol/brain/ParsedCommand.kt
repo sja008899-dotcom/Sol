@@ -21,6 +21,12 @@ enum class SolAction {
     DEVICE_STATUS,
     ADJUST_VOLUME,
     RUN_ROUTINE,
+    SCHEDULE_REMINDER,
+    BACKGROUND_CONTROL,
+    WEB_BOOK_LEARN_ROLE,
+    TEACH_ROLE_VOICE,
+    CONSULT_ROLE_BOOK,
+    SHOW_CAPABILITIES,
     UNKNOWN,
 }
 
@@ -40,6 +46,10 @@ data class ParsedCommand(
     val phone: String? = null,
     val volumeDelta: Int = 0,
     val routineName: String? = null,
+    val delayMinutes: Long = 1L,
+    val backgroundJobId: String? = null,
+    val bookQuery: String? = null,
+    val roleName: String? = null,
     val requireConfirmation: Boolean = true,
     val steps: List<String> = emptyList(),
 )
@@ -58,5 +68,15 @@ sealed interface PendingSolTask {
         val messageBody: String,
         val locationReference: String?,
         val isMultiStepReport: Boolean,
+    ) : PendingSolTask
+
+    data class InternetBookRoleFetch(
+        val bookQuery: String,
+        val requestedRoleHint: String,
+        val runInBackground: Boolean,
+    ) : PendingSolTask
+
+    data class OpenCapabilitiesCatalog(
+        val focusBackgroundOnly: Boolean = false,
     ) : PendingSolTask
 }

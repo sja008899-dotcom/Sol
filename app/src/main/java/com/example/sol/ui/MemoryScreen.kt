@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material3.AlertDialog
@@ -30,9 +33,11 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,9 +52,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.sol.memory.BookKnowledgeEntity
 import com.example.sol.memory.LocationEntity
 import com.example.sol.memory.MemoryFactEntity
 import com.example.sol.memory.PersonEntity
+import com.example.sol.memory.SolRoleEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +64,8 @@ fun MemoryScreen(
     memories: List<MemoryFactEntity>,
     persons: List<PersonEntity>,
     locations: List<LocationEntity>,
+    books: List<BookKnowledgeEntity>,
+    roles: List<SolRoleEntity>,
     confirmedCurrentLocation: String,
     onAddOrUpdateAlias: (String, String) -> Unit,
     onAddFact: (String) -> Unit,
@@ -66,10 +75,16 @@ fun MemoryScreen(
     onDeletePerson: (Long) -> Unit,
     onSaveLocation: (alias: String, fullName: String, note: String, existingId: Long) -> Unit,
     onDeleteLocation: (Long) -> Unit,
+    onOpenBookRoleStudio: () -> Unit,
+    onTeachVoiceForBook: (BookKnowledgeEntity) -> Unit,
+    onSpeakBook: (String) -> Unit,
+    onDeleteBook: (Long) -> Unit,
+    onToggleRoleActive: (SolRoleEntity, Boolean) -> Unit,
+    onDeleteRole: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("قوانین و نکات", "اشخاص", "مکان‌ها")
+    val tabs = listOf("قوانین و نکات", "اشخاص", "مکان‌ها", "کتاب‌ها و نقش‌ها")
 
     var showAddDialog by remember { mutableStateOf(false) }
     var editingMemory by remember { mutableStateOf<MemoryFactEntity?>(null) }
@@ -80,7 +95,9 @@ fun MemoryScreen(
         modifier = modifier.fillMaxSize(),
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddDialog = true },
+                onClick = {
+                    if (selectedTab == 3) onOpenBookRoleStudio() else showAddDialog = true
+                },
                 modifier = Modifier.testTag("add_memory_fab"),
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -101,7 +118,7 @@ fun MemoryScreen(
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    text = "تمام اطلاعات محلی هستند و هر زمان قابل مشاهده، ویرایش و حذف‌اند.",
+                    text = "تمام اطلاعات، کتاب‌ها و نقش‌های صوتی محلی هستند و هر زمان قابل مشاهده و حذف‌اند.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -112,7 +129,7 @@ fun MemoryScreen(
                     Tab(
                         selected = selectedTab == idx,
                         onClick = { selectedTab = idx },
-                        text = { Text(label, style = MaterialTheme.typography.labelLarge) },
+                        text = { Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1) },
                     )
                 }
             }
@@ -148,6 +165,8 @@ fun MemoryScreen(
                                             Text(
                                                 text = if (isAlias) {
                                                     "مترادف: «${item.keyText.removePrefix("alias:")}»"
+                                                } else if (item.kind == "instruction") {
+                                                    "دستورالعمل نقش"
                                                 } else {
                                                     "نکتهٔ شخصی"
                                                 },
@@ -328,11 +347,161 @@ fun MemoryScreen(
                         }
                     }
                 }
+
+                3 -> {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        item {
+                            Button(
+                                onClick = onOpenBookRoleStudio,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("دریافت کتاب از اینترنت یا فایل و آموزش نقش صوتی")
+                            }
+                        }
+
+                        if (roles.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "نقش‌های آموخته‌شده Sol:",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                )
+                            }
+                            items(roles, key = { "role_${it.id}" }) { role ->
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    ),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Text(
+                                                text = role.roleName,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                            Switch(
+                                                checked = role.isActive,
+                                                onCheckedChange = { onToggleRoleActive(role, it) },
+                                            )
+                                            IconButton(onClick = { onDeleteRole(role.id) }) {
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = "حذف نقش",
+                                                    tint = MaterialTheme.colorScheme.error,
+                                                )
+                                            }
+                                        }
+                                        if (role.linkedBookTitle.isNotBlank()) {
+                                            Text(
+                                                text = "مبتنی بر کتاب: ${role.linkedBookTitle}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                            )
+                                        }
+                                        Text(
+                                            text = role.instructions,
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        if (books.isEmpty() && roles.isEmpty()) {
+                            item {
+                                EmptyMemoryState(
+                                    icon = Icons.Default.MenuBook,
+                                    title = "هنوز کتاب یا نقشی آموزش داده نشده",
+                                    subtitle = "دکمه بالا را بزنید تا Sol کتابی را پیدا کند و با توضیحات صوتی شما به حافظه و نقشش اضافه کند.",
+                                )
+                            }
+                        } else if (books.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "کتاب‌های ذخیره‌شده:",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            items(books, key = { "book_${it.id}" }) { book ->
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    ),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = book.title,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                )
+                                                Text(
+                                                    text = "${book.author} • ${book.sourceType}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.secondary,
+                                                )
+                                            }
+                                            IconButton(onClick = {
+                                                onSpeakBook("${book.title}. ${book.summaryText}")
+                                            }) {
+                                                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "روخوانی خلاصه کتاب")
+                                            }
+                                            IconButton(onClick = { onDeleteBook(book.id) }) {
+                                                Icon(
+                                                    Icons.Default.Delete,
+                                                    contentDescription = "حذف کتاب",
+                                                    tint = MaterialTheme.colorScheme.error,
+                                                )
+                                            }
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = book.summaryText.take(280),
+                                            style = MaterialTheme.typography.bodySmall,
+                                        )
+                                        if (book.voiceNotes.isNotBlank()) {
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            Text(
+                                                text = "🎙 توضیحات صوتی شما:\n• ${book.voiceNotes}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        OutlinedButton(onClick = { onTeachVoiceForBook(book) }) {
+                                            Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("افزودن توضیح صوتی / نقش جدید")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
-    // Add dialogs according to active tab
     if (showAddDialog) {
         when (selectedTab) {
             0 -> AddRuleOrFactDialog(

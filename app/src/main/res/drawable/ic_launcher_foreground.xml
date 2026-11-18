@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/ic_sol_foreground_art_1795043134349"
+        android:drawable="@drawable/ic_sol_emblem_v2_1795044139765"
         android:gravity="center" />
 </layer-list>

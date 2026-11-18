@@ -1,6 +1,7 @@
 package com.example.sol.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,9 +26,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.BatteryStd
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Stop
@@ -37,6 +40,7 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -50,24 +54,30 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.R
 import com.example.sol.device.BatteryStatus
 import com.example.sol.memory.LocationEntity
 import com.example.sol.memory.SolPreferences
+import com.example.sol.memory.SolRoleEntity
 import com.example.sol.tasks.ActiveTaskState
 import com.example.sol.voice.TtsAvailability
 import com.example.sol.voice.VoiceListeningState
 
 private val QUICK_COMMANDS = listOf(
-    "سلام",
-    "ساعت چنده؟",
-    "وضعیت باتری",
-    "حافظه‌ات چی یادت است؟",
+    "۲۰ قابلیت",
+    "به اینترنت برو کتاب Little Prince را پیدا کن و با توضیحات صوتی من به حافظه و نقشت اضافه کن",
+    "۱ دقیقه دیگر یادآوری کن وضعیت کارها را چک کنم",
+    "از حافظه در پس‌زمینه پشتیبان بگیر",
     "هر وقت می‌گم دفتر منظورم شرکت کارنو صنعت ماکیان است",
     "وضعیت شرکت را به علی اطلاع بده و بعد نتیجه را به من گزارش کن",
 )
@@ -81,6 +91,8 @@ fun HomeScreen(
     micRms: Float,
     ttsAvailability: TtsAvailability,
     isSpeaking: Boolean,
+    isFetchingBook: Boolean,
+    activeRoles: List<SolRoleEntity>,
     messages: List<ChatMessageItem>,
     inputText: String,
     activeTask: ActiveTaskState?,
@@ -94,6 +106,8 @@ fun HomeScreen(
     onStopSpeaking: () -> Unit,
     onConfirmCurrentLocation: (String) -> Unit,
     onDismissTaskCard: () -> Unit,
+    onOpenCapabilities: () -> Unit,
+    onOpenBookRoleStudio: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var showLocationDialog by remember { mutableStateOf(false) }
@@ -126,15 +140,36 @@ fun HomeScreen(
                 )
             ),
     ) {
-        // Header + Status Strip
-        Surface(
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-            tonalElevation = 2.dp,
+        // Sleek Hero Header Card using img_sol_hero_banner
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .clip(RoundedCornerShape(22.dp)),
         ) {
+            Image(
+                painter = painterResource(id = R.drawable.img_sol_hero_banner_1795044139786),
+                contentDescription = "پس‌زمینه هنری Sol",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xCC051226),
+                                Color(0xDF051226),
+                            )
+                        )
+                    ),
+            )
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(14.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -148,45 +183,41 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.primary,
                         )
                         Text(
-                            text = "دستیار شخصی آفلاین فارسی",
+                            text = activeRoles.firstOrNull()?.let { "نقش فعال: ${it.roleName}" }
+                                ?: "دستیار شخصی فارسی • مستقل و هوشمند",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
 
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Surface(
-                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f),
                             shape = RoundedCornerShape(50),
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Shield,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.tertiary,
-                                    modifier = Modifier.size(14.dp),
+                                    modifier = Modifier.size(13.dp),
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "آفلاین",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("حریم امن", style = MaterialTheme.typography.labelSmall)
                             }
                         }
 
                         Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
                             shape = RoundedCornerShape(50),
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
@@ -197,13 +228,10 @@ fun HomeScreen(
                                     },
                                     contentDescription = "باتری",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(14.dp),
+                                    modifier = Modifier.size(13.dp),
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = "${batteryStatus.levelPercent}%",
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
+                                Text("${batteryStatus.levelPercent}%", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -211,10 +239,76 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Confirmed Current Location Pill (Strict Separation from Saved Locations)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.88f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(onClick = onOpenCapabilities)
+                            .testTag("open_capabilities_button"),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "۲۰ قابلیت و پس‌زمینه",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.88f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable(onClick = onOpenBookRoleStudio)
+                            .testTag("open_book_role_button"),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MenuBook,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text(
+                                text = "کتاب و نقش صوتی",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.85f),
+                    shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -222,7 +316,7 @@ fun HomeScreen(
                         .testTag("current_location_pill"),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
@@ -238,7 +332,7 @@ fun HomeScreen(
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 },
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(16.dp),
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
@@ -263,11 +357,15 @@ fun HomeScreen(
             }
         }
 
+        if (isFetchingBook) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+
         // Interactive Voice Orb Section
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 10.dp, bottom = 4.dp),
+                .padding(top = 4.dp, bottom = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             SolVoiceOrb(
@@ -327,7 +425,7 @@ fun HomeScreen(
 
         // Quick Persian Command Chips
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(QUICK_COMMANDS) { sample ->
@@ -348,9 +446,8 @@ fun HomeScreen(
             }
         }
 
-        // Multi-Step Task Card (when running)
         if (activeTask != null) {
-            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
                 ActiveTaskProgressCard(
                     task = activeTask,
                     onDismiss = onDismissTaskCard,

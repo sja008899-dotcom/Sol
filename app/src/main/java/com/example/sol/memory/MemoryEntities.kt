@@ -52,3 +52,40 @@ data class HistoryEntity(
     val status: String = "COMPLETED",
     val createdAt: Long = System.currentTimeMillis(),
 )
+
+@Entity(tableName = "books")
+data class BookKnowledgeEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val author: String = "",
+    val subjects: String = "",
+    val summaryText: String,
+    val voiceNotes: String = "",
+    val sourceType: String = "INTERNET", // INTERNET_OPEN_LIBRARY, INTERNET_GUTENDEX, LOCAL_FILE
+    val sourceUrl: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(
+    tableName = "sol_roles",
+    indices = [Index(value = ["normalizedRoleName"], unique = true)]
+)
+data class SolRoleEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val roleName: String,
+    val normalizedRoleName: String,
+    val instructions: String,
+    val linkedBookTitle: String = "",
+    val isActive: Boolean = true,
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "background_logs")
+data class BackgroundJobLogEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val jobKey: String,
+    val titleFa: String,
+    val status: String, // SCHEDULED, RUNNING, COMPLETED, FAILED
+    val detailFa: String = "",
+    val executedAt: Long = System.currentTimeMillis(),
+)

@@ -1,6 +1,8 @@
 package com.example
 
 import android.app.Application
+import com.example.sol.background.BackgroundTaskCoordinator
+import com.example.sol.background.SolNotificationHelper
 import com.example.sol.brain.CommandBrain
 import com.example.sol.brain.EntityExtractor
 import com.example.sol.brain.IntentParser
@@ -10,7 +12,9 @@ import com.example.sol.communication.CallScriptManager
 import com.example.sol.communication.MessageManager
 import com.example.sol.contacts.ContactManager
 import com.example.sol.device.DeviceController
+import com.example.sol.knowledge.BookWebFetcher
 import com.example.sol.memory.HistoryRepository
+import com.example.sol.memory.KnowledgeRepository
 import com.example.sol.memory.LocationRepository
 import com.example.sol.memory.MemoryDatabase
 import com.example.sol.memory.MemoryRepository
@@ -32,6 +36,7 @@ class SolAppContainer(application: Application) {
     val personRepository = PersonRepository(dao)
     val locationRepository = LocationRepository(dao)
     val historyRepository = HistoryRepository(dao)
+    val knowledgeRepository = KnowledgeRepository(dao)
     val preferencesRepository = PreferencesRepository(application)
 
     val audioManager = SolAudioManager(application)
@@ -45,6 +50,9 @@ class SolAppContainer(application: Application) {
     val callManager = CallManager(application)
     val messageManager = MessageManager(application)
 
+    val bookWebFetcher = BookWebFetcher(application)
+    val backgroundTaskCoordinator = BackgroundTaskCoordinator(application, knowledgeRepository)
+
     val learningEngine = LearningEngine(memoryRepository, personRepository, locationRepository)
     val intentParser = IntentParser(EntityExtractor())
     val commandBrain = CommandBrain(
@@ -52,8 +60,10 @@ class SolAppContainer(application: Application) {
         learningEngine = learningEngine,
         memoryRepository = memoryRepository,
         locationRepository = locationRepository,
+        knowledgeRepository = knowledgeRepository,
         preferencesRepository = preferencesRepository,
         deviceController = deviceController,
+        backgroundCoordinator = backgroundTaskCoordinator,
     )
 
     val confirmationManager = ConfirmationManager()
@@ -78,6 +88,7 @@ class SolApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        SolNotificationHelper.ensureChannels(this)
         container = SolAppContainer(this)
     }
 

@@ -11,8 +11,11 @@ import androidx.room.RoomDatabase
         PersonEntity::class,
         LocationEntity::class,
         HistoryEntity::class,
+        BookKnowledgeEntity::class,
+        SolRoleEntity::class,
+        BackgroundJobLogEntity::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = false,
 )
 abstract class MemoryDatabase : RoomDatabase() {
@@ -28,7 +31,10 @@ abstract class MemoryDatabase : RoomDatabase() {
                     context.applicationContext,
                     MemoryDatabase::class.java,
                     "sol_memory.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
+                    .also { INSTANCE = it }
             }
         }
     }

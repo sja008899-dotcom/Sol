@@ -165,4 +165,82 @@ class HistoryRepository(private val dao: MemoryDao) {
     suspend fun clearAll() {
         dao.clearHistory()
     }
+
+    suspend fun trimKeepingLatest(keepCount: Int = 100): Int {
+        return dao.trimHistoryKeepingLatest(keepCount)
+    }
+}
+
+class KnowledgeRepository(private val dao: MemoryDao) {
+    val books: Flow<List<BookKnowledgeEntity>> = dao.observeBooks()
+    val roles: Flow<List<SolRoleEntity>> = dao.observeRoles()
+    val backgroundLogs: Flow<List<BackgroundJobLogEntity>> = dao.observeBackgroundLogs()
+
+    suspend fun getAllBooksOnce(): List<BookKnowledgeEntity> = dao.getAllBooksOnce()
+
+    suspend fun getAllRolesOnce(): List<SolRoleEntity> = dao.getAllRolesOnce()
+
+    suspend fun saveBook(book: BookKnowledgeEntity): Long = dao.upsertBook(book)
+
+    suspend fun attachVoiceNoteToBook(bookId: Long, voiceNote: String) {
+        val book = dao.getAllBooksOnce().firstOrNull { it.id == bookId } ?: return
+        val combined = listOf(book.voiceNotes, voiceNote.trim())
+            .filter { it.isNotBlank() }
+            .joinToString("\n• ")
+        dao.upsertBook(book.copy(voiceNotes = combined))
+    }
+
+    suspend fun deleteBook(id: Long) {
+        dao.deleteBookById(id)
+    }
+
+    suspend fun saveRole(
+        roleName: String,
+        instructions: String,
+        linkedBookTitle: String = "",
+        isActive: Boolean = true,
+        existingId: Long = 0,
+    ): Long {
+        val norm = PersianNormalizer.normalize(roleName)
+        val existing = if (existingId != 0L) null else dao.findRoleByNormalizedName(norm)
+        return dao.upsertRole(
+            SolRoleEntity(
+                id = if (existingId != 0L) existingId else (existing?.id ?: 0),
+                roleName = roleName.trim(),
+                normalizedRoleName = norm,
+                instructions = instructions.trim(),
+                linkedBookTitle = linkedBookTitle.trim().ifBlank { existing?.linkedBookTitle ?: "" },
+                isActive = isActive,
+                updatedAt = System.currentTimeMillis(),
+            )
+        )
+    }
+
+    suspend fun toggleRoleActive(role: SolRoleEntity, active: Boolean) {
+        dao.upsertRole(role.copy(isActive = active, updatedAt = System.currentTimeMillis()))
+    }
+
+    suspend fun deleteRole(id: Long) {
+        dao.deleteRoleById(id)
+    }
+
+    suspend fun logBackgroundJob(
+        jobKey: String,
+        titleFa: String,
+        status: String,
+        detailFa: String,
+    ) {
+        dao.insertBackgroundLog(
+            BackgroundJobLogEntity(
+                jobKey = jobKey,
+                titleFa = titleFa,
+                status = status,
+                detailFa = detailFa,
+            )
+        )
+    }
+
+    suspend fun clearBackgroundLogs() {
+        dao.clearBackgroundLogs()
+    }
 }

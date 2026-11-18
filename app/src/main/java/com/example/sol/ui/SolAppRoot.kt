@@ -1,6 +1,7 @@
 package com.example.sol.ui
 
 import android.Manifest
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -83,6 +84,11 @@ fun SolAppRoot(viewModel: SolViewModel) {
     val persons by viewModel.persons.collectAsStateWithLifecycle()
     val locations by viewModel.locations.collectAsStateWithLifecycle()
     val history by viewModel.history.collectAsStateWithLifecycle()
+    val books by viewModel.books.collectAsStateWithLifecycle()
+    val roles by viewModel.roles.collectAsStateWithLifecycle()
+    val backgroundLogs by viewModel.backgroundLogs.collectAsStateWithLifecycle()
+    val enabledPeriodicJobs by viewModel.enabledPeriodicJobs.collectAsStateWithLifecycle()
+
     val listeningState by viewModel.listeningState.collectAsStateWithLifecycle()
     val partialSpeechText by viewModel.partialSpeechText.collectAsStateWithLifecycle()
     val micRms by viewModel.micRms.collectAsStateWithLifecycle()
@@ -91,6 +97,11 @@ fun SolAppRoot(viewModel: SolViewModel) {
     val persianVoices by viewModel.persianVoices.collectAsStateWithLifecycle()
     val activeTask by viewModel.activeTask.collectAsStateWithLifecycle()
     val pendingConfirmation by viewModel.pendingConfirmation.collectAsStateWithLifecycle()
+    val pendingBookFetch by viewModel.pendingBookFetch.collectAsStateWithLifecycle()
+    val isFetchingBook by viewModel.isFetchingBook.collectAsStateWithLifecycle()
+    val voiceRoleSession by viewModel.voiceRoleSession.collectAsStateWithLifecycle()
+    val showCapabilitiesSheet by viewModel.showCapabilitiesSheet.collectAsStateWithLifecycle()
+
     val inputText by viewModel.inputText.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val contacts by viewModel.contacts.collectAsStateWithLifecycle()
@@ -100,6 +111,7 @@ fun SolAppRoot(viewModel: SolViewModel) {
     val securityAudit by viewModel.securityAudit.collectAsStateWithLifecycle()
     val hasMicPermission by viewModel.hasMicPermission.collectAsStateWithLifecycle()
     val hasContactsPermission by viewModel.hasContactsPermission.collectAsStateWithLifecycle()
+    val hasNotificationPermission by viewModel.hasNotificationPermission.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -109,7 +121,11 @@ fun SolAppRoot(viewModel: SolViewModel) {
     ) { granted ->
         viewModel.refreshSystemSnapshots()
         if (granted) {
-            viewModel.startVoiceListening()
+            if (voiceRoleSession != null) {
+                viewModel.listenVoiceExplanationForRole()
+            } else {
+                viewModel.startVoiceListening()
+            }
         } else {
             scope.launch {
                 snackbarHostState.showSnackbar("مجوز میکروفون رد شد؛ می‌توانید فرمان را تایپ کنید.")
@@ -128,11 +144,33 @@ fun SolAppRoot(viewModel: SolViewModel) {
         }
     }
 
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        viewModel.refreshSystemSnapshots()
+    }
+
+    val localBookPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importLocalBookFile(uri)
+        }
+    }
+
     val handleMicClick: () -> Unit = {
         if (listeningState is VoiceListeningState.Listening) {
             viewModel.stopVoiceListening()
         } else if (hasMicPermission) {
             viewModel.startVoiceListening()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    val handleRoleVoiceClick: () -> Unit = {
+        if (hasMicPermission) {
+            viewModel.listenVoiceExplanationForRole()
         } else {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -165,6 +203,29 @@ fun SolAppRoot(viewModel: SolViewModel) {
                 )
             }
 
+            pendingBookFetch?.let { bookReq ->
+                InternetBookFetchDialog(
+                    pending = bookReq,
+                    onUpdateQuery = viewModel::updatePendingBookQuery,
+                    onConfirmFetch = viewModel::confirmInternetBookFetch,
+                    onPickLocalFile = {
+                        localBookPickerLauncher.launch(arrayOf("text/plain", "text/*"))
+                    },
+                    onDismiss = viewModel::dismissPendingBookFetch,
+                )
+            }
+
+            voiceRoleSession?.let { session ->
+                VoiceRoleTeachingDialog(
+                    session = session,
+                    onUpdateDraft = viewModel::updateVoiceRoleDraft,
+                    onStartVoiceExplanation = handleRoleVoiceClick,
+                    onStopVoiceExplanation = viewModel::stopVoiceExplanationListening,
+                    onSave = viewModel::saveVoiceRoleTeaching,
+                    onDismiss = viewModel::dismissVoiceRoleSession,
+                )
+            }
+
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val useNavRail = maxWidth >= 600.dp
 
@@ -173,7 +234,7 @@ fun SolAppRoot(viewModel: SolViewModel) {
                     contentWindowInsets = WindowInsets.safeDrawing,
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     bottomBar = {
-                        if (!useNavRail) {
+                        if (!useNavRail && !showCapabilitiesSheet) {
                             NavigationBar(
                                 windowInsets = WindowInsets.navigationBars,
                                 containerColor = MaterialTheme.colorScheme.surface,
@@ -197,148 +258,190 @@ fun SolAppRoot(viewModel: SolViewModel) {
                         }
                     },
                 ) { innerPadding ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
-                    ) {
-                        if (useNavRail) {
-                            NavigationRail(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                            ) {
-                                NAV_ITEMS.forEach { item ->
-                                    val selected = currentRoute == item.route
-                                    NavigationRailItem(
-                                        selected = selected,
-                                        onClick = { navigateTo(item.route) },
-                                        icon = {
-                                            Icon(
-                                                imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                                contentDescription = item.labelFa,
-                                            )
-                                        },
-                                        label = { Text(item.labelFa) },
-                                        modifier = Modifier.testTag("nav_${item.route}"),
-                                    )
+                    if (showCapabilitiesSheet) {
+                        CapabilitiesScreen(
+                            enabledPeriodicJobs = enabledPeriodicJobs,
+                            backgroundLogs = backgroundLogs,
+                            hasNotificationPermission = hasNotificationPermission,
+                            onRequestNotificationPermission = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                            },
+                            onRunBackgroundJob = { jobId ->
+                                if (!hasNotificationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                                viewModel.runBackgroundJobNow(jobId)
+                            },
+                            onTogglePeriodicJob = { jobId, enable ->
+                                if (enable && !hasNotificationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                                viewModel.togglePeriodicBackgroundJob(jobId, enable)
+                            },
+                            onClearBackgroundLogs = viewModel::clearBackgroundLogs,
+                            onOpenBookRoleStudio = { viewModel.requestBookRoleStudio() },
+                            onRunSampleCommand = { cmd -> viewModel.submitCommand(cmd) },
+                            onBack = { viewModel.openCapabilitiesSheet(false) },
+                            modifier = Modifier.padding(innerPadding),
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(innerPadding),
+                        ) {
+                            if (useNavRail) {
+                                NavigationRail(
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                ) {
+                                    NAV_ITEMS.forEach { item ->
+                                        val selected = currentRoute == item.route
+                                        NavigationRailItem(
+                                            selected = selected,
+                                            onClick = { navigateTo(item.route) },
+                                            icon = {
+                                                Icon(
+                                                    imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                                                    contentDescription = item.labelFa,
+                                                )
+                                            },
+                                            label = { Text(item.labelFa) },
+                                            modifier = Modifier.testTag("nav_${item.route}"),
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        NavHost(
-                            navController = navController,
-                            startDestination = ROUTE_HOME,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxSize()
-                                .widthIn(max = 720.dp)
-                                .align(Alignment.CenterVertically),
-                        ) {
-                            composable(ROUTE_HOME) {
-                                HomeScreen(
-                                    preferences = preferences,
-                                    batteryStatus = batteryStatus,
-                                    listeningState = listeningState,
-                                    partialSpeechText = partialSpeechText,
-                                    micRms = micRms,
-                                    ttsAvailability = ttsAvailability,
-                                    isSpeaking = isSpeaking,
-                                    messages = messages,
-                                    inputText = inputText,
-                                    activeTask = activeTask,
-                                    savedLocations = locations,
-                                    onInputChange = viewModel::updateInputText,
-                                    onSendCommand = { viewModel.submitCommand() },
-                                    onQuickCommand = { cmd -> viewModel.submitCommand(cmd) },
-                                    onMicClick = handleMicClick,
-                                    onClearVoiceError = viewModel::clearVoiceError,
-                                    onSpeakMessage = viewModel::speakText,
-                                    onStopSpeaking = viewModel::stopSpeaking,
-                                    onConfirmCurrentLocation = viewModel::confirmCurrentLocation,
-                                    onDismissTaskCard = viewModel::dismissActiveTaskCard,
-                                )
-                            }
+                            NavHost(
+                                navController = navController,
+                                startDestination = ROUTE_HOME,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxSize()
+                                    .widthIn(max = 720.dp)
+                                    .align(Alignment.CenterVertically),
+                            ) {
+                                composable(ROUTE_HOME) {
+                                    HomeScreen(
+                                        preferences = preferences,
+                                        batteryStatus = batteryStatus,
+                                        listeningState = listeningState,
+                                        partialSpeechText = partialSpeechText,
+                                        micRms = micRms,
+                                        ttsAvailability = ttsAvailability,
+                                        isSpeaking = isSpeaking,
+                                        isFetchingBook = isFetchingBook,
+                                        activeRoles = roles.filter { it.isActive },
+                                        messages = messages,
+                                        inputText = inputText,
+                                        activeTask = activeTask,
+                                        savedLocations = locations,
+                                        onInputChange = viewModel::updateInputText,
+                                        onSendCommand = { viewModel.submitCommand() },
+                                        onQuickCommand = { cmd -> viewModel.submitCommand(cmd) },
+                                        onMicClick = handleMicClick,
+                                        onClearVoiceError = viewModel::clearVoiceError,
+                                        onSpeakMessage = viewModel::speakText,
+                                        onStopSpeaking = viewModel::stopSpeaking,
+                                        onConfirmCurrentLocation = viewModel::confirmCurrentLocation,
+                                        onDismissTaskCard = viewModel::dismissActiveTaskCard,
+                                        onOpenCapabilities = { viewModel.openCapabilitiesSheet(true) },
+                                        onOpenBookRoleStudio = { viewModel.requestBookRoleStudio() },
+                                    )
+                                }
 
-                            composable(ROUTE_MEMORY) {
-                                MemoryScreen(
-                                    memories = memories,
-                                    persons = persons,
-                                    locations = locations,
-                                    confirmedCurrentLocation = preferences.confirmedCurrentLocation,
-                                    onAddOrUpdateAlias = viewModel::addOrUpdateAlias,
-                                    onAddFact = viewModel::addFact,
-                                    onUpdateMemory = viewModel::updateMemoryItem,
-                                    onDeleteMemory = viewModel::deleteMemoryItem,
-                                    onSavePerson = viewModel::savePerson,
-                                    onDeletePerson = viewModel::deletePerson,
-                                    onSaveLocation = viewModel::saveLocation,
-                                    onDeleteLocation = viewModel::deleteLocation,
-                                )
-                            }
+                                composable(ROUTE_MEMORY) {
+                                    MemoryScreen(
+                                        memories = memories,
+                                        persons = persons,
+                                        locations = locations,
+                                        books = books,
+                                        roles = roles,
+                                        confirmedCurrentLocation = preferences.confirmedCurrentLocation,
+                                        onAddOrUpdateAlias = viewModel::addOrUpdateAlias,
+                                        onAddFact = viewModel::addFact,
+                                        onUpdateMemory = viewModel::updateMemoryItem,
+                                        onDeleteMemory = viewModel::deleteMemoryItem,
+                                        onSavePerson = viewModel::savePerson,
+                                        onDeletePerson = viewModel::deletePerson,
+                                        onSaveLocation = viewModel::saveLocation,
+                                        onDeleteLocation = viewModel::deleteLocation,
+                                        onOpenBookRoleStudio = { viewModel.requestBookRoleStudio() },
+                                        onTeachVoiceForBook = viewModel::openVoiceRoleTeachingForBook,
+                                        onSpeakBook = viewModel::speakText,
+                                        onDeleteBook = viewModel::deleteBook,
+                                        onToggleRoleActive = viewModel::toggleRoleActive,
+                                        onDeleteRole = viewModel::deleteRole,
+                                    )
+                                }
 
-                            composable(ROUTE_CONTACTS) {
-                                ContactsScreen(
-                                    contacts = contacts,
-                                    hasContactsPermission = hasContactsPermission,
-                                    onRequestContactsPermission = {
-                                        contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-                                    },
-                                    onCallContact = { contact ->
-                                        viewModel.initiateContactAction(contact, CommunicationChannel.CALL)
-                                    },
-                                    onSmsContact = { contact ->
-                                        viewModel.initiateContactAction(contact, CommunicationChannel.SMS)
-                                    },
-                                    onSaveToMemory = { contact ->
-                                        viewModel.savePerson(
-                                            name = contact.name,
-                                            phone = contact.phone,
-                                            relation = contact.relation,
-                                            callScriptNote = contact.callScriptNote,
-                                        )
-                                        scope.launch {
-                                            snackbarHostState.showSnackbar("${contact.name} در حافظه Sol ذخیره شد")
-                                        }
-                                    },
-                                )
-                            }
+                                composable(ROUTE_CONTACTS) {
+                                    ContactsScreen(
+                                        contacts = contacts,
+                                        hasContactsPermission = hasContactsPermission,
+                                        onRequestContactsPermission = {
+                                            contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                                        },
+                                        onCallContact = { contact ->
+                                            viewModel.initiateContactAction(contact, CommunicationChannel.CALL)
+                                        },
+                                        onSmsContact = { contact ->
+                                            viewModel.initiateContactAction(contact, CommunicationChannel.SMS)
+                                        },
+                                        onSaveToMemory = { contact ->
+                                            viewModel.savePerson(
+                                                name = contact.name,
+                                                phone = contact.phone,
+                                                relation = contact.relation,
+                                                callScriptNote = contact.callScriptNote,
+                                            )
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar("${contact.name} در حافظه Sol ذخیره شد")
+                                            }
+                                        },
+                                    )
+                                }
 
-                            composable(ROUTE_HISTORY) {
-                                HistoryScreen(
-                                    history = history,
-                                    onSpeakText = viewModel::speakText,
-                                    onDeleteItem = viewModel::deleteHistoryEntry,
-                                    onClearAll = viewModel::clearHistory,
-                                )
-                            }
+                                composable(ROUTE_HISTORY) {
+                                    HistoryScreen(
+                                        history = history,
+                                        onSpeakText = viewModel::speakText,
+                                        onDeleteItem = viewModel::deleteHistoryEntry,
+                                        onClearAll = viewModel::clearHistory,
+                                    )
+                                }
 
-                            composable(ROUTE_SETTINGS) {
-                                SettingsScreen(
-                                    preferences = preferences,
-                                    ttsAvailability = ttsAvailability,
-                                    persianVoices = persianVoices,
-                                    batteryStatus = batteryStatus,
-                                    volumeStatus = volumeStatus,
-                                    launchableApps = launchableApps,
-                                    securityAudit = securityAudit,
-                                    onOwnerNameChange = viewModel::setOwnerName,
-                                    onVoicePersonaChange = viewModel::setVoicePersona,
-                                    onSelectTtsVoice = viewModel::setPreferredTtsVoice,
-                                    onSpeechRateChange = viewModel::setSpeechRate,
-                                    onAutoSpeakChange = viewModel::setAutoSpeak,
-                                    onTestVoice = viewModel::testVoiceSample,
-                                    onInvocationModeChange = viewModel::setInvocationMode,
-                                    onDeliveryPreferenceChange = viewModel::setDeliveryPreference,
-                                    onConfirmationPolicyChange = viewModel::setConfirmationPolicy,
-                                    onDarkThemeChange = viewModel::setDarkTheme,
-                                    onVolumePercentChange = viewModel::setMediaVolumePercent,
-                                    onOpenWifi = viewModel::openWifiSettings,
-                                    onOpenLocation = viewModel::openLocationSettings,
-                                    onOpenBluetooth = viewModel::openBluetoothSettings,
-                                    onOpenBattery = viewModel::openBatterySettings,
-                                    onLaunchApp = { label ->
-                                        viewModel.launchInstalledApp(label)
-                                    },
-                                )
+                                composable(ROUTE_SETTINGS) {
+                                    SettingsScreen(
+                                        preferences = preferences,
+                                        ttsAvailability = ttsAvailability,
+                                        persianVoices = persianVoices,
+                                        batteryStatus = batteryStatus,
+                                        volumeStatus = volumeStatus,
+                                        launchableApps = launchableApps,
+                                        securityAudit = securityAudit,
+                                        onOwnerNameChange = viewModel::setOwnerName,
+                                        onVoicePersonaChange = viewModel::setVoicePersona,
+                                        onSelectTtsVoice = viewModel::setPreferredTtsVoice,
+                                        onSpeechRateChange = viewModel::setSpeechRate,
+                                        onAutoSpeakChange = viewModel::setAutoSpeak,
+                                        onTestVoice = viewModel::testVoiceSample,
+                                        onInvocationModeChange = viewModel::setInvocationMode,
+                                        onDeliveryPreferenceChange = viewModel::setDeliveryPreference,
+                                        onConfirmationPolicyChange = viewModel::setConfirmationPolicy,
+                                        onDarkThemeChange = viewModel::setDarkTheme,
+                                        onVolumePercentChange = viewModel::setMediaVolumePercent,
+                                        onOpenWifi = viewModel::openWifiSettings,
+                                        onOpenLocation = viewModel::openLocationSettings,
+                                        onOpenBluetooth = viewModel::openBluetoothSettings,
+                                        onOpenBattery = viewModel::openBatterySettings,
+                                        onLaunchApp = { label ->
+                                            viewModel.launchInstalledApp(label)
+                                        },
+                                    )
+                                }
                             }
                         }
                     }

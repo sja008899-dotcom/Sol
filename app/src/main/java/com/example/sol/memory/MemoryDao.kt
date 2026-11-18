@@ -74,4 +74,46 @@ interface MemoryDao {
 
     @Query("DELETE FROM history")
     suspend fun clearHistory()
+
+    @Query("DELETE FROM history WHERE id NOT IN (SELECT id FROM history ORDER BY createdAt DESC LIMIT :keepCount)")
+    suspend fun trimHistoryKeepingLatest(keepCount: Int): Int
+
+    // --- Learned Books ---
+    @Query("SELECT * FROM books ORDER BY createdAt DESC")
+    fun observeBooks(): Flow<List<BookKnowledgeEntity>>
+
+    @Query("SELECT * FROM books ORDER BY createdAt DESC")
+    suspend fun getAllBooksOnce(): List<BookKnowledgeEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertBook(book: BookKnowledgeEntity): Long
+
+    @Query("DELETE FROM books WHERE id = :id")
+    suspend fun deleteBookById(id: Long): Int
+
+    // --- Learned Roles / Personas ---
+    @Query("SELECT * FROM sol_roles ORDER BY updatedAt DESC")
+    fun observeRoles(): Flow<List<SolRoleEntity>>
+
+    @Query("SELECT * FROM sol_roles ORDER BY updatedAt DESC")
+    suspend fun getAllRolesOnce(): List<SolRoleEntity>
+
+    @Query("SELECT * FROM sol_roles WHERE normalizedRoleName = :normalized LIMIT 1")
+    suspend fun findRoleByNormalizedName(normalized: String): SolRoleEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertRole(role: SolRoleEntity): Long
+
+    @Query("DELETE FROM sol_roles WHERE id = :id")
+    suspend fun deleteRoleById(id: Long): Int
+
+    // --- Background Job Logs ---
+    @Query("SELECT * FROM background_logs ORDER BY executedAt DESC LIMIT 100")
+    fun observeBackgroundLogs(): Flow<List<BackgroundJobLogEntity>>
+
+    @Insert
+    suspend fun insertBackgroundLog(log: BackgroundJobLogEntity): Long
+
+    @Query("DELETE FROM background_logs")
+    suspend fun clearBackgroundLogs()
 }

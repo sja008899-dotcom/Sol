@@ -32,9 +32,12 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.HourglassTop
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sms
@@ -44,6 +47,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -120,7 +124,7 @@ fun SolVoiceOrb(
 
     Box(
         modifier = modifier
-            .size(116.dp)
+            .size(96.dp)
             .clip(CircleShape)
             .clickable(onClick = onClick)
             .testTag("voice_orb_button"),
@@ -130,11 +134,10 @@ fun SolVoiceOrb(
             val center = Offset(size.width / 2f, size.height / 2f)
             val baseRadius = size.minDimension * 0.34f * dynamicScale
 
-            // Outer atmospheric glow
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        orbCoreColor.copy(alpha = if (isListening) 0.38f else 0.20f),
+                        orbCoreColor.copy(alpha = if (isListening) 0.40f else 0.22f),
                         Color.Transparent,
                     ),
                     center = center,
@@ -144,20 +147,18 @@ fun SolVoiceOrb(
                 center = center,
             )
 
-            // Outer harmonic ring
             drawCircle(
-                color = orbCoreColor.copy(alpha = if (isListening) 0.55f else 0.28f),
+                color = orbCoreColor.copy(alpha = if (isListening) 0.58f else 0.32f),
                 radius = baseRadius * 1.24f,
                 center = center,
                 style = Stroke(width = 2.dp.toPx()),
             )
 
-            // Inner glowing core
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        orbCoreColor.copy(alpha = 0.95f),
-                        orbCoreColor.copy(alpha = 0.45f),
+                        orbCoreColor.copy(alpha = 0.96f),
+                        orbCoreColor.copy(alpha = 0.46f),
                     ),
                     center = center,
                     radius = baseRadius,
@@ -176,9 +177,206 @@ fun SolVoiceOrb(
             },
             contentDescription = if (isListening) "توقف شنود" else "صحبت با Sol",
             tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(34.dp),
+            modifier = Modifier.size(30.dp),
         )
     }
+}
+
+@Composable
+fun InternetBookFetchDialog(
+    pending: PendingBookFetchConfirmation,
+    onUpdateQuery: (String, String) -> Unit,
+    onConfirmFetch: (runInBackground: Boolean) -> Unit,
+    onPickLocalFile: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var query by remember(pending.query) { mutableStateOf(pending.query) }
+    var roleHint by remember(pending.roleHint) { mutableStateOf(pending.roleHint) }
+    var runBg by remember(pending.runInBackground) { mutableStateOf(pending.runInBackground) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Language,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        title = { Text("تأیید اتصال اختیاری برای دریافت کتاب") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "طبق قانون امنیتی Sol، اتصال به اینترنت فقط با تأیید صریح شما برای جست‌وجوی کتاب در مخازن عمومی (Gutendex / Open Library) انجام می‌شود.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = {
+                        query = it
+                        onUpdateQuery(it, roleHint)
+                    },
+                    label = { Text("نام کتاب (فارسی یا انگلیسی)") },
+                    placeholder = { Text("مثلاً: Atomic Habits یا شازده کوچولو") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = roleHint,
+                    onValueChange = {
+                        roleHint = it
+                        onUpdateQuery(query, it)
+                    },
+                    label = { Text("نقش پیشنهادی برای Sol (اختیاری)") },
+                    placeholder = { Text("مثلاً: مربی بهره‌وری و عادت‌های روزانه") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { runBg = !runBg },
+                ) {
+                    Checkbox(checked = runBg, onCheckedChange = { runBg = it })
+                    Text("دریافت در پس‌زمینه (WorkManager) با اعلان", style = MaterialTheme.typography.bodySmall)
+                }
+                OutlinedButton(
+                    onClick = {
+                        onDismiss()
+                        onPickLocalFile()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("انتخاب فایل متنی کتاب از گوشی (بدون اینترنت)")
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirmFetch(runBg) },
+                enabled = query.isNotBlank(),
+            ) {
+                Text(if (runBg) "زمان‌بندی در پس‌زمینه" else "تأیید و دریافت کتاب")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("لغو") }
+        },
+    )
+}
+
+@Composable
+fun VoiceRoleTeachingDialog(
+    session: VoiceRoleTeachingSession,
+    onUpdateDraft: (roleName: String, explanation: String) -> Unit,
+    onStartVoiceExplanation: () -> Unit,
+    onStopVoiceExplanation: () -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.MenuBook,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+            )
+        },
+        title = { Text("آموزش نقش و حافظه با صدای شما") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                session.book?.let { b ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "کتاب ذخیره‌شده: ${b.title}",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                text = "نویسنده: ${b.author}",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Text(
+                                text = b.summaryText.take(160) + if (b.summaryText.length > 160) "…" else "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = session.roleNameDraft,
+                    onValueChange = { onUpdateDraft(it, session.voiceExplanationDraft) },
+                    label = { Text("نام نقش جدید Sol") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Button(
+                    onClick = {
+                        if (session.isListeningForExplanation) onStopVoiceExplanation() else onStartVoiceExplanation()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (session.isListeningForExplanation) {
+                            MaterialTheme.colorScheme.secondary
+                        } else {
+                            MaterialTheme.colorScheme.primaryContainer
+                        },
+                        contentColor = if (session.isListeningForExplanation) {
+                            MaterialTheme.colorScheme.onSecondary
+                        } else {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        },
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(
+                        imageVector = if (session.isListeningForExplanation) Icons.Default.Stop else Icons.Default.Mic,
+                        contentDescription = null,
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        if (session.isListeningForExplanation) {
+                            "در حال شنود توضیح صوتی شما… (توقف)"
+                        } else {
+                            "بیان توضیح صوتی شما درباره کتاب و نقش"
+                        }
+                    )
+                }
+
+                OutlinedTextField(
+                    value = session.voiceExplanationDraft,
+                    onValueChange = { onUpdateDraft(session.roleNameDraft, it) },
+                    label = { Text("توضیحات صوتی / متنی شما برای Sol") },
+                    placeholder = { Text("مثلاً: بر اساس این کتاب، هر روز صبح برنامه کاری من را اولویت‌بندی کن…") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = onSave) {
+                Text("ذخیره در حافظه و فعال‌سازی نقش")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("بستن") }
+        },
+    )
 }
 
 @Composable

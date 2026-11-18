@@ -1,8 +1,11 @@
 package com.example.sol.brain
 
+import com.example.sol.background.BackgroundTaskCoordinator
 import com.example.sol.device.DeviceController
+import com.example.sol.memory.KnowledgeRepository
 import com.example.sol.memory.LocationRepository
 import com.example.sol.memory.MemoryRepository
+import com.example.sol.memory.PersianNormalizer
 import com.example.sol.memory.PreferencesRepository
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -13,26 +16,55 @@ class CommandBrain(
     private val learningEngine: LearningEngine,
     private val memoryRepository: MemoryRepository,
     private val locationRepository: LocationRepository,
+    private val knowledgeRepository: KnowledgeRepository,
     private val preferencesRepository: PreferencesRepository,
     private val deviceController: DeviceController,
+    private val backgroundCoordinator: BackgroundTaskCoordinator,
 ) {
     suspend fun process(rawInput: String): BrainExecutionResult {
         val parsed = parser.parse(rawInput)
         val prefs = preferencesRepository.getSnapshot()
 
         return when (parsed.action) {
-            SolAction.GREETING -> BrainExecutionResult(
-                replyText = "سلام ${prefs.ownerName}. من Sol هستم و کاملاً آفلاین آماده‌ام. چه کاری انجام بدهم؟",
-                parsedCommand = parsed,
-            )
+            SolAction.GREETING -> {
+                val activeRole = knowledgeRepository.getAllRolesOnce().firstOrNull { it.isActive }
+                val roleNote = if (activeRole != null) {
+                    " (نقش فعال: ${activeRole.roleName})"
+                } else {
+                    ""
+                }
+                BrainExecutionResult(
+                    replyText = "سلام ${prefs.ownerName}. من Sol هستم و آماده‌ام$roleNote. چه کاری انجام بدهم؟",
+                    parsedCommand = parsed,
+                )
+            }
 
-            SolAction.IDENTITY -> BrainExecutionResult(
-                replyText = "من Sol هستم؛ دستیار شخصی آفلاین و قانون‌محور شما. تمام حافظه‌ام روی خود گوشی ذخیره می‌شود و هیچ داده‌ای به اینترنت نمی‌فرستم.",
+            SolAction.IDENTITY -> {
+                val roles = knowledgeRepository.getAllRolesOnce().filter { it.isActive }
+                val booksCount = knowledgeRepository.getAllBooksOnce().size
+                val extra = buildString {
+                    if (roles.isNotEmpty()) {
+                        append("\nنقش‌های فعال آموخته‌شده: ")
+                        append(roles.joinToString("، ") { it.roleName })
+                    }
+                    if (booksCount > 0) {
+                        append("\nتعداد کتاب‌های ذخیره‌شده در حافظه محلی: $booksCount")
+                    }
+                }
+                BrainExecutionResult(
+                    replyText = "من Sol هستم؛ دستیار شخصی آفلاین و قانون‌محور شما. فقط با اجازهٔ صریح شما به اینترنت می‌روم و پس از ذخیره در حافظه محلی کاملاً مستقل عمل می‌کنم.$extra",
+                    parsedCommand = parsed,
+                )
+            }
+
+            SolAction.SHOW_CAPABILITIES -> BrainExecutionResult(
+                replyText = "فهرست کامل ۲۰ قابلیت Sol (شامل ۱۰ اجرای پس‌زمینه، ۱ دستور پیشرفتهٔ اینترنت + کتاب + یادگیری نقش صوتی و ۹ قابلیت هوشمند) باز شد.",
                 parsedCommand = parsed,
+                pendingTask = PendingSolTask.OpenCapabilitiesCatalog(focusBackgroundOnly = false),
             )
 
             SolAction.HELP -> BrainExecutionResult(
-                replyText = "نمونه فرمان‌های من:\n• هر وقت می‌گم دفتر منظورم شرکت کارنو صنعت ماکیان است\n• الان شرکت هستم (ثبت موقعیت فعلی)\n• با علی تماس بگیر / به علی پیام بده که...\n• وضعیت شرکت را به علی اطلاع بده و بعد نتیجه را به من گزارش کن\n• وضعیت باتری چطوره؟ / وای‌فای را باز کن / صدا را زیاد کن",
+                replyText = "نمونه فرمان‌های Sol:\n• «۲۰ قابلیت» برای مشاهده کل ۱۰ اجرای پس‌زمینه و دستورهای پیشرفته\n• به اینترنت برو کتاب Atomic Habits را پیدا کن و با توضیحات صوتی من به حافظه و نقشت اضافه کن\n• ۵ دقیقه دیگر یادآوری کن با علی تماس بگیرم\n• از حافظه در پس‌زمینه پشتیبان بگیر\n• هر وقت می‌گم دفتر منظورم شرکت کارنو صنعت ماکیان است\n• وضعیت شرکت را به علی اطلاع بده و بعد نتیجه را به من گزارش کن",
                 parsedCommand = parsed,
             )
 
@@ -43,6 +75,85 @@ class CommandBrain(
                     replyText = "ساعت دستگاه $timeStr و تاریخ $dateStr است.",
                     parsedCommand = parsed,
                 )
+            }
+
+            SolAction.SCHEDULE_REMINDER -> {
+                val msg = parsed.message.orEmpty().ifBlank { "یادآور Sol" }
+                backgroundCoordinator.scheduleReminder(msg, parsed.delayMinutes)
+                knowledgeRepository.logBackgroundJob(
+                    jobKey = "bg_reminder",
+                    titleFa = "یادآور زمان‌بندی‌شده",
+                    status = "SCHEDULED",
+                    detailFa = "برای ${parsed.delayMinutes} دقیقه دیگر: $msg",
+                )
+                BrainExecutionResult(
+                    replyText = "یادآور پس‌زمینه برای ${parsed.delayMinutes} دقیقه دیگر تنظیم شد: «$msg».",
+                    parsedCommand = parsed,
+                )
+            }
+
+            SolAction.BACKGROUND_CONTROL -> {
+                val jobId = parsed.backgroundJobId ?: "bg_memory_backup"
+                val reply = backgroundCoordinator.triggerImmediateBackgroundJob(jobId)
+                BrainExecutionResult(replyText = reply, parsedCommand = parsed)
+            }
+
+            SolAction.WEB_BOOK_LEARN_ROLE -> {
+                val query = parsed.bookQuery.orEmpty().ifBlank { "Little Prince" }
+                BrainExecutionResult(
+                    replyText = "درخواست جست‌وجوی کتاب «$query» در اینترنت آماده شد؛ لطفاً اتصال اختیاری به اینترنت را تأیید کنید تا بعد با توضیحات صوتی شما به حافظه و نقش Sol اضافه شود.",
+                    parsedCommand = parsed,
+                    pendingTask = PendingSolTask.InternetBookRoleFetch(
+                        bookQuery = query,
+                        requestedRoleHint = parsed.roleName.orEmpty(),
+                        runInBackground = parsed.backgroundJobId != null,
+                    ),
+                )
+            }
+
+            SolAction.TEACH_ROLE_VOICE -> {
+                val roleName = parsed.roleName?.ifBlank { "دستیار تخصصی" } ?: "دستیار تخصصی"
+                val latestBook = knowledgeRepository.getAllBooksOnce().firstOrNull()
+                knowledgeRepository.saveRole(
+                    roleName = roleName,
+                    instructions = parsed.message.orEmpty(),
+                    linkedBookTitle = latestBook?.title.orEmpty(),
+                    isActive = true,
+                )
+                val bookSuffix = if (latestBook != null) " و به کتاب «${latestBook.title}» متصل شد" else ""
+                BrainExecutionResult(
+                    replyText = "نقش جدید «$roleName» با دستور شما ذخیره$bookSuffix و فعال شد.",
+                    parsedCommand = parsed,
+                )
+            }
+
+            SolAction.CONSULT_ROLE_BOOK -> {
+                val roles = knowledgeRepository.getAllRolesOnce().filter { it.isActive }
+                val books = knowledgeRepository.getAllBooksOnce()
+                val reply = if (roles.isEmpty() && books.isEmpty()) {
+                    "هنوز کتاب یا نقشی آموزش داده نشده است. می‌توانید بگویید: «به اینترنت برو کتاب ... را پیدا کن و با توضیحات صوتی من به حافظه و نقشت اضافه کن»."
+                } else {
+                    buildString {
+                        if (roles.isNotEmpty()) {
+                            val r = roles.first()
+                            append("بر اساس نقش فعال «${r.roleName}»")
+                            if (r.instructions.isNotBlank()) append(" (${r.instructions})")
+                            append(":\n")
+                        }
+                        val normQuery = PersianNormalizer.normalize(parsed.rawText)
+                        val matchedBook = books.firstOrNull {
+                            normQuery.contains(PersianNormalizer.normalize(it.title))
+                        } ?: books.firstOrNull()
+                        if (matchedBook != null) {
+                            append("📘 کتاب مرجع: ${matchedBook.title} (${matchedBook.author})\n")
+                            append("خلاصه: ${matchedBook.summaryText.take(360)}\n")
+                            if (matchedBook.voiceNotes.isNotBlank()) {
+                                append("🎙 یادداشت‌های صوتی شما:\n• ${matchedBook.voiceNotes}")
+                            }
+                        }
+                    }.trim()
+                }
+                BrainExecutionResult(replyText = reply, parsedCommand = parsed)
             }
 
             SolAction.LEARN_ALIAS -> {
@@ -113,16 +224,26 @@ class CommandBrain(
             SolAction.LIST_MEMORY -> {
                 val memories = memoryRepository.getAllOnce()
                 val locations = locationRepository.getAllOnce()
-                val reply = if (memories.isEmpty() && locations.isEmpty() && prefs.confirmedCurrentLocation.isBlank()) {
+                val books = knowledgeRepository.getAllBooksOnce()
+                val roles = knowledgeRepository.getAllRolesOnce()
+                val reply = if (memories.isEmpty() && locations.isEmpty() && books.isEmpty() && roles.isEmpty() && prefs.confirmedCurrentLocation.isBlank()) {
                     "هنوز چیزی در حافظهٔ شخصی ذخیره نشده است."
                 } else {
                     buildString {
                         if (prefs.confirmedCurrentLocation.isNotBlank()) {
                             append("موقعیت فعلی تأییدشده: ${prefs.confirmedCurrentLocation}\n")
                         }
+                        if (roles.isNotEmpty()) {
+                            append("نقش‌های Sol:\n")
+                            roles.forEach { r -> append("• ${r.roleName} (${if (r.isActive) "فعال" else "غیرفعال"})\n") }
+                        }
+                        if (books.isNotEmpty()) {
+                            append("کتاب‌های آموخته‌شده:\n")
+                            books.take(5).forEach { b -> append("• ${b.title} — ${b.author}\n") }
+                        }
                         if (memories.isNotEmpty()) {
                             append("یادگیری‌ها و نکات:\n")
-                            memories.take(15).forEach { m ->
+                            memories.take(12).forEach { m ->
                                 if (m.kind == "alias") {
                                     append("• «${m.keyText.removePrefix("alias:")}» ⟵ «${m.valueText}»\n")
                                 } else {
@@ -260,15 +381,37 @@ class CommandBrain(
 
             SolAction.UNKNOWN -> {
                 val (resolved, matched) = learningEngine.resolveAliasesInText(rawInput)
-                if (matched.isNotEmpty()) {
-                    val pairs = matched.joinToString("، ") { "«${it.first}» = «${it.second}»" }
-                    BrainExecutionResult(
-                        replyText = "طبق یادگیری قبلی ($pairs)، برداشت من این است: «$resolved».\nمی‌توانید بگویید با چه کسی تماس بگیرم یا چه نکته‌ای را ذخیره کنم.",
-                        parsedCommand = parsed,
-                    )
-                } else {
-                    BrainExecutionResult(
-                        replyText = "این فرمان را هنوز دقیق نشناختم. می‌توانید با «هر وقت می‌گم ... منظورم ... است» به من یاد بدهید یا «کمک» بنویسید.",
+                val activeRole = knowledgeRepository.getAllRolesOnce().firstOrNull { it.isActive }
+                val books = knowledgeRepository.getAllBooksOnce()
+                val normIn = PersianNormalizer.normalize(rawInput)
+                val bookMatch = books.firstOrNull {
+                    normIn.contains(PersianNormalizer.normalize(it.title)) ||
+                        (it.voiceNotes.isNotBlank() && PersianNormalizer.normalize(it.voiceNotes).split(" ").any { w -> w.length > 3 && normIn.contains(w) })
+                }
+
+                when {
+                    matched.isNotEmpty() -> {
+                        val pairs = matched.joinToString("، ") { "«${it.first}» = «${it.second}»" }
+                        BrainExecutionResult(
+                            replyText = "طبق یادگیری قبلی ($pairs)، برداشت من این است: «$resolved».",
+                            parsedCommand = parsed,
+                        )
+                    }
+                    bookMatch != null || activeRole != null -> {
+                        val rolePrefix = if (activeRole != null) "در نقش «${activeRole.roleName}»" else "طبق دانش ذخیره‌شده"
+                        val bookBody = if (bookMatch != null) {
+                            "\n📘 مرجع «${bookMatch.title}»: ${bookMatch.summaryText.take(260)}" +
+                                if (bookMatch.voiceNotes.isNotBlank()) "\n🎙 توضیح صوتی شما: ${bookMatch.voiceNotes}" else ""
+                        } else {
+                            "\nدستورالعمل نقش شما: ${activeRole?.instructions.orEmpty()}"
+                        }
+                        BrainExecutionResult(
+                            replyText = "$rolePrefix پاسخ می‌دهم:$bookBody",
+                            parsedCommand = parsed,
+                        )
+                    }
+                    else -> BrainExecutionResult(
+                        replyText = "این فرمان را هنوز دقیق نشناختم. می‌توانید «۲۰ قابلیت» را بزنید، یا با «هر وقت می‌گم ... منظورم ... است» یاد بدهید، یا کتابی را با توضیح صوتی به نقشم اضافه کنید.",
                         parsedCommand = parsed,
                     )
                 }
