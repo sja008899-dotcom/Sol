@@ -116,4 +116,36 @@ interface MemoryDao {
 
     @Query("DELETE FROM background_logs")
     suspend fun clearBackgroundLogs()
+
+    // --- Book Chunks (BM25 Offline RAG) ---
+    @Query("SELECT * FROM book_chunks ORDER BY bookId ASC, chunkIndex ASC")
+    suspend fun getAllBookChunksOnce(): List<BookChunkEntity>
+
+    @Query("SELECT * FROM book_chunks WHERE bookId = :bookId ORDER BY chunkIndex ASC")
+    suspend fun getChunksForBookOnce(bookId: Long): List<BookChunkEntity>
+
+    @Query("SELECT COUNT(*) FROM book_chunks")
+    fun observeChunkCount(): Flow<Int>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBookChunks(chunks: List<BookChunkEntity>)
+
+    @Query("DELETE FROM book_chunks WHERE bookId = :bookId")
+    suspend fun deleteChunksForBook(bookId: Long)
+
+    // --- Exact Scheduled Jalali Alarms ---
+    @Query("SELECT * FROM scheduled_alarms ORDER BY triggerAtMillis ASC")
+    fun observeScheduledAlarms(): Flow<List<ScheduledAlarmEntity>>
+
+    @Query("SELECT * FROM scheduled_alarms ORDER BY triggerAtMillis ASC")
+    suspend fun getAllAlarmsOnce(): List<ScheduledAlarmEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAlarm(alarm: ScheduledAlarmEntity): Long
+
+    @Query("UPDATE scheduled_alarms SET isTriggered = 1 WHERE requestCode = :requestCode")
+    suspend fun markAlarmTriggered(requestCode: Int)
+
+    @Query("DELETE FROM scheduled_alarms WHERE id = :id")
+    suspend fun deleteAlarmById(id: Long)
 }

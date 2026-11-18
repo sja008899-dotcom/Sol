@@ -11,4 +11,6 @@
     <string name="speak_with_sol">صحبت با Sol</string>
     <string name="stop_listening">توقف شنود</string>
     <string name="offline_badge">کاملاً آفلاین • بدون اینترنت</string>
+    <string name="qs_tile_label">صحبت با Sol</string>
+    <string name="widget_description">دسترسی سریع به میکروفون Sol، موقعیت فعلی تأییدشده و نقش فعال</string>
 </resources>

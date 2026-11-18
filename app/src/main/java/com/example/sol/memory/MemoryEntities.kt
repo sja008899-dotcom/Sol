@@ -89,3 +89,29 @@ data class BackgroundJobLogEntity(
     val detailFa: String = "",
     val executedAt: Long = System.currentTimeMillis(),
 )
+
+@Entity(
+    tableName = "book_chunks",
+    indices = [Index(value = ["bookId"])]
+)
+data class BookChunkEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val bookId: Long,
+    val bookTitle: String,
+    val chunkIndex: Int,
+    val contentText: String,
+    val normalizedTokens: String,
+)
+
+@Entity(tableName = "scheduled_alarms")
+data class ScheduledAlarmEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val requestCode: Int,
+    val titleFa: String,
+    val messageBody: String,
+    val triggerAtMillis: Long,
+    val jalaliLabel: String,
+    val targetContact: String = "",
+    val isExact: Boolean = true,
+    val isTriggered: Boolean = false,
+)

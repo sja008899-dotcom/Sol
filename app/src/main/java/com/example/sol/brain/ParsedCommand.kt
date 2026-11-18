@@ -50,6 +50,7 @@ data class ParsedCommand(
     val backgroundJobId: String? = null,
     val bookQuery: String? = null,
     val roleName: String? = null,
+    val jalaliSchedule: com.example.sol.calendar.ParsedJalaliSchedule? = null,
     val requireConfirmation: Boolean = true,
     val steps: List<String> = emptyList(),
 )

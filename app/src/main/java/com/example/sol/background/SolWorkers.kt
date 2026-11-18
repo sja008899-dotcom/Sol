@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.SolApplication
+import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.knowledge.BookWebFetcher
 import com.example.sol.memory.BookKnowledgeEntity
 import org.json.JSONArray
@@ -41,7 +42,8 @@ class DailyRoutineWorker(
         val prefs = app.container.preferencesRepository.getSnapshot()
         val bat = app.container.deviceController.getBatteryStatus()
         val loc = prefs.confirmedCurrentLocation.ifBlank { "ثبت‌نشده" }
-        val summary = "باتری ${bat.levelPercent}% • موقعیت تأییدشده: $loc"
+        val today = JalaliCalendar.fromMillis().formatFullFa()
+        val summary = "$today • باتری ${bat.levelPercent}% • موقعیت تأییدشده: $loc"
         SolNotificationHelper.postNotification(
             context = applicationContext,
             channelId = SolNotificationHelper.CHANNEL_REMINDERS,
@@ -194,7 +196,7 @@ class BookFetchWorker(
         val result = fetcher.fetchBookFromInternet(query)
         return result.fold(
             onSuccess = { book ->
-                app.container.knowledgeRepository.saveBook(
+                val bookId = app.container.knowledgeRepository.saveBook(
                     BookKnowledgeEntity(
                         title = book.title,
                         author = book.author,
@@ -204,7 +206,8 @@ class BookFetchWorker(
                         sourceUrl = book.sourceUrl,
                     )
                 )
-                val msg = "کتاب «${book.title}» اثر ${book.author} ذخیره شد و آمادهٔ آموزش صوتی نقش است."
+                app.container.bookRagEngine.indexBookContent(bookId, book.title, book.fullText)
+                val msg = "کتاب «${book.title}» اثر ${book.author} ذخیره و برای جست‌وجوی BM25 نمایه‌سازی شد."
                 SolNotificationHelper.postNotification(
                     context = applicationContext,
                     channelId = SolNotificationHelper.CHANNEL_BACKGROUND,

@@ -175,10 +175,23 @@ class KnowledgeRepository(private val dao: MemoryDao) {
     val books: Flow<List<BookKnowledgeEntity>> = dao.observeBooks()
     val roles: Flow<List<SolRoleEntity>> = dao.observeRoles()
     val backgroundLogs: Flow<List<BackgroundJobLogEntity>> = dao.observeBackgroundLogs()
+    val bookChunkCount: Flow<Int> = dao.observeChunkCount()
+    val scheduledAlarms: Flow<List<ScheduledAlarmEntity>> = dao.observeScheduledAlarms()
 
     suspend fun getAllBooksOnce(): List<BookKnowledgeEntity> = dao.getAllBooksOnce()
 
     suspend fun getAllRolesOnce(): List<SolRoleEntity> = dao.getAllRolesOnce()
+
+    suspend fun getAllChunksOnce(): List<BookChunkEntity> = dao.getAllBookChunksOnce()
+
+    suspend fun getChunksForBookOnce(bookId: Long): List<BookChunkEntity> = dao.getChunksForBookOnce(bookId)
+
+    suspend fun replaceChunksForBook(bookId: Long, chunks: List<BookChunkEntity>) {
+        dao.deleteChunksForBook(bookId)
+        if (chunks.isNotEmpty()) {
+            dao.insertBookChunks(chunks)
+        }
+    }
 
     suspend fun saveBook(book: BookKnowledgeEntity): Long = dao.upsertBook(book)
 
@@ -191,6 +204,7 @@ class KnowledgeRepository(private val dao: MemoryDao) {
     }
 
     suspend fun deleteBook(id: Long) {
+        dao.deleteChunksForBook(id)
         dao.deleteBookById(id)
     }
 
@@ -243,4 +257,12 @@ class KnowledgeRepository(private val dao: MemoryDao) {
     suspend fun clearBackgroundLogs() {
         dao.clearBackgroundLogs()
     }
+
+    suspend fun saveScheduledAlarm(alarm: ScheduledAlarmEntity): Long = dao.upsertAlarm(alarm)
+
+    suspend fun getAllAlarmsOnce(): List<ScheduledAlarmEntity> = dao.getAllAlarmsOnce()
+
+    suspend fun markAlarmTriggered(requestCode: Int) = dao.markAlarmTriggered(requestCode)
+
+    suspend fun deleteScheduledAlarm(id: Long) = dao.deleteAlarmById(id)
 }

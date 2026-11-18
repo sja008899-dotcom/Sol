@@ -51,6 +51,12 @@ data class SolPreferences(
     // Strictly separated from saved locations (Security Rule #4)
     val confirmedCurrentLocation: String = "",
     val confirmedCurrentLocationUpdatedAt: Long = 0L,
+    // v2 features
+    val voskOfflineEnabled: Boolean = true,
+    val wakeWordEnabled: Boolean = false,
+    val slmSynthesisEnabled: Boolean = false,
+    val slmModelPath: String = "",
+    val lastBackupAt: Long = 0L,
 )
 
 class PreferencesRepository(private val context: Context) {
@@ -67,6 +73,11 @@ class PreferencesRepository(private val context: Context) {
         val DARK_THEME = booleanPreferencesKey("dark_theme")
         val CONFIRMED_LOCATION = stringPreferencesKey("confirmed_current_location")
         val CONFIRMED_LOCATION_TIME = longPreferencesKey("confirmed_current_location_time")
+        val VOSK_OFFLINE_ENABLED = booleanPreferencesKey("vosk_offline_enabled")
+        val WAKE_WORD_ENABLED = booleanPreferencesKey("wake_word_enabled")
+        val SLM_SYNTHESIS_ENABLED = booleanPreferencesKey("slm_synthesis_enabled")
+        val SLM_MODEL_PATH = stringPreferencesKey("slm_model_path")
+        val LAST_BACKUP_AT = longPreferencesKey("last_backup_at")
     }
 
     val preferences: Flow<SolPreferences> = context.solPrefsDataStore.data.map { p ->
@@ -85,6 +96,11 @@ class PreferencesRepository(private val context: Context) {
             darkTheme = p[Keys.DARK_THEME] ?: true,
             confirmedCurrentLocation = p[Keys.CONFIRMED_LOCATION] ?: "",
             confirmedCurrentLocationUpdatedAt = p[Keys.CONFIRMED_LOCATION_TIME] ?: 0L,
+            voskOfflineEnabled = p[Keys.VOSK_OFFLINE_ENABLED] ?: true,
+            wakeWordEnabled = p[Keys.WAKE_WORD_ENABLED] ?: false,
+            slmSynthesisEnabled = p[Keys.SLM_SYNTHESIS_ENABLED] ?: false,
+            slmModelPath = p[Keys.SLM_MODEL_PATH] ?: "",
+            lastBackupAt = p[Keys.LAST_BACKUP_AT] ?: 0L,
         )
     }
 
@@ -137,6 +153,46 @@ class PreferencesRepository(private val context: Context) {
         context.solPrefsDataStore.edit {
             it[Keys.CONFIRMED_LOCATION] = ""
             it[Keys.CONFIRMED_LOCATION_TIME] = 0L
+        }
+    }
+
+    suspend fun setVoskOfflineEnabled(enabled: Boolean) {
+        context.solPrefsDataStore.edit { it[Keys.VOSK_OFFLINE_ENABLED] = enabled }
+    }
+
+    suspend fun setWakeWordEnabled(enabled: Boolean) {
+        context.solPrefsDataStore.edit { it[Keys.WAKE_WORD_ENABLED] = enabled }
+    }
+
+    suspend fun setSlmSynthesisEnabled(enabled: Boolean) {
+        context.solPrefsDataStore.edit { it[Keys.SLM_SYNTHESIS_ENABLED] = enabled }
+    }
+
+    suspend fun setSlmModelPath(path: String) {
+        context.solPrefsDataStore.edit { it[Keys.SLM_MODEL_PATH] = path }
+    }
+
+    suspend fun recordBackupTimestamp(timestamp: Long = System.currentTimeMillis()) {
+        context.solPrefsDataStore.edit { it[Keys.LAST_BACKUP_AT] = timestamp }
+    }
+
+    suspend fun restoreSnapshot(restored: SolPreferences) {
+        context.solPrefsDataStore.edit { p ->
+            p[Keys.OWNER_NAME] = restored.ownerName
+            p[Keys.VOICE_PERSONA] = restored.voicePersona.name
+            p[Keys.TTS_VOICE_NAME] = restored.preferredTtsVoiceName
+            p[Keys.SPEECH_RATE] = restored.speechRate
+            p[Keys.AUTO_SPEAK] = restored.autoSpeak
+            p[Keys.INVOCATION_MODE] = restored.invocationMode.name
+            p[Keys.DELIVERY_PREF] = restored.deliveryPreference.name
+            p[Keys.CONFIRMATION_POLICY] = restored.confirmationPolicy.name
+            p[Keys.DARK_THEME] = restored.darkTheme
+            p[Keys.CONFIRMED_LOCATION] = restored.confirmedCurrentLocation
+            p[Keys.CONFIRMED_LOCATION_TIME] = restored.confirmedCurrentLocationUpdatedAt
+            p[Keys.VOSK_OFFLINE_ENABLED] = restored.voskOfflineEnabled
+            p[Keys.WAKE_WORD_ENABLED] = restored.wakeWordEnabled
+            p[Keys.SLM_SYNTHESIS_ENABLED] = restored.slmSynthesisEnabled
+            p[Keys.SLM_MODEL_PATH] = restored.slmModelPath
         }
     }
 

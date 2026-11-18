@@ -18,13 +18,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -32,10 +41,13 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,19 +57,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.sol.device.BatteryStatus
 import com.example.sol.device.InstalledAppShortcut
+import com.example.sol.knowledge.SlmStatus
 import com.example.sol.memory.ConfirmationPolicy
 import com.example.sol.memory.DeliveryPreference
 import com.example.sol.memory.InvocationMode
+import com.example.sol.memory.ScheduledAlarmEntity
 import com.example.sol.memory.SolPreferences
 import com.example.sol.memory.VoicePersona
+import com.example.sol.security.RamUsageSnapshot
 import com.example.sol.security.SecurityAuditItem
 import com.example.sol.voice.AudioVolumeStatus
 import com.example.sol.voice.TtsAvailability
 import com.example.sol.voice.TtsVoiceInfo
+import com.example.sol.voice.VoskModelStatus
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -66,6 +83,13 @@ fun SettingsScreen(
     preferences: SolPreferences,
     ttsAvailability: TtsAvailability,
     persianVoices: List<TtsVoiceInfo>,
+    voskModelStatus: VoskModelStatus,
+    vocabularyTermsCount: Int,
+    bookChunkCount: Int,
+    slmStatus: SlmStatus,
+    ramSnapshot: RamUsageSnapshot,
+    canScheduleExactAlarms: Boolean,
+    scheduledAlarms: List<ScheduledAlarmEntity>,
     batteryStatus: BatteryStatus,
     volumeStatus: AudioVolumeStatus,
     launchableApps: List<InstalledAppShortcut>,
@@ -76,6 +100,19 @@ fun SettingsScreen(
     onSpeechRateChange: (Float) -> Unit,
     onAutoSpeakChange: (Boolean) -> Unit,
     onTestVoice: () -> Unit,
+    onVoskOfflineToggle: (Boolean) -> Unit,
+    onWakeWordToggle: (Boolean) -> Unit,
+    onDownloadVoskModel: () -> Unit,
+    onPickVoskZip: () -> Unit,
+    onUnloadVoskRam: () -> Unit,
+    onDeleteVoskModel: () -> Unit,
+    onSlmToggle: (Boolean) -> Unit,
+    onAddQuickSettingsTile: () -> Unit,
+    onRequestExactAlarmPermission: () -> Unit,
+    onCancelScheduledAlarm: (ScheduledAlarmEntity) -> Unit,
+    onExportEncryptedBackup: () -> Unit,
+    onImportEncryptedBackup: () -> Unit,
+    onTrimRamNow: () -> Unit,
     onInvocationModeChange: (InvocationMode) -> Unit,
     onDeliveryPreferenceChange: (DeliveryPreference) -> Unit,
     onConfirmationPolicyChange: (ConfirmationPolicy) -> Unit,
@@ -97,18 +134,290 @@ fun SettingsScreen(
     ) {
         item {
             Text(
-                text = "تنظیمات شخصیت و کنترل گوشی",
+                text = "تنظیمات Sol v2 و بهینه‌سازی گوشی",
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = "پیکربندی صدای فارسی، روش ارتباط، کنترل امکانات مجاز گوشی و ممیزی امنیتی Sol",
+                text = "گفتار آفلاین Vosk، تقویم شمسی و AlarmManager، هوش BM25، ویجت و نوار بالا، پشتیبان رمزدار و مدیریت ۴ گیگابایت RAM",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
-        // 1. Owner Name & Theme
+        // 1. Offline Vosk Persian ASR + Vocabulary Bias + Wake Word
+        item {
+            SectionCard(title = "۱. گفتار ۱۰۰٪ آفلاین فارسی (Vosk + کلمه بیدارباش Sol)") {
+                when (voskModelStatus) {
+                    is VoskModelStatus.NotInstalled -> {
+                        Text(
+                            text = "مدل آفلاین فارسی Vosk (~۴۷ مگابایت) هنوز نصب نشده است. پس از دانلود یک‌باره، تشخیص گفتار بدون اینترنت و با لغت‌نامه تقویتی کار می‌کند.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Button(
+                                onClick = onDownloadVoskModel,
+                                modifier = Modifier.testTag("download_vosk_button"),
+                            ) {
+                                Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("دانلود یک‌باره مدل فارسی (~47MB)")
+                            }
+                            OutlinedButton(onClick = onPickVoskZip) {
+                                Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("نصب از فایل ZIP گوشی")
+                            }
+                        }
+                    }
+
+                    is VoskModelStatus.Downloading -> {
+                        Text(
+                            text = voskModelStatus.stageFa,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            progress = { voskModelStatus.progressPercent / 100f },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+
+                    is VoskModelStatus.Installed -> {
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(12.dp),
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = "✅ مدل Vosk فارسی نصب است (${voskModelStatus.modelSizeMb}MB) • وضعیت RAM: ${if (voskModelStatus.isLoadedInRam) "بارگذاری‌شده" else "آزاد (Lazy Load)"}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                )
+                                Text(
+                                    text = "${voskModelStatus.lastNoteFa}\nلغت‌نامه تقویتی (Grammar/Bias): $vocabularyTermsCount واژهٔ شخصی از مخاطبین و مکان‌ها",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            OutlinedButton(onClick = onUnloadVoskRam) {
+                                Text("آزادسازی مدل از RAM")
+                            }
+                            OutlinedButton(onClick = onDeleteVoskModel) {
+                                Text("حذف مدل از حافظه")
+                            }
+                        }
+                    }
+
+                    is VoskModelStatus.Error -> {
+                        Text(
+                            text = voskModelStatus.messageFa,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = onDownloadVoskModel) { Text("تلاش مجدد") }
+                            OutlinedButton(onClick = onPickVoskZip) { Text("انتخاب فایل ZIP") }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("اولویت با موتور آفلاین Vosk (در صورت نصب)", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = preferences.voskOfflineEnabled, onCheckedChange = onVoskOfflineToggle)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("حالت بیدارباش «Sol» با تشخیص مکث VAD", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = preferences.wakeWordEnabled, onCheckedChange = onWakeWordToggle)
+                }
+            }
+        }
+
+        // 2. Quick Access: Widget, Quick Settings Tile, Exact Jalali Alarms
+        item {
+            SectionCard(title = "۲. ویجت صفحه اصلی، دکمه نوار بالا و یادآورهای دقیق شمسی") {
+                Text(
+                    text = "• ویجت صفحه اصلی: نمایش «موقعیت فعلی تأییدشده»، «نقش فعال» و تاریخ شمسی به همراه دکمهٔ مستقیم میکروفون از لانچر گوشی.\n• دکمه نوار اعلان بالای گوشی (Quick Settings Tile): از هر برنامه‌ای که هستید با کشیدن نوار بالا مستقیم با Sol صحبت کنید.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = onAddQuickSettingsTile,
+                        modifier = Modifier.testTag("pin_qs_tile_button"),
+                    ) {
+                        Icon(Icons.Default.Widgets, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("افزودن دکمه به نوار بالای گوشی")
+                    }
+
+                    OutlinedButton(onClick = onRequestExactAlarmPermission) {
+                        Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            if (canScheduleExactAlarms) {
+                                "هشدار دقیق AlarmManager فعال ✓"
+                            } else {
+                                "فعال‌سازی دسترسی Alarm دقیق"
+                            }
+                        )
+                    }
+                }
+
+                if (scheduledAlarms.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("یادآورهای زمان‌بندی‌شده شمسی:", style = MaterialTheme.typography.labelMedium)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    scheduledAlarms.take(6).forEach { alarm ->
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${alarm.titleFa} • ${alarm.jalaliLabel}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                    Text(
+                                        text = "${alarm.messageBody} (${if (alarm.isExact) "دقیق" else "Doze"})",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                IconButton(onClick = { onCancelScheduledAlarm(alarm) }) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "لغو یادآور",
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Offline BM25 Book RAG + Optional Local SLM Module
+        item {
+            SectionCard(title = "۳. موتور معنایی کتاب‌ها (BM25) و ماژول اختیاری SLM") {
+                Text(
+                    text = "بخش‌های نمایه‌شدهٔ کتاب‌ها (PDF / EPUB / وب / متن) در Room: $bookChunkCount بخش آمادهٔ جست‌وجوی آفلاین",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("ماژول اختیاری SLM محلی روی گوشی", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = slmStatus.statusLabelFa,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = preferences.slmSynthesisEnabled, onCheckedChange = onSlmToggle)
+                }
+            }
+        }
+
+        // 4. Encrypted Portable Backup (.solbackup) & 4GB RAM Optimization
+        item {
+            SectionCard(title = "۴. پشتیبان‌گیری رمزنگاری‌شده (.solbackup) و مدیریت ۴GB RAM") {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Memory, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "RAM دستگاه: کل ${ramSnapshot.totalDeviceRamMb}MB • آزاد ${ramSnapshot.availableDeviceRamMb}MB • مصرف اپ ${ramSnapshot.appHeapUsedMb}MB",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                        Text(
+                            text = ramSnapshot.lastTrimActionFa,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = onExportEncryptedBackup,
+                        modifier = Modifier.testTag("export_solbackup_button"),
+                    ) {
+                        Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("صدور پشتیبان رمزدار (.solbackup)")
+                    }
+                    OutlinedButton(
+                        onClick = onImportEncryptedBackup,
+                        modifier = Modifier.testTag("import_solbackup_button"),
+                    ) {
+                        Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("بازیابی از .solbackup")
+                    }
+                    OutlinedButton(
+                        onClick = onTrimRamNow,
+                        modifier = Modifier.testTag("trim_ram_button"),
+                    ) {
+                        Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("آزادسازی فوری کش و RAM")
+                    }
+                }
+            }
+        }
+
+        // 5. Owner Name & Theme
         item {
             SectionCard(title = "هویت شما و ظاهر برنامه") {
                 Row(
@@ -138,9 +447,9 @@ fun SettingsScreen(
             }
         }
 
-        // 2. Voice & Speech Engine Settings
+        // 6. Voice & Speech Engine Settings
         item {
-            SectionCard(title = "۱. صدای Sol و گفتار فارسی") {
+            SectionCard(title = "صدای Sol و گفتار فارسی (TTS)") {
                 Text(
                     text = ttsAvailability.labelFa,
                     style = MaterialTheme.typography.bodySmall,
@@ -211,9 +520,9 @@ fun SettingsScreen(
             }
         }
 
-        // 3. Invocation, Delivery & Confirmation Policy
+        // 7. Invocation, Delivery & Confirmation Policy
         item {
-            SectionCard(title = "۲ تا ۴. نحوه فراخوانی، ارسال پیام و سطح اختیار") {
+            SectionCard(title = "نحوه فراخوانی، ارسال پیام و سطح اختیار") {
                 Text("چگونه صدایش کنی:", style = MaterialTheme.typography.labelMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     InvocationMode.entries.forEach { mode ->
@@ -251,7 +560,7 @@ fun SettingsScreen(
             }
         }
 
-        // 4. Device Controller
+        // 8. Device Controller
         item {
             SectionCard(title = "کنترل امکانات مجاز گوشی (Device Controller)") {
                 Row(
@@ -334,7 +643,7 @@ fun SettingsScreen(
             }
         }
 
-        // 5. Security & Privacy Audit (7 Rules)
+        // 9. Security & Privacy Audit (7 Rules)
         item {
             SectionCard(title = "قوانین امنیتی و حریم خصوصی Sol") {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -1,5 +1,6 @@
 package com.example.sol.brain
 
+import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.memory.PersianNormalizer
 
 class IntentParser(
@@ -65,8 +66,34 @@ class IntentParser(
             )
         }
 
-        // 0E. Scheduled Reminder in background: «5 دقیقه دیگر یادآوری کن ...»
+        // 0E. Exact Jalali Scheduled Reminder or Timed Message:
+        // e.g. «چهارشنبه ساعت ۹ صبح یادآوری کن ...», «دو روز دیگه به علی پیام یادآوری بفرست», «۵ دقیقه دیگر یادآوری کن ...»
         val reminderMatch = Regex("(\\d+)\\s*(?:دقیقه|ثانیه|ساعت)\\s*(?:دیگر|دیگه|بعد)\\s*(?:یادآوری کن|یادم بنداز|به من بگو)\\s*(.*)$").find(cleaned)
+        val parsedDelayMinutes = if (reminderMatch != null) {
+            val num = reminderMatch.groupValues[1].toLongOrNull() ?: 1L
+            when {
+                norm.contains("ساعت") -> num * 60L
+                norm.contains("ثانیه") -> 1L
+                else -> num.coerceAtLeast(1L)
+            }
+        } else {
+            0L
+        }
+
+        val jalaliParsed = JalaliCalendar.parsePersianDateTimeCommand(cleaned)
+        if (jalaliParsed != null) {
+            return ParsedCommand(
+                action = SolAction.SCHEDULE_REMINDER,
+                rawText = raw,
+                normalizedText = norm,
+                delayMinutes = parsedDelayMinutes,
+                message = jalaliParsed.reminderMessage,
+                contact = jalaliParsed.contactHint,
+                jalaliSchedule = jalaliParsed,
+                backgroundJobId = "bg_exact_alarm",
+                requireConfirmation = false,
+            )
+        }
         if (reminderMatch != null) {
             val num = reminderMatch.groupValues[1].toLongOrNull() ?: 1L
             val minutes = when {
@@ -355,8 +382,10 @@ class IntentParser(
             )
         }
 
-        // 12. Time, Date, Identity, Greetings, Help
-        if (norm.contains("ساعت") || norm.contains("تاریخ") || norm.contains("امروز")) {
+        // 12. Time, Date (Jalali), Identity, Greetings, Help
+        if (norm.contains("ساعت") || norm.contains("تاریخ") || norm.contains("امروز") ||
+            norm.contains("چندم برج") || norm.contains("چندمه") || norm.contains("شمسی") || norm.contains("چه روزی")
+        ) {
             return ParsedCommand(action = SolAction.TIME_DATE, rawText = raw, normalizedText = norm, requireConfirmation = false)
         }
         if (norm.contains("اسم تو") || norm.contains("نام تو") || norm.contains("کی هستی") || norm.contains("چیستی")) {

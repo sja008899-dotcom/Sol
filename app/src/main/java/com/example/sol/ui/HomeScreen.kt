@@ -29,6 +29,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.BatteryStd
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Mic
@@ -65,18 +67,23 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
+import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.device.BatteryStatus
 import com.example.sol.memory.LocationEntity
 import com.example.sol.memory.SolPreferences
 import com.example.sol.memory.SolRoleEntity
 import com.example.sol.tasks.ActiveTaskState
+import com.example.sol.voice.ActiveAsrBackend
 import com.example.sol.voice.TtsAvailability
 import com.example.sol.voice.VoiceListeningState
+import com.example.sol.voice.VoskModelStatus
 
 private val QUICK_COMMANDS = listOf(
+    "امروز چندم برج است؟",
+    "چهارشنبه ساعت ۹ صبح یادآوری کن جلسه دارم",
+    "دو روز دیگه به علی پیام یادآوری بفرست",
     "۲۰ قابلیت",
-    "به اینترنت برو کتاب Little Prince را پیدا کن و با توضیحات صوتی من به حافظه و نقشت اضافه کن",
-    "۱ دقیقه دیگر یادآوری کن وضعیت کارها را چک کنم",
+    "به اینترنت برو کتاب Atomic Habits را پیدا کن و با توضیحات صوتی من به حافظه و نقشت اضافه کن",
     "از حافظه در پس‌زمینه پشتیبان بگیر",
     "هر وقت می‌گم دفتر منظورم شرکت کارنو صنعت ماکیان است",
     "وضعیت شرکت را به علی اطلاع بده و بعد نتیجه را به من گزارش کن",
@@ -89,6 +96,8 @@ fun HomeScreen(
     listeningState: VoiceListeningState,
     partialSpeechText: String,
     micRms: Float,
+    activeAsrBackend: ActiveAsrBackend,
+    voskModelStatus: VoskModelStatus,
     ttsAvailability: TtsAvailability,
     isSpeaking: Boolean,
     isFetchingBook: Boolean,
@@ -101,6 +110,7 @@ fun HomeScreen(
     onSendCommand: () -> Unit,
     onQuickCommand: (String) -> Unit,
     onMicClick: () -> Unit,
+    onWakeWordClick: () -> Unit,
     onClearVoiceError: () -> Unit,
     onSpeakMessage: (String) -> Unit,
     onStopSpeaking: () -> Unit,
@@ -112,6 +122,7 @@ fun HomeScreen(
 ) {
     var showLocationDialog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val todayJalali = remember { JalaliCalendar.fromMillis().formatFullFa() }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -176,15 +187,15 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "S O L",
+                            text = "S O L  v2",
                             style = MaterialTheme.typography.displaySmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
                         Text(
                             text = activeRoles.firstOrNull()?.let { "نقش فعال: ${it.roleName}" }
-                                ?: "دستیار شخصی فارسی • مستقل و هوشمند",
+                                ?: "دستیار شخصی فارسی • آفلاین و مستقل",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -194,7 +205,7 @@ fun HomeScreen(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Surface(
-                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f),
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.88f),
                             shape = RoundedCornerShape(50),
                         ) {
                             Row(
@@ -202,13 +213,13 @@ fun HomeScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Shield,
+                                    imageVector = Icons.Default.CalendarMonth,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.tertiary,
                                     modifier = Modifier.size(13.dp),
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
-                                Text("حریم امن", style = MaterialTheme.typography.labelSmall)
+                                Text(todayJalali, style = MaterialTheme.typography.labelSmall)
                             }
                         }
 
@@ -294,7 +305,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = "کتاب و نقش صوتی",
+                                text = "کتاب (PDF/EPUB) و نقش",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                                 maxLines = 1,
@@ -368,23 +379,73 @@ fun HomeScreen(
                 .padding(top = 4.dp, bottom = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            SolVoiceOrb(
-                listeningState = listeningState,
-                isSpeaking = isSpeaking,
-                rmsLevel = micRms,
-                onClick = onMicClick,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                SolVoiceOrb(
+                    listeningState = listeningState,
+                    isSpeaking = isSpeaking,
+                    rmsLevel = micRms,
+                    onClick = onMicClick,
+                )
 
+                if (voskModelStatus is VoskModelStatus.Installed) {
+                    Surface(
+                        color = if (listeningState is VoiceListeningState.WakeWordArmed) {
+                            MaterialTheme.colorScheme.tertiaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier
+                            .clickable(onClick = onWakeWordClick)
+                            .testTag("wake_word_button"),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Hearing,
+                                contentDescription = "بیدارباش صوتی Sol",
+                                tint = if (listeningState is VoiceListeningState.WakeWordArmed) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (listeningState is VoiceListeningState.WakeWordArmed) {
+                                    "منتظر «Sol»…"
+                                } else {
+                                    "بیدارباش «Sol»"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
+                }
+            }
+
+            val backendLabel = if (activeAsrBackend == ActiveAsrBackend.VOSK_OFFLINE) {
+                "Vosk ۱۰۰٪ آفلاین"
+            } else {
+                "گفتار سیستم"
+            }
             val voiceStatusText = when (listeningState) {
                 is VoiceListeningState.Listening ->
-                    if (partialSpeechText.isNotBlank()) "«$partialSpeechText»" else "در حال شنیدن صدای فارسی شما…"
+                    if (partialSpeechText.isNotBlank()) "«$partialSpeechText»" else "در حال شنیدن فارسی ($backendLabel)…"
+                is VoiceListeningState.WakeWordArmed ->
+                    "گوش‌به‌زنگ کلمهٔ بیدارباش «Sol» یا «سول» هستم (آفلاین)…"
                 is VoiceListeningState.Processing -> "در حال پردازش گفتار…"
                 is VoiceListeningState.Error -> listeningState.messageFa
                 VoiceListeningState.Idle -> when {
                     isSpeaking -> "Sol در حال صحبت است…"
-                    ttsAvailability == TtsAvailability.MISSING_PERSIAN_DATA ->
-                        "پاسخ متنی فعال است (بستهٔ صدای فارسی TTS روی گوشی نصب نیست)"
-                    else -> "برای فرمان صوتی دایره را لمس کنید یا در پایین بنویسید"
+                    else -> "موتور صوتی: $backendLabel • برای فرمان صوتی دایره را لمس کنید"
                 }
             }
 
@@ -393,6 +454,17 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.padding(horizontal = 20.dp),
             ) {
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = if (activeAsrBackend == ActiveAsrBackend.VOSK_OFFLINE) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.size(13.dp),
+                )
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = voiceStatusText,
                     style = MaterialTheme.typography.bodySmall,

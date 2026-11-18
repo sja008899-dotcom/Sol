@@ -9,6 +9,7 @@ import com.example.sol.brain.PendingSolTask
 import com.example.sol.contacts.ResolvedContact
 import com.example.sol.device.BatteryStatus
 import com.example.sol.device.InstalledAppShortcut
+import com.example.sol.knowledge.SlmStatus
 import com.example.sol.memory.BackgroundJobLogEntity
 import com.example.sol.memory.BookKnowledgeEntity
 import com.example.sol.memory.ConfirmationPolicy
@@ -18,21 +19,28 @@ import com.example.sol.memory.InvocationMode
 import com.example.sol.memory.LocationEntity
 import com.example.sol.memory.MemoryFactEntity
 import com.example.sol.memory.PersonEntity
+import com.example.sol.memory.ScheduledAlarmEntity
 import com.example.sol.memory.SolPreferences
 import com.example.sol.memory.SolRoleEntity
 import com.example.sol.memory.VoicePersona
+import com.example.sol.security.RamUsageSnapshot
 import com.example.sol.security.SecurityAuditItem
 import com.example.sol.tasks.ActiveTaskState
 import com.example.sol.tasks.CommunicationChannel
 import com.example.sol.tasks.PendingCommunicationConfirmation
+import com.example.sol.voice.ActiveAsrBackend
 import com.example.sol.voice.AudioVolumeStatus
 import com.example.sol.voice.TtsAvailability
 import com.example.sol.voice.TtsVoiceInfo
 import com.example.sol.voice.VoiceListeningState
+import com.example.sol.voice.VoskModelStatus
+import com.example.sol.widget.SolQuickSettingsTileService
+import com.example.sol.widget.SolWidgetStateMirror
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -55,6 +63,13 @@ data class VoiceRoleTeachingSession(
     val roleNameDraft: String,
     val voiceExplanationDraft: String = "",
     val isListeningForExplanation: Boolean = false,
+)
+
+enum class BackupDialogMode { EXPORT, IMPORT }
+
+data class PendingBackupPasswordRequest(
+    val mode: BackupDialogMode,
+    val uri: Uri,
 )
 
 class SolViewModel(application: Application) : AndroidViewModel(application) {
@@ -84,17 +99,33 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     val backgroundLogs: StateFlow<List<BackgroundJobLogEntity>> = c.knowledgeRepository.backgroundLogs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val bookChunkCount: StateFlow<Int> = c.knowledgeRepository.bookChunkCount
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val scheduledAlarms: StateFlow<List<ScheduledAlarmEntity>> = c.knowledgeRepository.scheduledAlarms
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val enabledPeriodicJobs: StateFlow<Set<String>> = c.backgroundTaskCoordinator.enabledPeriodicJobs
 
     val listeningState: StateFlow<VoiceListeningState> = c.voiceEngine.state
     val partialSpeechText: StateFlow<String> = c.voiceEngine.partialText
     val micRms: StateFlow<Float> = c.voiceEngine.rmsDb
+    val activeAsrBackend: StateFlow<ActiveAsrBackend> = c.voiceEngine.activeBackend
+    val voskModelStatus: StateFlow<VoskModelStatus> = c.voiceEngine.voskEngine.modelStatus
+    val ramSnapshot: StateFlow<RamUsageSnapshot> = c.memoryOptimizer.ramSnapshot
+
     val ttsAvailability: StateFlow<TtsAvailability> = c.persianTts.availability
     val isSpeaking: StateFlow<Boolean> = c.persianTts.isSpeaking
     val persianVoices: StateFlow<List<TtsVoiceInfo>> = c.persianTts.persianVoices
 
     val activeTask: StateFlow<ActiveTaskState?> = c.taskManager.activeTask
     val pendingConfirmation: StateFlow<PendingCommunicationConfirmation?> = c.confirmationManager.pending
+
+    private val _isListeningForConfirm = MutableStateFlow(false)
+    val isListeningForConfirm: StateFlow<Boolean> = _isListeningForConfirm.asStateFlow()
+
+    private val _confirmVoiceFeedback = MutableStateFlow("")
+    val confirmVoiceFeedback: StateFlow<String> = _confirmVoiceFeedback.asStateFlow()
 
     private val _pendingBookFetch = MutableStateFlow<PendingBookFetchConfirmation?>(null)
     val pendingBookFetch: StateFlow<PendingBookFetchConfirmation?> = _pendingBookFetch.asStateFlow()
@@ -108,6 +139,21 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     private val _showCapabilitiesSheet = MutableStateFlow(false)
     val showCapabilitiesSheet: StateFlow<Boolean> = _showCapabilitiesSheet.asStateFlow()
 
+    private val _pendingBackupRequest = MutableStateFlow<PendingBackupPasswordRequest?>(null)
+    val pendingBackupRequest: StateFlow<PendingBackupPasswordRequest?> = _pendingBackupRequest.asStateFlow()
+
+    private val _statusBannerMessage = MutableStateFlow<String?>(null)
+    val statusBannerMessage: StateFlow<String?> = _statusBannerMessage.asStateFlow()
+
+    private val _canScheduleExactAlarms = MutableStateFlow(c.exactAlarmScheduler.canScheduleExactAlarms())
+    val canScheduleExactAlarms: StateFlow<Boolean> = _canScheduleExactAlarms.asStateFlow()
+
+    private val _vocabularyTermsCount = MutableStateFlow(0)
+    val vocabularyTermsCount: StateFlow<Int> = _vocabularyTermsCount.asStateFlow()
+
+    private val _slmStatus = MutableStateFlow(c.localSlmEngine.getStatus(false, ""))
+    val slmStatus: StateFlow<SlmStatus> = _slmStatus.asStateFlow()
+
     private val _inputText = MutableStateFlow("")
     val inputText: StateFlow<String> = _inputText.asStateFlow()
 
@@ -116,7 +162,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
             ChatMessageItem(
                 id = 1L,
                 isUser = false,
-                text = "سلام. من Sol هستم — دستیار شخصی شما با ۲۰ قابلیت (۱۰ اجرای پس‌زمینه، جست‌وجوی کتاب با تأیید و آموزش نقش با صدای شما).\nمی‌توانی دکمه «۲۰ قابلیت» را بزنی، تایپ کنی یا با میکروفون صحبت کنی.",
+                text = "سلام. من Sol v2 هستم — مجهز به تقویم شمسی دقیق و AlarmManager، موتور آفلاین فارسی Vosk، جست‌وجوی معنایی BM25 روی PDF/EPUB/کتاب‌ها، ویجت صفحه اصلی، دکمه نوار بالای گوشی و پشتیبان رمزنگاری‌شده .solbackup.",
                 actionBadge = "آماده",
             )
         )
@@ -149,21 +195,67 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         refreshSystemSnapshots()
+        observeDynamicSyncs()
+    }
+
+    private fun observeDynamicSyncs() {
+        // Keep Home Screen Widget & Quick Settings Tile synchronized with location + active role
+        viewModelScope.launch {
+            combine(preferences, roles) { prefs, roleList ->
+                prefs to (roleList.firstOrNull { it.isActive }?.roleName.orEmpty())
+            }.collect { (prefs, activeRole) ->
+                SolWidgetStateMirror.saveAndRefresh(
+                    context = getApplication(),
+                    confirmedLocation = prefs.confirmedCurrentLocation,
+                    activeRoleName = activeRole,
+                )
+                c.voiceEngine.refreshBackend(prefs.voskOfflineEnabled)
+                _slmStatus.value = c.localSlmEngine.getStatus(prefs.slmSynthesisEnabled, prefs.slmModelPath)
+            }
+        }
+
+        // Keep ASR Vocabulary Bias enriched with user Contacts, Locations, Aliases & Books
+        viewModelScope.launch {
+            combine(memories, persons, locations, books) { mems, ppl, locs, bks ->
+                buildList {
+                    mems.forEach { m ->
+                        add(m.keyText.removePrefix("alias:"))
+                        add(m.valueText)
+                    }
+                    ppl.forEach { p -> add(p.name) }
+                    locs.forEach { l ->
+                        add(l.alias)
+                        add(l.fullName)
+                    }
+                    bks.forEach { b -> add(b.title) }
+                }
+            }.collect { terms ->
+                c.voiceEngine.updateVocabularyBias(terms)
+                _vocabularyTermsCount.value = c.voiceEngine.voskEngine.vocabularyBias.currentTermsCount()
+            }
+        }
     }
 
     fun refreshSystemSnapshots() {
         _hasMicPermission.value = c.permissionManager.hasMicrophonePermission()
         _hasContactsPermission.value = c.permissionManager.hasContactsPermission()
         _hasNotificationPermission.value = c.permissionManager.hasNotificationPermission()
+        _canScheduleExactAlarms.value = c.exactAlarmScheduler.canScheduleExactAlarms()
         _batteryStatus.value = c.deviceController.getBatteryStatus()
         _volumeStatus.value = c.deviceController.getVolumeStatus()
         _securityAudit.value = c.privacyManager.getSecurityAudit(
             preferences.value.confirmationPolicy == ConfirmationPolicy.ALWAYS_COMMUNICATION
         )
+        c.memoryOptimizer.refresh()
+        c.voiceEngine.voskEngine.refreshInstalledStatus()
         viewModelScope.launch {
             _contacts.value = c.contactManager.loadMergedContacts()
             _launchableApps.value = c.deviceController.appLauncher.getLaunchableApps().take(12)
         }
+    }
+
+    fun clearStatusBanner() {
+        _statusBannerMessage.value = null
     }
 
     fun updateInputText(newText: String) {
@@ -220,7 +312,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // --- Advanced Web Book + Voice Role Learning ---
+    // --- Advanced Web / PDF / EPUB Book + BM25 + Voice Role Learning ---
     fun requestBookRoleStudio(defaultQuery: String = "", roleHint: String = "") {
         _pendingBookFetch.value = PendingBookFetchConfirmation(
             query = defaultQuery,
@@ -243,7 +335,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
         if (runInBackground) {
             c.backgroundTaskCoordinator.enqueueBookFetchWorker(req.query)
-            val msg = "دریافت کتاب «${req.query}» در پس‌زمینه زمان‌بندی شد؛ پس از دریافت در حافظه ذخیره و با اعلان اطلاع‌رسانی می‌شود."
+            val msg = "دریافت کتاب «${req.query}» در پس‌زمینه زمان‌بندی شد؛ پس از دریافت در Room ذخیره و در موتور BM25 نمایه‌سازی می‌شود."
             appendMessage(isUser = false, text = msg, actionBadge = "BG_BOOK")
             if (preferences.value.autoSpeak) speakText(msg)
             return
@@ -251,7 +343,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
         _isFetchingBook.value = true
         viewModelScope.launch {
-            val result = c.bookWebFetcher.fetchBookFromInternet(req.query)
+            val result = c.bookWebFetcher.fetchBookOrWebpageFromInternet(req.query)
             _isFetchingBook.value = false
             result.fold(
                 onSuccess = { fetched ->
@@ -264,11 +356,12 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                         sourceUrl = fetched.sourceUrl,
                     )
                     val savedId = c.knowledgeRepository.saveBook(entity)
+                    val chunksCount = c.bookRagEngine.indexBookContent(savedId, fetched.title, fetched.fullText)
                     val savedBook = entity.copy(id = savedId)
-                    val msg = "📘 کتاب «${fetched.title}» اثر ${fetched.author} دریافت و در حافظه محلی ذخیره شد.\nحالا می‌توانید با توضیحات صوتی خودتان، نقش جدید Sol را بر اساس این کتاب آموزش دهید."
+                    val msg = "📘 منبع «${fetched.title}» اثر ${fetched.author} ذخیره و به $chunksCount بخش معنایی (BM25) تبدیل شد.\nاکنون می‌توانید با توضیحات صوتی خود، نقش جدید Sol را آموزش دهید."
                     appendMessage(isUser = false, text = msg, actionBadge = "BOOK_SAVED")
                     c.historyRepository.record(
-                        userText = "دریافت کتاب ${req.query}",
+                        userText = "دریافت کتاب/صفحه ${req.query}",
                         solText = msg,
                         intentAction = "WEB_BOOK_LEARN_ROLE",
                     )
@@ -282,7 +375,6 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                 onFailure = { err ->
                     val failMsg = err.message ?: "دریافت کتاب از اینترنت ناموفق بود."
                     appendMessage(isUser = false, text = failMsg, actionBadge = "BOOK_ERROR")
-                    // Still allow user to teach voice role/notes offline!
                     _voiceRoleSession.value = VoiceRoleTeachingSession(
                         book = null,
                         roleNameDraft = req.roleHint.ifBlank { "نقش مبتنی بر ${req.query}" },
@@ -293,13 +385,16 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun importLocalBookFile(uri: Uri, titleHint: String = "") {
+        _isFetchingBook.value = true
         viewModelScope.launch {
-            val result = c.bookWebFetcher.importLocalTextBook(uri, titleHint)
+            val result = c.bookWebFetcher.importLocalDocument(uri, titleHint)
+            _isFetchingBook.value = false
             result.fold(
-                onSuccess = { book ->
-                    val id = c.knowledgeRepository.saveBook(book)
-                    val saved = book.copy(id = id)
-                    val msg = "فایل کتاب «${saved.title}» به صورت آفلاین خوانده و در حافظه ذخیره شد."
+                onSuccess = { imported ->
+                    val id = c.knowledgeRepository.saveBook(imported.entity)
+                    val chunkCount = c.bookRagEngine.indexBookContent(id, imported.entity.title, imported.fullText)
+                    val saved = imported.entity.copy(id = id)
+                    val msg = "فایل «${saved.title}» به صورت آفلاین استخراج و به $chunkCount بخش برای جست‌وجوی BM25 نمایه‌سازی شد."
                     appendMessage(isUser = false, text = msg, actionBadge = "LOCAL_BOOK")
                     _voiceRoleSession.value = VoiceRoleTeachingSession(
                         book = saved,
@@ -329,7 +424,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
     fun listenVoiceExplanationForRole() {
         _voiceRoleSession.value = _voiceRoleSession.value?.copy(isListeningForExplanation = true)
-        c.voiceEngine.startListening { spoken ->
+        c.voiceEngine.startListening(preferVosk = preferences.value.voskOfflineEnabled) { spoken ->
             val current = _voiceRoleSession.value
             if (current != null) {
                 val merged = listOf(current.voiceExplanationDraft, spoken)
@@ -358,6 +453,11 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
             session.book?.let { b ->
                 if (explanation.isNotBlank()) {
                     c.knowledgeRepository.attachVoiceNoteToBook(b.id, explanation)
+                    c.bookRagEngine.indexBookContent(
+                        b.id,
+                        b.title,
+                        "${b.summaryText}\nتوضیح صوتی کاربر: $explanation",
+                    )
                 }
             }
             c.knowledgeRepository.saveRole(
@@ -373,7 +473,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                     kind = "instruction",
                 )
             }
-            val confirmText = "یاد گرفتم! نقش «$roleName» با توضیحات شما${session.book?.let { " و کتاب «${it.title}»" } ?: ""} در حافظه و شخصیت کاری Sol ثبت و فعال شد."
+            val confirmText = "یاد گرفتم! نقش «$roleName» با توضیحات شما${session.book?.let { " و کتاب «${it.title}»" } ?: ""} ثبت، نمایه‌سازی و روی ویجت فعال شد."
             appendMessage(isUser = false, text = confirmText, actionBadge = "ROLE_LEARNED")
             c.historyRepository.record(
                 userText = "آموزش نقش $roleName",
@@ -387,6 +487,100 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissVoiceRoleSession() {
         c.voiceEngine.stopListening()
         _voiceRoleSession.value = null
+    }
+
+    // --- Vosk Offline Voice & Wake Word Controls ---
+    fun downloadVoskPersianModel() {
+        c.voiceEngine.voskEngine.downloadPersianSmallModel()
+    }
+
+    fun importVoskModelZip(uri: Uri) {
+        c.voiceEngine.voskEngine.importLocalModelZip(uri)
+    }
+
+    fun unloadVoskModelFromRam() {
+        c.voiceEngine.voskEngine.unloadModelFromRam("آزادسازی دستی مدل صوتی از RAM")
+        c.memoryOptimizer.refresh("مدل Vosk از حافظه موقت آزاد شد")
+    }
+
+    fun deleteVoskModel() {
+        c.voiceEngine.voskEngine.deleteInstalledModel()
+        c.memoryOptimizer.refresh()
+    }
+
+    fun startWakeWordGuard() {
+        c.voiceEngine.startWakeWordListening {
+            appendMessage(isUser = false, text = "واژه بیدارباش «Sol» شنیده شد — در حال گوش‌دادن به فرمان شما…", actionBadge = "WAKE_WORD")
+            startVoiceListening()
+        }
+    }
+
+    // --- Encrypted Portable Backup (.solbackup) ---
+    fun requestBackupPassword(mode: BackupDialogMode, uri: Uri) {
+        _pendingBackupRequest.value = PendingBackupPasswordRequest(mode = mode, uri = uri)
+    }
+
+    fun dismissBackupPasswordDialog() {
+        _pendingBackupRequest.value = null
+    }
+
+    fun executeEncryptedBackup(password: String, replaceOnImport: Boolean) {
+        val req = _pendingBackupRequest.value ?: return
+        _pendingBackupRequest.value = null
+        viewModelScope.launch {
+            when (req.mode) {
+                BackupDialogMode.EXPORT -> {
+                    c.encryptedBackupManager.exportEncryptedBackup(req.uri, password).fold(
+                        onSuccess = { stats ->
+                            val msg = "پشتیبان رمزنگاری‌شده (.solbackup) صادر شد: ${stats.memoriesCount} حافظه، ${stats.personsCount} شخص، ${stats.booksCount} کتاب (${stats.chunksCount} بخش) و ${stats.rolesCount} نقش."
+                            _statusBannerMessage.value = msg
+                        },
+                        onFailure = { err ->
+                            _statusBannerMessage.value = err.message ?: "خطا در صدور پشتیبان"
+                        }
+                    )
+                }
+                BackupDialogMode.IMPORT -> {
+                    c.encryptedBackupManager.importEncryptedBackup(req.uri, password, replaceOnImport).fold(
+                        onSuccess = { stats ->
+                            val msg = "بازیابی رمزنگاری‌شده موفق بود: ${stats.memoriesCount} حافظه، ${stats.booksCount} کتاب و ${stats.rolesCount} نقش وارد شدند."
+                            _statusBannerMessage.value = msg
+                            refreshSystemSnapshots()
+                        },
+                        onFailure = { err ->
+                            _statusBannerMessage.value = err.message ?: "خطا در بازیابی پشتیبان"
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    // --- 4GB RAM Optimization & Quick Settings / Exact Alarms ---
+    fun trimRamManually() {
+        c.memoryOptimizer.manualTrimNow(
+            evictRagCache = { c.bookRagEngine.evictCache() },
+            unloadVoskIfIdle = { c.voiceEngine.voskEngine.unloadModelFromRam("آزادسازی دستی RAM") },
+            releaseSlmCache = { c.localSlmEngine.releaseSessionMemory() },
+        )
+        _statusBannerMessage.value = "کش کتاب‌ها، حافظهٔ صوتی و SLM برای گوشی ۴ گیگابایتی آزاد شد."
+    }
+
+    fun requestAddQuickSettingsTile() {
+        SolQuickSettingsTileService.promptPinTile(getApplication()) { msg ->
+            _statusBannerMessage.value = msg
+        }
+    }
+
+    fun requestExactAlarmPermission() {
+        c.exactAlarmScheduler.openExactAlarmSettings()
+    }
+
+    fun cancelScheduledAlarm(alarm: ScheduledAlarmEntity) {
+        viewModelScope.launch {
+            c.exactAlarmScheduler.cancelAlarm(alarm)
+            _statusBannerMessage.value = "یادآور «${alarm.titleFa}» لغو شد."
+        }
     }
 
     // --- Background Jobs Controls ---
@@ -415,12 +609,15 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteBook(id: Long) {
-        viewModelScope.launch { c.knowledgeRepository.deleteBook(id) }
+        viewModelScope.launch {
+            c.knowledgeRepository.deleteBook(id)
+            c.bookRagEngine.evictCache()
+        }
     }
 
     // --- Voice & TTS ---
     fun startVoiceListening() {
-        c.voiceEngine.startListening { recognizedText ->
+        c.voiceEngine.startListening(preferVosk = preferences.value.voskOfflineEnabled) { recognizedText ->
             _inputText.value = recognizedText
             submitCommand(recognizedText)
         }
@@ -446,12 +643,44 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         speakText("سلام ${prefs.ownerName}. من Sol دستیار شخصی شما هستم.")
     }
 
-    // --- Confirmation & Communication ---
+    // --- Confirmation & Communication (+ Hands-Free Voice Confirm/Cancel) ---
+    fun startVoiceConfirmationListening() {
+        _isListeningForConfirm.value = true
+        _confirmVoiceFeedback.value = "بگویید «تأیید» یا «لغو»…"
+        c.voiceEngine.startConfirmationVoiceListening(preferVosk = preferences.value.voskOfflineEnabled) { decision, spoken ->
+            _isListeningForConfirm.value = false
+            when (decision) {
+                true -> {
+                    _confirmVoiceFeedback.value = "شنیده شد: «$spoken» ⟵ در حال تأیید"
+                    confirmAndExecutePending()
+                }
+                false -> {
+                    _confirmVoiceFeedback.value = "شنیده شد: «$spoken» ⟵ لغو شد"
+                    cancelPendingConfirmation()
+                }
+                null -> {
+                    _confirmVoiceFeedback.value = if (spoken.isBlank()) {
+                        "صدایی شنیده نشد؛ لطفاً «تأیید» یا «لغو» بگویید."
+                    } else {
+                        "شنیده شد «$spoken» — لطفاً واضح‌تر بگویید «تأیید» یا «لغو»."
+                    }
+                }
+            }
+        }
+    }
+
+    fun stopVoiceConfirmationListening() {
+        _isListeningForConfirm.value = false
+        c.voiceEngine.stopListening()
+    }
+
     fun selectConfirmationCandidate(contact: ResolvedContact) = c.confirmationManager.selectCandidate(contact)
     fun updateConfirmationChannel(channel: CommunicationChannel) = c.confirmationManager.updateChannel(channel)
     fun updateConfirmationMessage(text: String) = c.confirmationManager.updateMessageBody(text)
 
     fun confirmAndExecutePending() {
+        stopVoiceConfirmationListening()
+        _confirmVoiceFeedback.value = ""
         val pending = c.confirmationManager.pending.value ?: return
         viewModelScope.launch {
             c.taskManager.confirmAndExecute(pending) { report ->
@@ -462,6 +691,8 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun cancelPendingConfirmation() {
+        stopVoiceConfirmationListening()
+        _confirmVoiceFeedback.value = ""
         c.taskManager.cancelConfirmation { msg ->
             appendMessage(isUser = false, text = msg, actionBadge = "CANCELLED")
         }
@@ -562,6 +793,9 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         refreshSystemSnapshots()
     }
     fun setDarkTheme(dark: Boolean) = viewModelScope.launch { c.preferencesRepository.setDarkTheme(dark) }
+    fun setVoskOfflineEnabled(enabled: Boolean) = viewModelScope.launch { c.preferencesRepository.setVoskOfflineEnabled(enabled) }
+    fun setWakeWordEnabled(enabled: Boolean) = viewModelScope.launch { c.preferencesRepository.setWakeWordEnabled(enabled) }
+    fun setSlmSynthesisEnabled(enabled: Boolean) = viewModelScope.launch { c.preferencesRepository.setSlmSynthesisEnabled(enabled) }
 
     private fun appendMessage(isUser: Boolean, text: String, actionBadge: String = "") {
         val next = ChatMessageItem(

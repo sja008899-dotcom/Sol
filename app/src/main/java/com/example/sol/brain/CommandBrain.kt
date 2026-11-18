@@ -1,17 +1,20 @@
 package com.example.sol.brain
 
+import android.content.Context
 import com.example.sol.background.BackgroundTaskCoordinator
+import com.example.sol.calendar.ExactAlarmScheduler
+import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.device.DeviceController
+import com.example.sol.knowledge.BookRagEngine
+import com.example.sol.knowledge.LocalSlmEngine
 import com.example.sol.memory.KnowledgeRepository
 import com.example.sol.memory.LocationRepository
 import com.example.sol.memory.MemoryRepository
-import com.example.sol.memory.PersianNormalizer
 import com.example.sol.memory.PreferencesRepository
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import com.example.sol.widget.SolWidgetStateMirror
 
 class CommandBrain(
+    private val context: Context,
     private val parser: IntentParser,
     private val learningEngine: LearningEngine,
     private val memoryRepository: MemoryRepository,
@@ -20,6 +23,9 @@ class CommandBrain(
     private val preferencesRepository: PreferencesRepository,
     private val deviceController: DeviceController,
     private val backgroundCoordinator: BackgroundTaskCoordinator,
+    private val bookRagEngine: BookRagEngine,
+    private val localSlmEngine: LocalSlmEngine,
+    private val exactAlarmScheduler: ExactAlarmScheduler,
 ) {
     suspend fun process(rawInput: String): BrainExecutionResult {
         val parsed = parser.parse(rawInput)
@@ -48,11 +54,11 @@ class CommandBrain(
                         append(roles.joinToString("، ") { it.roleName })
                     }
                     if (booksCount > 0) {
-                        append("\nتعداد کتاب‌های ذخیره‌شده در حافظه محلی: $booksCount")
+                        append("\nتعداد کتاب‌های نمایه‌شده در موتور آفلاین BM25: $booksCount")
                     }
                 }
                 BrainExecutionResult(
-                    replyText = "من Sol هستم؛ دستیار شخصی آفلاین و قانون‌محور شما. فقط با اجازهٔ صریح شما به اینترنت می‌روم و پس از ذخیره در حافظه محلی کاملاً مستقل عمل می‌کنم.$extra",
+                    replyText = "من Sol هستم؛ دستیار شخصی آفلاین و قانون‌محور شما با تقویم شمسی دقیق، جست‌وجوی معنایی کتاب‌ها و پشتیبان رمزنگاری‌شده.$extra",
                     parsedCommand = parsed,
                 )
             }
@@ -64,32 +70,66 @@ class CommandBrain(
             )
 
             SolAction.HELP -> BrainExecutionResult(
-                replyText = "نمونه فرمان‌های Sol:\n• «۲۰ قابلیت» برای مشاهده کل ۱۰ اجرای پس‌زمینه و دستورهای پیشرفته\n• به اینترنت برو کتاب Atomic Habits را پیدا کن و با توضیحات صوتی من به حافظه و نقشت اضافه کن\n• ۵ دقیقه دیگر یادآوری کن با علی تماس بگیرم\n• از حافظه در پس‌زمینه پشتیبان بگیر\n• هر وقت می‌گم دفتر منظورم شرکت کارنو صنعت ماکیان است\n• وضعیت شرکت را به علی اطلاع بده و بعد نتیجه را به من گزارش کن",
+                replyText = "نمونه فرمان‌های پیشرفته Sol v2:\n" +
+                    "• «امروز چندم برج است؟» (تقویم شمسی واقعی)\n" +
+                    "• «چهارشنبه ساعت ۹ صبح یادآوری کن جلسه دارم» (AlarmManager دقیق)\n" +
+                    "• «دو روز دیگه به علی پیام یادآوری بفرست»\n" +
+                    "• «طبق نقشت درباره عادت‌های اتمی راهنماییم کن» (جست‌وجوی BM25 روی کتاب‌ها)\n" +
+                    "• «هر وقت می‌گم دفتر منظورم شرکت کارنو صنعت ماکیان است»\n" +
+                    "• «۲۰ قابلیت» برای مشاهده کل قابلیت‌ها و وظایف پس‌زمینه",
                 parsedCommand = parsed,
             )
 
             SolAction.TIME_DATE -> {
-                val timeStr = SimpleDateFormat("HH:mm", Locale.US).format(Date())
-                val dateStr = SimpleDateFormat("yyyy/MM/dd (EEEE)", Locale("fa", "IR")).format(Date())
+                val jalaliReply = JalaliCalendar.answerCalendarQuestion(parsed.rawText)
                 BrainExecutionResult(
-                    replyText = "ساعت دستگاه $timeStr و تاریخ $dateStr است.",
+                    replyText = jalaliReply,
                     parsedCommand = parsed,
                 )
             }
 
             SolAction.SCHEDULE_REMINDER -> {
-                val msg = parsed.message.orEmpty().ifBlank { "یادآور Sol" }
-                backgroundCoordinator.scheduleReminder(msg, parsed.delayMinutes)
-                knowledgeRepository.logBackgroundJob(
-                    jobKey = "bg_reminder",
-                    titleFa = "یادآور زمان‌بندی‌شده",
-                    status = "SCHEDULED",
-                    detailFa = "برای ${parsed.delayMinutes} دقیقه دیگر: $msg",
-                )
-                BrainExecutionResult(
-                    replyText = "یادآور پس‌زمینه برای ${parsed.delayMinutes} دقیقه دیگر تنظیم شد: «$msg».",
-                    parsedCommand = parsed,
-                )
+                val schedule = parsed.jalaliSchedule
+                if (schedule != null) {
+                    val title = if (schedule.isMessageReminder && !schedule.contactHint.isNullOrBlank()) {
+                        "یادآور پیام به ${schedule.contactHint}"
+                    } else {
+                        "یادآور دقیق شمسی Sol"
+                    }
+                    val outcome = exactAlarmScheduler.scheduleJalaliAlarm(
+                        triggerAtMillis = schedule.triggerAtMillis,
+                        titleFa = title,
+                        messageBody = schedule.reminderMessage,
+                        targetContact = schedule.contactHint.orEmpty(),
+                    )
+                    val modeNote = if (outcome.isExactGranted) {
+                        "با دقت ثانیه‌ای (AlarmManager + Doze)"
+                    } else {
+                        "با احترام به Doze (برای دقت دقیق‌تر در تنظیمات «دسترسی هشدار دقیق» را فعال کنید)"
+                    }
+                    val contactNote = if (!schedule.contactHint.isNullOrBlank()) {
+                        "\nمخاطب هدف: ${schedule.contactHint}"
+                    } else {
+                        ""
+                    }
+                    BrainExecutionResult(
+                        replyText = "یادآور شما برای «${outcome.jalaliDateTimeFa}» تنظیم شد ($modeNote).$contactNote\nمتن: «${schedule.reminderMessage}»",
+                        parsedCommand = parsed,
+                    )
+                } else {
+                    val msg = parsed.message.orEmpty().ifBlank { "یادآور Sol" }
+                    backgroundCoordinator.scheduleReminder(msg, parsed.delayMinutes)
+                    knowledgeRepository.logBackgroundJob(
+                        jobKey = "bg_reminder",
+                        titleFa = "یادآور زمان‌بندی‌شده",
+                        status = "SCHEDULED",
+                        detailFa = "برای ${parsed.delayMinutes} دقیقه دیگر: $msg",
+                    )
+                    BrainExecutionResult(
+                        replyText = "یادآور پس‌زمینه برای ${parsed.delayMinutes} دقیقه دیگر تنظیم شد: «$msg».",
+                        parsedCommand = parsed,
+                    )
+                }
             }
 
             SolAction.BACKGROUND_CONTROL -> {
@@ -101,7 +141,7 @@ class CommandBrain(
             SolAction.WEB_BOOK_LEARN_ROLE -> {
                 val query = parsed.bookQuery.orEmpty().ifBlank { "Little Prince" }
                 BrainExecutionResult(
-                    replyText = "درخواست جست‌وجوی کتاب «$query» در اینترنت آماده شد؛ لطفاً اتصال اختیاری به اینترنت را تأیید کنید تا بعد با توضیحات صوتی شما به حافظه و نقش Sol اضافه شود.",
+                    replyText = "درخواست جست‌وجوی کتاب «$query» آماده شد؛ می‌توانید از اینترنت دریافت کنید یا فایل PDF / EPUB / TXT انتخاب نمایید و سپس توضیحات صوتی خود را به نقش Sol اضافه کنید.",
                     parsedCommand = parsed,
                     pendingTask = PendingSolTask.InternetBookRoleFetch(
                         bookQuery = query,
@@ -120,40 +160,25 @@ class CommandBrain(
                     linkedBookTitle = latestBook?.title.orEmpty(),
                     isActive = true,
                 )
+                SolWidgetStateMirror.saveAndRefresh(
+                    context = context,
+                    confirmedLocation = prefs.confirmedCurrentLocation,
+                    activeRoleName = roleName,
+                )
                 val bookSuffix = if (latestBook != null) " و به کتاب «${latestBook.title}» متصل شد" else ""
                 BrainExecutionResult(
-                    replyText = "نقش جدید «$roleName» با دستور شما ذخیره$bookSuffix و فعال شد.",
+                    replyText = "نقش جدید «$roleName» با دستور شما ذخیره$bookSuffix و فعال شد (ویجت صفحه اصلی نیز به‌روزرسانی شد).",
                     parsedCommand = parsed,
                 )
             }
 
             SolAction.CONSULT_ROLE_BOOK -> {
-                val roles = knowledgeRepository.getAllRolesOnce().filter { it.isActive }
-                val books = knowledgeRepository.getAllBooksOnce()
-                val reply = if (roles.isEmpty() && books.isEmpty()) {
-                    "هنوز کتاب یا نقشی آموزش داده نشده است. می‌توانید بگویید: «به اینترنت برو کتاب ... را پیدا کن و با توضیحات صوتی من به حافظه و نقشت اضافه کن»."
-                } else {
-                    buildString {
-                        if (roles.isNotEmpty()) {
-                            val r = roles.first()
-                            append("بر اساس نقش فعال «${r.roleName}»")
-                            if (r.instructions.isNotBlank()) append(" (${r.instructions})")
-                            append(":\n")
-                        }
-                        val normQuery = PersianNormalizer.normalize(parsed.rawText)
-                        val matchedBook = books.firstOrNull {
-                            normQuery.contains(PersianNormalizer.normalize(it.title))
-                        } ?: books.firstOrNull()
-                        if (matchedBook != null) {
-                            append("📘 کتاب مرجع: ${matchedBook.title} (${matchedBook.author})\n")
-                            append("خلاصه: ${matchedBook.summaryText.take(360)}\n")
-                            if (matchedBook.voiceNotes.isNotBlank()) {
-                                append("🎙 یادداشت‌های صوتی شما:\n• ${matchedBook.voiceNotes}")
-                            }
-                        }
-                    }.trim()
-                }
-                BrainExecutionResult(replyText = reply, parsedCommand = parsed)
+                val rag = bookRagEngine.consultOffline(
+                    query = parsed.rawText,
+                    slmEngine = localSlmEngine,
+                    useSlm = prefs.slmSynthesisEnabled,
+                )
+                BrainExecutionResult(replyText = rag.answerText, parsedCommand = parsed)
             }
 
             SolAction.LEARN_ALIAS -> {
@@ -198,6 +223,12 @@ class CommandBrain(
                     ?: locationRepository.findLocation(rawLoc)?.fullName
                     ?: rawLoc
                 preferencesRepository.confirmCurrentLocation(resolvedLoc)
+                val activeRole = knowledgeRepository.getAllRolesOnce().firstOrNull { it.isActive }?.roleName.orEmpty()
+                SolWidgetStateMirror.saveAndRefresh(
+                    context = context,
+                    confirmedLocation = resolvedLoc,
+                    activeRoleName = activeRole,
+                )
                 BrainExecutionResult(
                     replyText = "موقعیت فعلی تأییدشدهٔ شما روی «$resolvedLoc» ثبت شد.",
                     parsedCommand = parsed,
@@ -272,7 +303,7 @@ class CommandBrain(
                 } else {
                     val (resolvedMsg, _) = learningEngine.resolveAliasesInText(parsed.message.orEmpty())
                     BrainExecutionResult(
-                        replyText = "در حال آماده‌سازی تماس با $contact؛ لطفاً تأیید کنید.",
+                        replyText = "در حال آماده‌سازی تماس با $contact؛ می‌توانید «تأیید» یا «لغو» بگویید یا دکمه را بزنید.",
                         parsedCommand = parsed,
                         pendingTask = PendingSolTask.Communicate(
                             preferSms = false,
@@ -295,7 +326,7 @@ class CommandBrain(
                 } else {
                     val (resolvedMsg, _) = learningEngine.resolveAliasesInText(parsed.message.orEmpty())
                     BrainExecutionResult(
-                        replyText = "در حال آماده‌سازی پیامک برای $contact؛ لطفاً متن و شماره را تأیید کنید.",
+                        replyText = "در حال آماده‌سازی پیامک برای $contact؛ می‌توانید «تأیید» یا «لغو» بگویید یا دکمه را بزنید.",
                         parsedCommand = parsed,
                         pendingTask = PendingSolTask.Communicate(
                             preferSms = true,
@@ -372,46 +403,38 @@ class CommandBrain(
             SolAction.RUN_ROUTINE -> {
                 val bat = deviceController.getBatteryStatus()
                 val loc = prefs.confirmedCurrentLocation.ifBlank { "ثبت‌نشده" }
+                val todayJalali = JalaliCalendar.fromMillis().formatFullFa()
                 val routineLabel = if (parsed.routineName == "NIGHT") "شب" else "کار"
                 BrainExecutionResult(
-                    replyText = "روتین «$routineLabel» اجرا شد:\n• موقعیت فعلی تأییدشده: $loc\n• باتری: ${bat.levelPercent}٪\n• حافظهٔ محلی: فعال و آماده",
+                    replyText = "روتین «$routineLabel» ($todayJalali) اجرا شد:\n• موقعیت فعلی تأییدشده: $loc\n• باتری: ${bat.levelPercent}٪\n• موتور BM25 و حافظه محلی: آماده",
                     parsedCommand = parsed,
                 )
             }
 
             SolAction.UNKNOWN -> {
                 val (resolved, matched) = learningEngine.resolveAliasesInText(rawInput)
-                val activeRole = knowledgeRepository.getAllRolesOnce().firstOrNull { it.isActive }
-                val books = knowledgeRepository.getAllBooksOnce()
-                val normIn = PersianNormalizer.normalize(rawInput)
-                val bookMatch = books.firstOrNull {
-                    normIn.contains(PersianNormalizer.normalize(it.title)) ||
-                        (it.voiceNotes.isNotBlank() && PersianNormalizer.normalize(it.voiceNotes).split(" ").any { w -> w.length > 3 && normIn.contains(w) })
+                if (matched.isNotEmpty()) {
+                    val pairs = matched.joinToString("، ") { "«${it.first}» = «${it.second}»" }
+                    return BrainExecutionResult(
+                        replyText = "طبق یادگیری قبلی ($pairs)، برداشت من این است: «$resolved».",
+                        parsedCommand = parsed,
+                    )
                 }
 
-                when {
-                    matched.isNotEmpty() -> {
-                        val pairs = matched.joinToString("، ") { "«${it.first}» = «${it.second}»" }
-                        BrainExecutionResult(
-                            replyText = "طبق یادگیری قبلی ($pairs)، برداشت من این است: «$resolved».",
-                            parsedCommand = parsed,
-                        )
-                    }
-                    bookMatch != null || activeRole != null -> {
-                        val rolePrefix = if (activeRole != null) "در نقش «${activeRole.roleName}»" else "طبق دانش ذخیره‌شده"
-                        val bookBody = if (bookMatch != null) {
-                            "\n📘 مرجع «${bookMatch.title}»: ${bookMatch.summaryText.take(260)}" +
-                                if (bookMatch.voiceNotes.isNotBlank()) "\n🎙 توضیح صوتی شما: ${bookMatch.voiceNotes}" else ""
-                        } else {
-                            "\nدستورالعمل نقش شما: ${activeRole?.instructions.orEmpty()}"
-                        }
-                        BrainExecutionResult(
-                            replyText = "$rolePrefix پاسخ می‌دهم:$bookBody",
-                            parsedCommand = parsed,
-                        )
-                    }
-                    else -> BrainExecutionResult(
-                        replyText = "این فرمان را هنوز دقیق نشناختم. می‌توانید «۲۰ قابلیت» را بزنید، یا با «هر وقت می‌گم ... منظورم ... است» یاد بدهید، یا کتابی را با توضیح صوتی به نقشم اضافه کنید.",
+                // Try on-device BM25 search over stored books + active role
+                val rag = bookRagEngine.consultOffline(
+                    query = rawInput,
+                    slmEngine = localSlmEngine,
+                    useSlm = prefs.slmSynthesisEnabled,
+                )
+                if (rag.topChunks.isNotEmpty() || rag.activeRole != null) {
+                    BrainExecutionResult(
+                        replyText = rag.answerText,
+                        parsedCommand = parsed,
+                    )
+                } else {
+                    BrainExecutionResult(
+                        replyText = "این فرمان را هنوز دقیق نشناختم. می‌توانید «امروز چندم برج است؟»، «چهارشنبه ساعت ۹ یادآوری کن...»، «۲۰ قابلیت» یا با «هر وقت می‌گم ... منظورم ... است» آموزش بدهید.",
                         parsedCommand = parsed,
                     )
                 }

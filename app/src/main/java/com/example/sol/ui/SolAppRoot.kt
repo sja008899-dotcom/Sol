@@ -35,6 +35,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -51,6 +52,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.tasks.CommunicationChannel
 import com.example.sol.voice.VoiceListeningState
 import com.example.ui.theme.SolTheme
@@ -78,7 +80,10 @@ private val NAV_ITEMS = listOf(
 )
 
 @Composable
-fun SolAppRoot(viewModel: SolViewModel) {
+fun SolAppRoot(
+    viewModel: SolViewModel,
+    externalVoiceTriggerNonce: Int = 0,
+) {
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
     val memories by viewModel.memories.collectAsStateWithLifecycle()
     val persons by viewModel.persons.collectAsStateWithLifecycle()
@@ -88,19 +93,32 @@ fun SolAppRoot(viewModel: SolViewModel) {
     val roles by viewModel.roles.collectAsStateWithLifecycle()
     val backgroundLogs by viewModel.backgroundLogs.collectAsStateWithLifecycle()
     val enabledPeriodicJobs by viewModel.enabledPeriodicJobs.collectAsStateWithLifecycle()
+    val bookChunkCount by viewModel.bookChunkCount.collectAsStateWithLifecycle()
+    val scheduledAlarms by viewModel.scheduledAlarms.collectAsStateWithLifecycle()
 
     val listeningState by viewModel.listeningState.collectAsStateWithLifecycle()
     val partialSpeechText by viewModel.partialSpeechText.collectAsStateWithLifecycle()
     val micRms by viewModel.micRms.collectAsStateWithLifecycle()
+    val activeAsrBackend by viewModel.activeAsrBackend.collectAsStateWithLifecycle()
+    val voskModelStatus by viewModel.voskModelStatus.collectAsStateWithLifecycle()
+    val vocabularyTermsCount by viewModel.vocabularyTermsCount.collectAsStateWithLifecycle()
+    val ramSnapshot by viewModel.ramSnapshot.collectAsStateWithLifecycle()
+    val slmStatus by viewModel.slmStatus.collectAsStateWithLifecycle()
+    val canScheduleExactAlarms by viewModel.canScheduleExactAlarms.collectAsStateWithLifecycle()
+
     val ttsAvailability by viewModel.ttsAvailability.collectAsStateWithLifecycle()
     val isSpeaking by viewModel.isSpeaking.collectAsStateWithLifecycle()
     val persianVoices by viewModel.persianVoices.collectAsStateWithLifecycle()
     val activeTask by viewModel.activeTask.collectAsStateWithLifecycle()
     val pendingConfirmation by viewModel.pendingConfirmation.collectAsStateWithLifecycle()
+    val isListeningForConfirm by viewModel.isListeningForConfirm.collectAsStateWithLifecycle()
+    val confirmVoiceFeedback by viewModel.confirmVoiceFeedback.collectAsStateWithLifecycle()
     val pendingBookFetch by viewModel.pendingBookFetch.collectAsStateWithLifecycle()
     val isFetchingBook by viewModel.isFetchingBook.collectAsStateWithLifecycle()
     val voiceRoleSession by viewModel.voiceRoleSession.collectAsStateWithLifecycle()
     val showCapabilitiesSheet by viewModel.showCapabilitiesSheet.collectAsStateWithLifecycle()
+    val pendingBackupRequest by viewModel.pendingBackupRequest.collectAsStateWithLifecycle()
+    val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
 
     val inputText by viewModel.inputText.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
@@ -116,15 +134,22 @@ fun SolAppRoot(viewModel: SolViewModel) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    LaunchedEffect(statusBannerMessage) {
+        statusBannerMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearStatusBanner()
+        }
+    }
+
     val micPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         viewModel.refreshSystemSnapshots()
         if (granted) {
-            if (voiceRoleSession != null) {
-                viewModel.listenVoiceExplanationForRole()
-            } else {
-                viewModel.startVoiceListening()
+            when {
+                pendingConfirmation != null -> viewModel.startVoiceConfirmationListening()
+                voiceRoleSession != null -> viewModel.listenVoiceExplanationForRole()
+                else -> viewModel.startVoiceListening()
             }
         } else {
             scope.launch {
@@ -158,11 +183,53 @@ fun SolAppRoot(viewModel: SolViewModel) {
         }
     }
 
+    val voskZipPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importVoskModelZip(uri)
+        }
+    }
+
+    val backupExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/octet-stream"),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.requestBackupPassword(BackupDialogMode.EXPORT, uri)
+        }
+    }
+
+    val backupImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.requestBackupPassword(BackupDialogMode.IMPORT, uri)
+        }
+    }
+
     val handleMicClick: () -> Unit = {
-        if (listeningState is VoiceListeningState.Listening) {
+        if (listeningState is VoiceListeningState.Listening || listeningState is VoiceListeningState.WakeWordArmed) {
             viewModel.stopVoiceListening()
         } else if (hasMicPermission) {
             viewModel.startVoiceListening()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    val handleWakeWordClick: () -> Unit = {
+        if (listeningState is VoiceListeningState.WakeWordArmed) {
+            viewModel.stopVoiceListening()
+        } else if (hasMicPermission) {
+            viewModel.startWakeWordGuard()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    val handleConfirmVoiceClick: () -> Unit = {
+        if (hasMicPermission) {
+            viewModel.startVoiceConfirmationListening()
         } else {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -173,6 +240,17 @@ fun SolAppRoot(viewModel: SolViewModel) {
             viewModel.listenVoiceExplanationForRole()
         } else {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    // Trigger mic automatically when opened from Home Screen Widget or Quick Settings Tile
+    LaunchedEffect(externalVoiceTriggerNonce) {
+        if (externalVoiceTriggerNonce > 0) {
+            if (hasMicPermission) {
+                viewModel.startVoiceListening()
+            } else {
+                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
         }
     }
 
@@ -195,6 +273,10 @@ fun SolAppRoot(viewModel: SolViewModel) {
             pendingConfirmation?.let { confirmation ->
                 CommunicationConfirmationDialog(
                     confirmation = confirmation,
+                    isListeningVoiceConfirm = isListeningForConfirm,
+                    voiceConfirmFeedback = confirmVoiceFeedback,
+                    onStartVoiceConfirm = handleConfirmVoiceClick,
+                    onStopVoiceConfirm = viewModel::stopVoiceConfirmationListening,
                     onSelectCandidate = viewModel::selectConfirmationCandidate,
                     onSelectChannel = viewModel::updateConfirmationChannel,
                     onMessageChange = viewModel::updateConfirmationMessage,
@@ -209,7 +291,15 @@ fun SolAppRoot(viewModel: SolViewModel) {
                     onUpdateQuery = viewModel::updatePendingBookQuery,
                     onConfirmFetch = viewModel::confirmInternetBookFetch,
                     onPickLocalFile = {
-                        localBookPickerLauncher.launch(arrayOf("text/plain", "text/*"))
+                        localBookPickerLauncher.launch(
+                            arrayOf(
+                                "application/pdf",
+                                "application/epub+zip",
+                                "text/plain",
+                                "text/html",
+                                "application/octet-stream",
+                            )
+                        )
                     },
                     onDismiss = viewModel::dismissPendingBookFetch,
                 )
@@ -223,6 +313,14 @@ fun SolAppRoot(viewModel: SolViewModel) {
                     onStopVoiceExplanation = viewModel::stopVoiceExplanationListening,
                     onSave = viewModel::saveVoiceRoleTeaching,
                     onDismiss = viewModel::dismissVoiceRoleSession,
+                )
+            }
+
+            pendingBackupRequest?.let { req ->
+                BackupPasswordDialog(
+                    mode = req.mode,
+                    onConfirm = viewModel::executeEncryptedBackup,
+                    onDismiss = viewModel::dismissBackupPasswordDialog,
                 )
             }
 
@@ -330,6 +428,8 @@ fun SolAppRoot(viewModel: SolViewModel) {
                                         listeningState = listeningState,
                                         partialSpeechText = partialSpeechText,
                                         micRms = micRms,
+                                        activeAsrBackend = activeAsrBackend,
+                                        voskModelStatus = voskModelStatus,
                                         ttsAvailability = ttsAvailability,
                                         isSpeaking = isSpeaking,
                                         isFetchingBook = isFetchingBook,
@@ -342,6 +442,7 @@ fun SolAppRoot(viewModel: SolViewModel) {
                                         onSendCommand = { viewModel.submitCommand() },
                                         onQuickCommand = { cmd -> viewModel.submitCommand(cmd) },
                                         onMicClick = handleMicClick,
+                                        onWakeWordClick = handleWakeWordClick,
                                         onClearVoiceError = viewModel::clearVoiceError,
                                         onSpeakMessage = viewModel::speakText,
                                         onStopSpeaking = viewModel::stopSpeaking,
@@ -418,6 +519,13 @@ fun SolAppRoot(viewModel: SolViewModel) {
                                         preferences = preferences,
                                         ttsAvailability = ttsAvailability,
                                         persianVoices = persianVoices,
+                                        voskModelStatus = voskModelStatus,
+                                        vocabularyTermsCount = vocabularyTermsCount,
+                                        bookChunkCount = bookChunkCount,
+                                        slmStatus = slmStatus,
+                                        ramSnapshot = ramSnapshot,
+                                        canScheduleExactAlarms = canScheduleExactAlarms,
+                                        scheduledAlarms = scheduledAlarms,
                                         batteryStatus = batteryStatus,
                                         volumeStatus = volumeStatus,
                                         launchableApps = launchableApps,
@@ -428,6 +536,26 @@ fun SolAppRoot(viewModel: SolViewModel) {
                                         onSpeechRateChange = viewModel::setSpeechRate,
                                         onAutoSpeakChange = viewModel::setAutoSpeak,
                                         onTestVoice = viewModel::testVoiceSample,
+                                        onVoskOfflineToggle = viewModel::setVoskOfflineEnabled,
+                                        onWakeWordToggle = viewModel::setWakeWordEnabled,
+                                        onDownloadVoskModel = viewModel::downloadVoskPersianModel,
+                                        onPickVoskZip = {
+                                            voskZipPickerLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
+                                        },
+                                        onUnloadVoskRam = viewModel::unloadVoskModelFromRam,
+                                        onDeleteVoskModel = viewModel::deleteVoskModel,
+                                        onSlmToggle = viewModel::setSlmSynthesisEnabled,
+                                        onAddQuickSettingsTile = viewModel::requestAddQuickSettingsTile,
+                                        onRequestExactAlarmPermission = viewModel::requestExactAlarmPermission,
+                                        onCancelScheduledAlarm = viewModel::cancelScheduledAlarm,
+                                        onExportEncryptedBackup = {
+                                            val jDate = JalaliCalendar.fromMillis().formatShortFa().replace("/", "-")
+                                            backupExportLauncher.launch("sol-backup-$jDate.solbackup")
+                                        },
+                                        onImportEncryptedBackup = {
+                                            backupImportLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                        },
+                                        onTrimRamNow = viewModel::trimRamManually,
                                         onInvocationModeChange = viewModel::setInvocationMode,
                                         onDeliveryPreferenceChange = viewModel::setDeliveryPreference,
                                         onConfirmationPolicyChange = viewModel::setConfirmationPolicy,

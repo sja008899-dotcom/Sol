@@ -210,7 +210,7 @@ fun InternetBookFetchDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = "طبق قانون امنیتی Sol، اتصال به اینترنت فقط با تأیید صریح شما برای جست‌وجوی کتاب در مخازن عمومی (Gutendex / Open Library) انجام می‌شود.",
+                    text = "طبق قانون امنیتی Sol، اتصال به اینترنت فقط با تأیید صریح شما برای جست‌وجوی کتاب (Gutendex / Open Library) یا خواندن لینک صفحهٔ وب انجام می‌شود.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -220,8 +220,8 @@ fun InternetBookFetchDialog(
                         query = it
                         onUpdateQuery(it, roleHint)
                     },
-                    label = { Text("نام کتاب (فارسی یا انگلیسی)") },
-                    placeholder = { Text("مثلاً: Atomic Habits یا شازده کوچولو") },
+                    label = { Text("نام کتاب یا لینک صفحه وب (URL)") },
+                    placeholder = { Text("مثلاً: Atomic Habits یا https://...") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -252,7 +252,7 @@ fun InternetBookFetchDialog(
                 ) {
                     Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("انتخاب فایل متنی کتاب از گوشی (بدون اینترنت)")
+                    Text("انتخاب فایل PDF / EPUB / HTML / TXT از گوشی")
                 }
             }
         },
@@ -462,6 +462,10 @@ fun ActiveTaskProgressCard(
 @Composable
 fun CommunicationConfirmationDialog(
     confirmation: PendingCommunicationConfirmation,
+    isListeningVoiceConfirm: Boolean,
+    voiceConfirmFeedback: String,
+    onStartVoiceConfirm: () -> Unit,
+    onStopVoiceConfirm: () -> Unit,
     onSelectCandidate: (ResolvedContact) -> Unit,
     onSelectChannel: (CommunicationChannel) -> Unit,
     onMessageChange: (String) -> Unit,
@@ -490,6 +494,52 @@ fun CommunicationConfirmationDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                Surface(
+                    color = if (isListeningVoiceConfirm) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (isListeningVoiceConfirm) onStopVoiceConfirm() else onStartVoiceConfirm()
+                        }
+                        .testTag("voice_confirm_toggle"),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = if (isListeningVoiceConfirm) Icons.Default.Stop else Icons.Default.Mic,
+                            contentDescription = "تأیید صوتی",
+                            tint = if (isListeningVoiceConfirm) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (isListeningVoiceConfirm) {
+                                    "در حال شنود: بگویید «تأیید» یا «لغو»…"
+                                } else {
+                                    "تأیید یا لغو صوتی (برای گفتن «تأیید» / «لغو» بزنید)"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            if (voiceConfirmFeedback.isNotBlank()) {
+                                Text(
+                                    text = voiceConfirmFeedback,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(12.dp),
@@ -603,6 +653,76 @@ fun CommunicationConfirmationDialog(
             ) {
                 Text("لغو")
             }
+        },
+    )
+}
+
+@Composable
+fun BackupPasswordDialog(
+    mode: BackupDialogMode,
+    onConfirm: (password: String, replaceExisting: Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    var replaceExisting by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Security,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        title = {
+            Text(
+                if (mode == BackupDialogMode.EXPORT) {
+                    "رمزگذاری فایل پشتیبان (.solbackup)"
+                } else {
+                    "رمزگشایی و بازیابی (.solbackup)"
+                }
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = if (mode == BackupDialogMode.EXPORT) {
+                        "کل حافظه، مترادف‌ها، مخاطبین، کتاب‌ها (همراه با بخش‌های BM25) و نقش‌ها با AES-256-GCM رمزنگاری می‌شوند."
+                    } else {
+                        "رمز فایل پشتیبان را وارد کنید تا داده‌های رمزدار روی این گوشی بازیابی شوند."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("رمز عبور پشتیبان (حداقل ۴ کاراکتر)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (mode == BackupDialogMode.IMPORT) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { replaceExisting = !replaceExisting },
+                    ) {
+                        Checkbox(checked = replaceExisting, onCheckedChange = { replaceExisting = it })
+                        Text("جایگزینی کامل به جای ادغام با حافظه فعلی", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(password, replaceExisting) },
+                enabled = password.length >= 4,
+            ) {
+                Text(if (mode == BackupDialogMode.EXPORT) "رمزنگاری و ذخیره" else "رمزگشایی و بازیابی")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("لغو") }
         },
     )
 }
