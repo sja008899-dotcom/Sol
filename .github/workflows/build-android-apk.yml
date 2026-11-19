@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-apk:
@@ -29,16 +29,30 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept Android SDK Licenses & Install SDK 36.1
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
+          SDK_MANAGER="$(command -v sdkmanager || find "${SDK_ROOT}" -maxdepth 4 -type f -name sdkmanager 2>/dev/null | head -n 1)"
+          if [ -z "${SDK_MANAGER}" ]; then
+            echo "sdkmanager not found under ${SDK_ROOT}"
+            exit 1
+          fi
+          echo "Using sdkmanager: ${SDK_MANAGER}"
+          (yes || true) | "${SDK_MANAGER}" --licenses >/dev/null
+          "${SDK_MANAGER}" --install "platform-tools" "build-tools;36.0.0" "platforms;android-36.1"
+
       - name: Set up Gradle 9.3.1
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.3.1"
 
-      - name: Prepare debug keystore and env
+      - name: Verify Gradle & Prepare Keystore / Env
         run: |
-          if [ -f debug.keystore.base64 ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
-          elif [ ! -f debug.keystore ]; then
+          gradle --version
+          if [ -s debug.keystore.base64 ]; then
+            tr -d '\r\n' < debug.keystore.base64 | base64 -d > debug.keystore
+          fi
+          if [ ! -s debug.keystore ]; then
             keytool -genkeypair -v \
               -keystore debug.keystore \
               -storepass android \
@@ -52,26 +66,40 @@ jobs:
           touch .env
 
       - name: Run Unit & Robolectric Tests
-        run: gradle :app:testDebugUnitTest --no-daemon
+        run: |
+          gradle :app:testDebugUnitTest --no-daemon --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+            -Dorg.gradle.workers.max=2
 
       - name: Build Installable Debug APK
-        run: gradle :app:assembleDebug --no-daemon
+        run: |
+          gradle :app:assembleDebug --no-daemon --stacktrace \
+            -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+            -Dorg.gradle.workers.max=2
 
-      - name: Prepare APK output folder
+      - name: Prepare APK Output Folder
         run: |
           mkdir -p release-apks
           cp app/build/outputs/apk/debug/app-debug.apk release-apks/Sol-v2.0.0-debug.apk
+          ls -lh release-apks/
 
       - name: Build Signed Release APK (if secrets configured)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' && secrets.STORE_PASSWORD != '' && secrets.KEY_PASSWORD != '' }}
         env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "${KEYSTORE_PATH}"
-          gradle :app:assembleRelease --no-daemon
-          cp app/build/outputs/apk/release/app-release.apk release-apks/Sol-v2.0.0-release.apk
+          if [ -n "${KEYSTORE_BASE64}" ] && [ -n "${STORE_PASSWORD}" ] && [ -n "${KEY_PASSWORD}" ]; then
+            printf '%s' "${KEYSTORE_BASE64}" | tr -d '\r\n' | base64 -d > "${KEYSTORE_PATH}"
+            gradle :app:assembleRelease --no-daemon --stacktrace \
+              -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8" \
+              -Dorg.gradle.workers.max=2
+            cp app/build/outputs/apk/release/app-release.apk release-apks/Sol-v2.0.0-release.apk
+            rm -f "${KEYSTORE_PATH}"
+          else
+            echo "Release signing secrets not set; skipping signed release APK."
+          fi
 
       - name: Upload Sol APK Artifact
         uses: actions/upload-artifact@v4
@@ -80,8 +108,22 @@ jobs:
           path: release-apks/*.apk
           if-no-files-found: error
 
-      - name: Publish GitHub Release on Tag
-        if: startsWith(github.ref, 'refs/tags/v')
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-apk
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Sol APK Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Sol-Android-APK
+          path: release-apks
+
+      - name: Publish Release Files
         uses: softprops/action-gh-release@v2
         with:
           files: release-apks/*.apk
