@@ -118,15 +118,14 @@ class CommandBrain(
                     )
                 } else {
                     val msg = parsed.message.orEmpty().ifBlank { "یادآور Sol" }
-                    backgroundCoordinator.scheduleReminder(msg, parsed.delayMinutes)
-                    knowledgeRepository.logBackgroundJob(
-                        jobKey = "bg_reminder",
-                        titleFa = "یادآور زمان‌بندی‌شده",
-                        status = "SCHEDULED",
-                        detailFa = "برای ${parsed.delayMinutes} دقیقه دیگر: $msg",
-                    )
+                    val outcome = backgroundCoordinator.scheduleReminder(msg, parsed.delayMinutes)
+                    val modeNote = if (outcome.isExactGranted) {
+                        "با دقت ثانیه‌ای (AlarmManager)"
+                    } else {
+                        "با احترام به Doze"
+                    }
                     BrainExecutionResult(
-                        replyText = "یادآور پس‌زمینه برای ${parsed.delayMinutes} دقیقه دیگر تنظیم شد: «$msg».",
+                        replyText = "یادآور شما برای ${parsed.delayMinutes} دقیقه دیگر (${outcome.jalaliDateTimeFa}) تنظیم شد ($modeNote): «$msg».",
                         parsedCommand = parsed,
                     )
                 }

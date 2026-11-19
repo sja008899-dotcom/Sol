@@ -8,6 +8,8 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.example.sol.calendar.AlarmScheduleOutcome
+import com.example.sol.calendar.ExactAlarmScheduler
 import com.example.sol.memory.KnowledgeRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +19,7 @@ import java.util.concurrent.TimeUnit
 class BackgroundTaskCoordinator(
     private val context: Context,
     private val knowledgeRepository: KnowledgeRepository,
+    private val exactAlarmScheduler: ExactAlarmScheduler,
 ) {
     private val workManager: WorkManager by lazy {
         WorkManager.getInstance(context.applicationContext)
@@ -25,26 +28,27 @@ class BackgroundTaskCoordinator(
     private val _enabledPeriodicJobs = MutableStateFlow<Set<String>>(emptySet())
     val enabledPeriodicJobs: StateFlow<Set<String>> = _enabledPeriodicJobs.asStateFlow()
 
-    fun scheduleReminder(message: String, delayMinutes: Long) {
+    suspend fun scheduleReminder(message: String, delayMinutes: Long): AlarmScheduleOutcome {
         val safeMinutes = delayMinutes.coerceIn(1L, 1440L)
-        val req = OneTimeWorkRequestBuilder<ScheduledReminderWorker>()
-            .setInitialDelay(safeMinutes, TimeUnit.MINUTES)
-            .setInputData(workDataOf(ScheduledReminderWorker.KEY_REMINDER_TEXT to message))
-            .build()
-        workManager.enqueue(req)
+        val triggerAt = System.currentTimeMillis() + safeMinutes * 60_000L
+        return exactAlarmScheduler.scheduleJalaliAlarm(
+            triggerAtMillis = triggerAt,
+            titleFa = "یادآور زمان‌بندی‌شده Sol",
+            messageBody = message,
+        )
     }
 
     suspend fun triggerImmediateBackgroundJob(jobId: String, extraText: String = ""): String {
         return when (jobId) {
             "bg_reminder" -> {
                 val msg = extraText.ifBlank { "یادآور فوری Sol در پس‌زمینه" }
-                val req = OneTimeWorkRequestBuilder<ScheduledReminderWorker>()
-                    .setInitialDelay(10, TimeUnit.SECONDS)
-                    .setInputData(workDataOf(ScheduledReminderWorker.KEY_REMINDER_TEXT to msg))
-                    .build()
-                workManager.enqueue(req)
-                knowledgeRepository.logBackgroundJob(jobId, "یادآور زمان‌بندی‌شده", "SCHEDULED", "برای ۱۰ ثانیه دیگر زمان‌بندی شد: $msg")
-                "یادآور «$msg» در پس‌زمینه برای ۱۰ ثانیه دیگر زمان‌بندی شد."
+                val outcome = exactAlarmScheduler.scheduleJalaliAlarm(
+                    triggerAtMillis = System.currentTimeMillis() + 10_000L,
+                    titleFa = "یادآور زمان‌بندی‌شده Sol",
+                    messageBody = msg,
+                )
+                val mode = if (outcome.isExactGranted) "دقیق (AlarmManager)" else "Doze"
+                "یادآور «$msg» برای ${outcome.jalaliDateTimeFa} زمان‌بندی شد ($mode)."
             }
 
             "bg_daily_briefing" -> {
@@ -88,13 +92,18 @@ class BackgroundTaskCoordinator(
                         }
                     }
                 }
-                SolBackgroundService.startVoiceReader(
+                val started = SolBackgroundService.startVoiceReader(
                     context = context,
                     title = "روخوانی صوتی Sol",
                     text = textToRead,
                 )
-                knowledgeRepository.logBackgroundJob(jobId, "سرویس روخوانی صوتی", "RUNNING", textToRead.take(120))
-                "سرویس روخوانی صوتی در پس‌زمینه (Foreground Service) فعال شد."
+                if (started) {
+                    knowledgeRepository.logBackgroundJob(jobId, "سرویس روخوانی صوتی", "RUNNING", textToRead.take(120))
+                    "سرویس روخوانی صوتی در پس‌زمینه (Foreground Service) فعال شد."
+                } else {
+                    knowledgeRepository.logBackgroundJob(jobId, "سرویس روخوانی صوتی", "FALLBACK_NOTIFICATION", "محدودیت پس‌زمینه اندروید؛ اعلان راهنما ارسال شد")
+                    "اندروید اجازهٔ شروع سرویس پس‌زمینه نداد؛ اعلان خواندن صوتی ارسال شد تا برنامه را باز کنید."
+                }
             }
 
             "bg_history_cleanup" -> {

@@ -43,7 +43,10 @@ data class LocationEntity(
     val updatedAt: Long = System.currentTimeMillis(),
 )
 
-@Entity(tableName = "history")
+@Entity(
+    tableName = "history",
+    indices = [Index(value = ["createdAt"])]
+)
 data class HistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val userText: String,
@@ -103,7 +106,10 @@ data class BookChunkEntity(
     val normalizedTokens: String,
 )
 
-@Entity(tableName = "scheduled_alarms")
+@Entity(
+    tableName = "scheduled_alarms",
+    indices = [Index(value = ["isTriggered", "triggerAtMillis"])]
+)
 data class ScheduledAlarmEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val requestCode: Int,

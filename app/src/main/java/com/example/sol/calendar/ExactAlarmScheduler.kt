@@ -13,6 +13,9 @@ import com.example.sol.memory.KnowledgeRepository
 import com.example.sol.memory.ScheduledAlarmEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class AlarmScheduleOutcome(
@@ -22,12 +25,27 @@ data class AlarmScheduleOutcome(
     val alarmId: Long,
 )
 
+data class RescheduleSummary(
+    val rescheduledCount: Int,
+    val missedDeliveredCount: Int,
+    val isExactGranted: Boolean,
+)
+
 class ExactAlarmScheduler(
     private val context: Context,
     private val knowledgeRepository: KnowledgeRepository,
 ) {
     private val alarmManager: AlarmManager?
         get() = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+
+    private val _isExactModeActive = MutableStateFlow(canScheduleExactAlarms())
+    val isExactModeActive: StateFlow<Boolean> = _isExactModeActive.asStateFlow()
+
+    fun refreshExactAlarmState(): Boolean {
+        val exact = canScheduleExactAlarms()
+        _isExactModeActive.value = exact
+        return exact
+    }
 
     fun canScheduleExactAlarms(): Boolean {
         val am = alarmManager ?: return false
@@ -57,54 +75,99 @@ class ExactAlarmScheduler(
         targetContact: String = "",
     ): AlarmScheduleOutcome {
         val safeTrigger = maxOf(triggerAtMillis, System.currentTimeMillis() + 5_000L)
-        val requestCode = (safeTrigger % Int.MAX_VALUE).toInt().let { if (it == 0) 1 else it }
         val jalaliFormatted = JalaliCalendar.formatDateTimeFa(safeTrigger)
-        val exactAllowed = canScheduleExactAlarms()
+        val exactAllowed = refreshExactAlarmState()
 
-        val pi = buildPendingIntent(
-            requestCode = requestCode,
-            titleFa = titleFa,
-            messageBody = messageBody,
-            targetContact = targetContact,
-        )
-
-        val am = alarmManager
-        if (am != null) {
-            if (exactAllowed) {
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, safeTrigger, pi)
-            } else {
-                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, safeTrigger, pi)
-            }
-        }
-
-        val id = knowledgeRepository.saveScheduledAlarm(
+        val savedAlarm = knowledgeRepository.insertAlarmWithUniqueRequestCode(
             ScheduledAlarmEntity(
-                requestCode = requestCode,
+                requestCode = 0,
                 titleFa = titleFa,
                 messageBody = messageBody,
                 triggerAtMillis = safeTrigger,
                 jalaliLabel = jalaliFormatted,
                 targetContact = targetContact,
                 isExact = exactAllowed,
+                isTriggered = false,
             )
         )
+
+        val registeredExact = scheduleWithAlarmManager(savedAlarm, exactAllowed)
+        if (registeredExact != exactAllowed) {
+            knowledgeRepository.updateAlarmExactFlag(savedAlarm.id, registeredExact)
+        }
+
         knowledgeRepository.logBackgroundJob(
             jobKey = "bg_exact_alarm",
-            titleFa = if (exactAllowed) "یادآور دقیق شمسی (AlarmManager)" else "یادآور با احترام به Doze",
+            titleFa = if (registeredExact) "یادآور دقیق شمسی (AlarmManager)" else "یادآور با احترام به Doze",
             status = "SCHEDULED",
             detailFa = "$jalaliFormatted — $messageBody",
         )
 
         return AlarmScheduleOutcome(
-            isExactGranted = exactAllowed,
+            isExactGranted = registeredExact,
             triggerAtMillis = safeTrigger,
             jalaliDateTimeFa = jalaliFormatted,
-            alarmId = id,
+            alarmId = savedAlarm.id,
+        )
+    }
+
+    suspend fun reschedulePendingAlarms(
+        reason: String,
+        fireMissedAsNotification: Boolean = true,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): RescheduleSummary {
+        val exactAllowed = refreshExactAlarmState()
+        val pendingAlarms = knowledgeRepository.getPendingAlarmsOnce()
+        var rescheduled = 0
+        var missedDelivered = 0
+
+        for (alarm in pendingAlarms) {
+            if (alarm.triggerAtMillis > nowMillis) {
+                val actuallyExact = scheduleWithAlarmManager(alarm, exactAllowed)
+                if (alarm.isExact != actuallyExact) {
+                    knowledgeRepository.updateAlarmExactFlag(alarm.id, actuallyExact)
+                }
+                rescheduled++
+            } else {
+                if (fireMissedAsNotification) {
+                    val contactPrefix = if (alarm.targetContact.isNotBlank()) {
+                        "مرتبط با ${alarm.targetContact} • "
+                    } else {
+                        ""
+                    }
+                    SolNotificationHelper.postNotification(
+                        context = context,
+                        channelId = SolNotificationHelper.CHANNEL_REMINDERS,
+                        notificationId = 7000 + (alarm.requestCode % 3000),
+                        title = "یادآور جاافتاده: ${alarm.titleFa}",
+                        body = "${contactPrefix}زمان «${alarm.jalaliLabel}» گذشت: ${alarm.messageBody}",
+                    )
+                    missedDelivered++
+                }
+                knowledgeRepository.markAlarmTriggeredById(alarm.id)
+            }
+        }
+
+        if (pendingAlarms.isNotEmpty() || reason == ACTION_REASON_PERMISSION_CHANGE) {
+            val modeFa = if (exactAllowed) "دقیق (AlarmManager)" else "تقریبی (Doze)"
+            knowledgeRepository.logBackgroundJob(
+                jobKey = "bg_exact_alarm",
+                titleFa = "همگام‌سازی یادآورها ($reason)",
+                status = "COMPLETED",
+                detailFa = "$rescheduled یادآور آینده بازنشانی شد ($modeFa)، $missedDelivered یادآور جاافتاده اعلان شد.",
+            )
+        }
+
+        return RescheduleSummary(
+            rescheduledCount = rescheduled,
+            missedDeliveredCount = missedDelivered,
+            isExactGranted = exactAllowed,
         )
     }
 
     suspend fun cancelAlarm(alarm: ScheduledAlarmEntity) {
         val pi = buildPendingIntent(
+            alarmId = alarm.id,
             requestCode = alarm.requestCode,
             titleFa = alarm.titleFa,
             messageBody = alarm.messageBody,
@@ -114,13 +177,39 @@ class ExactAlarmScheduler(
         knowledgeRepository.deleteScheduledAlarm(alarm.id)
     }
 
+    private fun scheduleWithAlarmManager(
+        alarm: ScheduledAlarmEntity,
+        preferExact: Boolean,
+    ): Boolean {
+        val am = alarmManager ?: return false
+        val pi = buildPendingIntent(
+            alarmId = alarm.id,
+            requestCode = alarm.requestCode,
+            titleFa = alarm.titleFa,
+            messageBody = alarm.messageBody,
+            targetContact = alarm.targetContact,
+        )
+        if (preferExact) {
+            val exactResult = runCatching {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, alarm.triggerAtMillis, pi)
+            }
+            if (exactResult.isSuccess) return true
+        }
+        runCatching {
+            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, alarm.triggerAtMillis, pi)
+        }
+        return false
+    }
+
     private fun buildPendingIntent(
+        alarmId: Long,
         requestCode: Int,
         titleFa: String,
         messageBody: String,
         targetContact: String,
     ): PendingIntent {
         val intent = Intent(context, ExactReminderReceiver::class.java).apply {
+            putExtra(ExactReminderReceiver.EXTRA_ALARM_ID, alarmId)
             putExtra(ExactReminderReceiver.EXTRA_REQUEST_CODE, requestCode)
             putExtra(ExactReminderReceiver.EXTRA_TITLE, titleFa)
             putExtra(ExactReminderReceiver.EXTRA_MESSAGE, messageBody)
@@ -133,10 +222,15 @@ class ExactAlarmScheduler(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
+
+    companion object {
+        internal const val ACTION_REASON_PERMISSION_CHANGE = "تغییر دسترسی هشدار دقیق"
+    }
 }
 
 class ExactReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val alarmId = intent.getLongExtra(EXTRA_ALARM_ID, -1L)
         val requestCode = intent.getIntExtra(EXTRA_REQUEST_CODE, 1001)
         val title = intent.getStringExtra(EXTRA_TITLE) ?: "یادآور دقیق Sol"
         val message = intent.getStringExtra(EXTRA_MESSAGE) ?: "زمان یادآور شما فرا رسید."
@@ -158,24 +252,87 @@ class ExactReminderReceiver : BroadcastReceiver() {
 
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            runCatching {
-                val app = context.applicationContext as? SolApplication
-                app?.container?.knowledgeRepository?.markAlarmTriggered(requestCode)
-                app?.container?.knowledgeRepository?.logBackgroundJob(
-                    jobKey = "bg_exact_alarm",
-                    titleFa = title,
-                    status = "COMPLETED",
-                    detailFa = fullBody,
-                )
+            try {
+                val repo = (context.applicationContext as? SolApplication)?.container?.knowledgeRepository
+                if (repo != null) {
+                    if (alarmId > 0L) {
+                        repo.markAlarmTriggeredById(alarmId)
+                    } else {
+                        repo.markAlarmTriggered(requestCode)
+                    }
+                    repo.logBackgroundJob(
+                        jobKey = "bg_exact_alarm",
+                        titleFa = title,
+                        status = "COMPLETED",
+                        detailFa = fullBody,
+                    )
+                }
+            } finally {
+                pendingResult.finish()
             }
-            pendingResult.finish()
         }
     }
 
     companion object {
+        const val EXTRA_ALARM_ID = "extra_alarm_id"
         const val EXTRA_REQUEST_CODE = "extra_request_code"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_MESSAGE = "extra_message"
         const val EXTRA_CONTACT = "extra_contact"
+    }
+}
+
+class BootReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val action = intent.action ?: return
+        if (action !in SUPPORTED_ACTIONS) return
+
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val app = context.applicationContext as? SolApplication ?: return@launch
+                val reason = when (action) {
+                    Intent.ACTION_BOOT_COMPLETED -> "راه‌اندازی مجدد گوشی"
+                    Intent.ACTION_MY_PACKAGE_REPLACED -> "به‌روزرسانی برنامه"
+                    Intent.ACTION_TIME_CHANGED -> "تغییر ساعت سیستم"
+                    Intent.ACTION_TIMEZONE_CHANGED -> "تغییر منطقه زمانی"
+                    else -> "رویداد سیستم"
+                }
+                app.container.exactAlarmScheduler.reschedulePendingAlarms(
+                    reason = reason,
+                    fireMissedAsNotification = true,
+                )
+            } finally {
+                pendingResult.finish()
+            }
+        }
+    }
+
+    companion object {
+        private val SUPPORTED_ACTIONS = setOf(
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            Intent.ACTION_TIME_CHANGED,
+            Intent.ACTION_TIMEZONE_CHANGED,
+        )
+    }
+}
+
+class ExactAlarmPermissionReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action != AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED) return
+
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val app = context.applicationContext as? SolApplication ?: return@launch
+                app.container.exactAlarmScheduler.reschedulePendingAlarms(
+                    reason = ExactAlarmScheduler.ACTION_REASON_PERMISSION_CHANGE,
+                    fireMissedAsNotification = true,
+                )
+            } finally {
+                pendingResult.finish()
+            }
+        }
     }
 }

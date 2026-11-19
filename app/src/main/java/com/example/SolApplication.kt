@@ -73,7 +73,9 @@ class SolAppContainer(private val application: Application) {
         )
     }
 
-    val backgroundTaskCoordinator by lazy { BackgroundTaskCoordinator(application, knowledgeRepository) }
+    val backgroundTaskCoordinator by lazy {
+        BackgroundTaskCoordinator(application, knowledgeRepository, exactAlarmScheduler)
+    }
 
     val learningEngine by lazy { LearningEngine(memoryRepository, personRepository, locationRepository) }
     val intentParser by lazy { IntentParser(EntityExtractor()) }
@@ -132,14 +134,5 @@ class SolApplication : Application() {
                 releaseSlmCache = { container.localSlmEngine.releaseSessionMemory() },
             )
         }
-    }
-
-    override fun onTerminate() {
-        if (::container.isInitialized) {
-            container.persianTts.shutdown()
-            container.voiceEngine.stopListening()
-            container.localSlmEngine.releaseSessionMemory()
-        }
-        super.onTerminate()
     }
 }

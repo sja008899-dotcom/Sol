@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.BuildConfig
 
 @Database(
     entities = [
@@ -19,8 +20,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         BookChunkEntity::class,
         ScheduledAlarmEntity::class,
     ],
-    version = 3,
-    exportSchema = false,
+    version = 4,
+    exportSchema = true,
 )
 abstract class MemoryDatabase : RoomDatabase() {
     abstract fun memoryDao(): MemoryDao
@@ -29,7 +30,104 @@ abstract class MemoryDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: MemoryDatabase? = null
 
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `memories` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `kind` TEXT NOT NULL,
+                        `keyText` TEXT NOT NULL,
+                        `valueText` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_memories_keyText` ON `memories` (`keyText`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `persons` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `normalizedName` TEXT NOT NULL,
+                        `phone` TEXT NOT NULL,
+                        `relation` TEXT NOT NULL,
+                        `callScriptNote` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_persons_normalizedName` ON `persons` (`normalizedName`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `locations` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `alias` TEXT NOT NULL,
+                        `normalizedAlias` TEXT NOT NULL,
+                        `fullName` TEXT NOT NULL,
+                        `addressNote` TEXT NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_locations_normalizedAlias` ON `locations` (`normalizedAlias`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `history` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `userText` TEXT NOT NULL,
+                        `solText` TEXT NOT NULL,
+                        `intentAction` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `books` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `author` TEXT NOT NULL,
+                        `subjects` TEXT NOT NULL,
+                        `summaryText` TEXT NOT NULL,
+                        `voiceNotes` TEXT NOT NULL,
+                        `sourceType` TEXT NOT NULL,
+                        `sourceUrl` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `sol_roles` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `roleName` TEXT NOT NULL,
+                        `normalizedRoleName` TEXT NOT NULL,
+                        `instructions` TEXT NOT NULL,
+                        `linkedBookTitle` TEXT NOT NULL,
+                        `isActive` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_sol_roles_normalizedRoleName` ON `sol_roles` (`normalizedRoleName`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `background_logs` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `jobKey` TEXT NOT NULL,
+                        `titleFa` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `detailFa` TEXT NOT NULL,
+                        `executedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     """
@@ -62,17 +160,36 @@ abstract class MemoryDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_history_createdAt` ON `history` (`createdAt`)")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_scheduled_alarms_isTriggered_triggerAtMillis` ON `scheduled_alarms` (`isTriggered`, `triggerAtMillis`)"
+                )
+            }
+        }
+
+        internal val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+
+        internal fun buildDatabase(
+            context: Context,
+            isDebugBuild: Boolean = BuildConfig.DEBUG,
+        ): MemoryDatabase {
+            val builder = Room.databaseBuilder(
+                context.applicationContext,
+                MemoryDatabase::class.java,
+                "sol_memory.db"
+            ).addMigrations(*ALL_MIGRATIONS)
+            if (isDebugBuild) {
+                // Only allowed in debug builds; release builds refuse destructive user-data wipes.
+                builder.fallbackToDestructiveMigration(dropAllTables = true)
+            }
+            return builder.build()
+        }
+
         fun getInstance(context: Context): MemoryDatabase {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    MemoryDatabase::class.java,
-                    "sol_memory.db"
-                )
-                    .addMigrations(MIGRATION_2_3)
-                    .fallbackToDestructiveMigration(dropAllTables = true)
-                    .build()
-                    .also { INSTANCE = it }
+                INSTANCE ?: buildDatabase(context).also { INSTANCE = it }
             }
         }
     }

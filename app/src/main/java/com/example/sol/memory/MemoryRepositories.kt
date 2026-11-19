@@ -187,10 +187,7 @@ class KnowledgeRepository(private val dao: MemoryDao) {
     suspend fun getChunksForBookOnce(bookId: Long): List<BookChunkEntity> = dao.getChunksForBookOnce(bookId)
 
     suspend fun replaceChunksForBook(bookId: Long, chunks: List<BookChunkEntity>) {
-        dao.deleteChunksForBook(bookId)
-        if (chunks.isNotEmpty()) {
-            dao.insertBookChunks(chunks)
-        }
+        dao.replaceChunksForBook(bookId, chunks)
     }
 
     suspend fun saveBook(book: BookKnowledgeEntity): Long = dao.upsertBook(book)
@@ -204,8 +201,7 @@ class KnowledgeRepository(private val dao: MemoryDao) {
     }
 
     suspend fun deleteBook(id: Long) {
-        dao.deleteChunksForBook(id)
-        dao.deleteBookById(id)
+        dao.deleteBookCascade(id)
     }
 
     suspend fun saveRole(
@@ -258,11 +254,20 @@ class KnowledgeRepository(private val dao: MemoryDao) {
         dao.clearBackgroundLogs()
     }
 
+    suspend fun insertAlarmWithUniqueRequestCode(alarm: ScheduledAlarmEntity): ScheduledAlarmEntity =
+        dao.insertAlarmWithUniqueRequestCode(alarm)
+
     suspend fun saveScheduledAlarm(alarm: ScheduledAlarmEntity): Long = dao.upsertAlarm(alarm)
 
     suspend fun getAllAlarmsOnce(): List<ScheduledAlarmEntity> = dao.getAllAlarmsOnce()
 
+    suspend fun getPendingAlarmsOnce(): List<ScheduledAlarmEntity> = dao.getPendingAlarmsOnce()
+
+    suspend fun updateAlarmExactFlag(id: Long, isExact: Boolean) = dao.updateAlarmExactFlag(id, isExact)
+
     suspend fun markAlarmTriggered(requestCode: Int) = dao.markAlarmTriggered(requestCode)
+
+    suspend fun markAlarmTriggeredById(id: Long) = dao.markAlarmTriggeredById(id)
 
     suspend fun deleteScheduledAlarm(id: Long) = dao.deleteAlarmById(id)
 }

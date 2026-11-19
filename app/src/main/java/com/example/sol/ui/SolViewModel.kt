@@ -152,8 +152,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     private val _statusBannerMessage = MutableStateFlow<String?>(null)
     val statusBannerMessage: StateFlow<String?> = _statusBannerMessage.asStateFlow()
 
-    private val _canScheduleExactAlarms = MutableStateFlow(c.exactAlarmScheduler.canScheduleExactAlarms())
-    val canScheduleExactAlarms: StateFlow<Boolean> = _canScheduleExactAlarms.asStateFlow()
+    val canScheduleExactAlarms: StateFlow<Boolean> = c.exactAlarmScheduler.isExactModeActive
 
     private val _vocabularyTermsCount = MutableStateFlow(0)
     val vocabularyTermsCount: StateFlow<Int> = _vocabularyTermsCount.asStateFlow()
@@ -261,7 +260,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         _hasMicPermission.value = c.permissionManager.hasMicrophonePermission()
         _hasContactsPermission.value = c.permissionManager.hasContactsPermission()
         _hasNotificationPermission.value = c.permissionManager.hasNotificationPermission()
-        _canScheduleExactAlarms.value = c.exactAlarmScheduler.canScheduleExactAlarms()
+        c.exactAlarmScheduler.refreshExactAlarmState()
         _batteryStatus.value = c.deviceController.getBatteryStatus()
         _volumeStatus.value = c.deviceController.getVolumeStatus()
         _securityAudit.value = c.privacyManager.getSecurityAudit(
@@ -1029,5 +1028,12 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         _messages.value = _messages.value.map { msg ->
             if (msg.id == messageId) msg.copy(text = updatedText) else msg
         }
+    }
+
+    override fun onCleared() {
+        c.voiceEngine.stopListening()
+        c.persianTts.stop()
+        c.localSlmEngine.releaseSessionMemory()
+        super.onCleared()
     }
 }

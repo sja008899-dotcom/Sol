@@ -306,6 +306,16 @@ fun SettingsScreen(
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = if (canScheduleExactAlarms) {
+                        "وضعیت زمان‌بندی یادآورها: دقیق (AlarmManager) — بعد از راه‌اندازی مجدد گوشی هم خودکار بازیابی می‌شوند."
+                    } else {
+                        "وضعیت زمان‌بندی یادآورها: تقریبی (سازگار با Doze) — برای دقت ثانیه‌ای دسترسی Alarm دقیق را فعال کنید."
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (canScheduleExactAlarms) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
 
                 if (scheduledAlarms.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(10.dp))

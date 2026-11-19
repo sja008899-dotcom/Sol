@@ -4,13 +4,14 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MemoryDao {
     // --- Memories (Aliases, Facts, Instructions) ---
-    @Query("SELECT * FROM memories ORDER BY updatedAt DESC")
-    fun observeAllMemories(): Flow<List<MemoryFactEntity>>
+    @Query("SELECT * FROM memories ORDER BY updatedAt DESC LIMIT :limit")
+    fun observeAllMemories(limit: Int = 300): Flow<List<MemoryFactEntity>>
 
     @Query("SELECT * FROM memories ORDER BY updatedAt DESC")
     suspend fun getAllMemoriesOnce(): List<MemoryFactEntity>
@@ -31,8 +32,8 @@ interface MemoryDao {
     suspend fun clearAllMemories()
 
     // --- Persons ---
-    @Query("SELECT * FROM persons ORDER BY updatedAt DESC")
-    fun observeAllPersons(): Flow<List<PersonEntity>>
+    @Query("SELECT * FROM persons ORDER BY updatedAt DESC LIMIT :limit")
+    fun observeAllPersons(limit: Int = 300): Flow<List<PersonEntity>>
 
     @Query("SELECT * FROM persons ORDER BY updatedAt DESC")
     suspend fun getAllPersonsOnce(): List<PersonEntity>
@@ -47,8 +48,8 @@ interface MemoryDao {
     suspend fun deletePersonById(id: Long): Int
 
     // --- Saved Locations ---
-    @Query("SELECT * FROM locations ORDER BY updatedAt DESC")
-    fun observeAllLocations(): Flow<List<LocationEntity>>
+    @Query("SELECT * FROM locations ORDER BY updatedAt DESC LIMIT :limit")
+    fun observeAllLocations(limit: Int = 300): Flow<List<LocationEntity>>
 
     @Query("SELECT * FROM locations ORDER BY updatedAt DESC")
     suspend fun getAllLocationsOnce(): List<LocationEntity>
@@ -79,8 +80,8 @@ interface MemoryDao {
     suspend fun trimHistoryKeepingLatest(keepCount: Int): Int
 
     // --- Learned Books ---
-    @Query("SELECT * FROM books ORDER BY createdAt DESC")
-    fun observeBooks(): Flow<List<BookKnowledgeEntity>>
+    @Query("SELECT * FROM books ORDER BY createdAt DESC LIMIT :limit")
+    fun observeBooks(limit: Int = 200): Flow<List<BookKnowledgeEntity>>
 
     @Query("SELECT * FROM books ORDER BY createdAt DESC")
     suspend fun getAllBooksOnce(): List<BookKnowledgeEntity>
@@ -133,19 +134,60 @@ interface MemoryDao {
     @Query("DELETE FROM book_chunks WHERE bookId = :bookId")
     suspend fun deleteChunksForBook(bookId: Long)
 
+    @Transaction
+    suspend fun replaceChunksForBook(bookId: Long, chunks: List<BookChunkEntity>) {
+        deleteChunksForBook(bookId)
+        if (chunks.isNotEmpty()) {
+            insertBookChunks(chunks)
+        }
+    }
+
+    @Transaction
+    suspend fun deleteBookCascade(bookId: Long) {
+        deleteChunksForBook(bookId)
+        deleteBookById(bookId)
+    }
+
     // --- Exact Scheduled Jalali Alarms ---
-    @Query("SELECT * FROM scheduled_alarms ORDER BY triggerAtMillis ASC")
-    fun observeScheduledAlarms(): Flow<List<ScheduledAlarmEntity>>
+    @Query("SELECT * FROM scheduled_alarms ORDER BY triggerAtMillis ASC LIMIT :limit")
+    fun observeScheduledAlarms(limit: Int = 200): Flow<List<ScheduledAlarmEntity>>
 
     @Query("SELECT * FROM scheduled_alarms ORDER BY triggerAtMillis ASC")
     suspend fun getAllAlarmsOnce(): List<ScheduledAlarmEntity>
 
+    @Query("SELECT * FROM scheduled_alarms WHERE isTriggered = 0 ORDER BY triggerAtMillis ASC")
+    suspend fun getPendingAlarmsOnce(): List<ScheduledAlarmEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAlarm(alarm: ScheduledAlarmEntity): Long
+
+    @Query("UPDATE scheduled_alarms SET requestCode = :requestCode WHERE id = :id")
+    suspend fun updateAlarmRequestCode(id: Long, requestCode: Int)
+
+    @Query("UPDATE scheduled_alarms SET isExact = :isExact WHERE id = :id")
+    suspend fun updateAlarmExactFlag(id: Long, isExact: Boolean)
 
     @Query("UPDATE scheduled_alarms SET isTriggered = 1 WHERE requestCode = :requestCode")
     suspend fun markAlarmTriggered(requestCode: Int)
 
+    @Query("UPDATE scheduled_alarms SET isTriggered = 1 WHERE id = :id")
+    suspend fun markAlarmTriggeredById(id: Long)
+
     @Query("DELETE FROM scheduled_alarms WHERE id = :id")
     suspend fun deleteAlarmById(id: Long)
+
+    @Transaction
+    suspend fun insertAlarmWithUniqueRequestCode(alarm: ScheduledAlarmEntity): ScheduledAlarmEntity {
+        val insertedId = upsertAlarm(alarm.copy(id = 0, requestCode = 0))
+        val uniqueRequestCode = deriveRequestCodeFromId(insertedId)
+        updateAlarmRequestCode(insertedId, uniqueRequestCode)
+        return alarm.copy(id = insertedId, requestCode = uniqueRequestCode)
+    }
+
+    companion object {
+        fun deriveRequestCodeFromId(rowId: Long): Int {
+            val safeOffset = ((rowId and 0x7FFF_FFFFL) % 1_900_000_000L).toInt()
+            return 10_000 + safeOffset
+        }
+    }
 }

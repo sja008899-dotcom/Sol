@@ -11,28 +11,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-class ScheduledReminderWorker(
-    appContext: Context,
-    params: WorkerParameters,
-) : CoroutineWorker(appContext, params) {
-    override suspend fun doWork(): Result {
-        val message = inputData.getString(KEY_REMINDER_TEXT) ?: "یادآور زمان‌بندی‌شده Sol"
-        SolNotificationHelper.postNotification(
-            context = applicationContext,
-            channelId = SolNotificationHelper.CHANNEL_REMINDERS,
-            notificationId = (System.currentTimeMillis() % 10000).toInt() + 100,
-            title = "یادآور Sol",
-            body = message,
-        )
-        logToDb("bg_reminder", "یادآور زمان‌بندی‌شده", "COMPLETED", message)
-        return Result.success()
-    }
-
-    companion object {
-        const val KEY_REMINDER_TEXT = "reminder_text"
-    }
-}
-
 class DailyRoutineWorker(
     appContext: Context,
     params: WorkerParameters,
