@@ -139,9 +139,14 @@ class CommandBrain(
             }
 
             SolAction.WEB_BOOK_LEARN_ROLE -> {
-                val query = parsed.bookQuery.orEmpty().ifBlank { "Little Prince" }
+                val query = parsed.bookQuery.orEmpty().trim()
+                val reply = if (query.isBlank()) {
+                    "باشه، آماده‌ام از اینترنت دریافت کنم. لطفاً نام کتاب، موضوع یا آدرس صفحهٔ اینترنتی مورد نظرتان را در کادر وارد کنید."
+                } else {
+                    "درخواست جست‌وجو و دریافت «$query» آماده شد؛ می‌توانید از اینترنت دریافت کنید یا فایل PDF / EPUB / TXT انتخاب کنید و با توضیحات صوتی به Sol آموزش دهید."
+                }
                 BrainExecutionResult(
-                    replyText = "درخواست جست‌وجوی کتاب «$query» آماده شد؛ می‌توانید از اینترنت دریافت کنید یا فایل PDF / EPUB / TXT انتخاب نمایید و سپس توضیحات صوتی خود را به نقش Sol اضافه کنید.",
+                    replyText = reply,
                     parsedCommand = parsed,
                     pendingTask = PendingSolTask.InternetBookRoleFetch(
                         bookQuery = query,
@@ -190,6 +195,14 @@ class CommandBrain(
             }
 
             SolAction.LEARN_FACT -> {
+                if (parsed.aliasKey == "owner_name" && !parsed.aliasValue.isNullOrBlank()) {
+                    preferencesRepository.setOwnerName(parsed.aliasValue)
+                    memoryRepository.remember("owner_name", parsed.aliasValue, kind = "fact")
+                    return BrainExecutionResult(
+                        replyText = "خوشبختم ${parsed.aliasValue}! نام شما را به خاطر سپردم.",
+                        parsedCommand = parsed,
+                    )
+                }
                 val reply = learningEngine.teachFact(parsed.message.orEmpty())
                 BrainExecutionResult(replyText = reply, parsedCommand = parsed)
             }
@@ -421,6 +434,44 @@ class CommandBrain(
                     )
                 }
 
+                // Search saved personal facts, locations, or persons when user asks a question
+                val queryTokens = bookRagEngine.tokenize(rawInput)
+                if (queryTokens.isNotEmpty()) {
+                    val normRaw = com.example.sol.memory.PersianNormalizer.normalize(rawInput)
+                    val matchedPerson = learningEngine.findMatchingPersonHint(normRaw)
+                    if (matchedPerson != null) {
+                        val phonePart = if (matchedPerson.phone.isNotBlank()) " — شماره: ${matchedPerson.phone}" else ""
+                        val relPart = if (matchedPerson.relation.isNotBlank()) " (${matchedPerson.relation})" else ""
+                        return BrainExecutionResult(
+                            replyText = "مخاطب «${matchedPerson.name}»$relPart$phonePart در حافظه ثبت شده است.",
+                            parsedCommand = parsed,
+                        )
+                    }
+
+                    val matchedLocation = locationRepository.getAllOnce().firstOrNull { loc ->
+                        normRaw.contains(loc.normalizedAlias) ||
+                            normRaw.contains(com.example.sol.memory.PersianNormalizer.normalize(loc.fullName))
+                    }
+                    if (matchedLocation != null) {
+                        val addrPart = if (matchedLocation.addressNote.isNotBlank()) "\nنشانی: ${matchedLocation.addressNote}" else ""
+                        return BrainExecutionResult(
+                            replyText = "مکان «${matchedLocation.alias}» همان «${matchedLocation.fullName}» است.$addrPart",
+                            parsedCommand = parsed,
+                        )
+                    }
+
+                    val matchedFact = memoryRepository.getAllOnce().firstOrNull { fact ->
+                        val factNorm = com.example.sol.memory.PersianNormalizer.normalize("${fact.keyText} ${fact.valueText}")
+                        queryTokens.any { token -> token.length >= 3 && factNorm.contains(token) }
+                    }
+                    if (matchedFact != null) {
+                        return BrainExecutionResult(
+                            replyText = "در حافظهٔ شما ثبت شده: ${matchedFact.valueText}",
+                            parsedCommand = parsed,
+                        )
+                    }
+                }
+
                 // Try on-device BM25 search over stored books + active role
                 val rag = bookRagEngine.consultOffline(
                     query = rawInput,
@@ -434,7 +485,7 @@ class CommandBrain(
                     )
                 } else {
                     BrainExecutionResult(
-                        replyText = "این فرمان را هنوز دقیق نشناختم. می‌توانید «امروز چندم برج است؟»، «چهارشنبه ساعت ۹ یادآوری کن...»، «۲۰ قابلیت» یا با «هر وقت می‌گم ... منظورم ... است» آموزش بدهید.",
+                        replyText = "منظورتان از «${rawInput.take(50)}» را دقیق متوجه نشدم. می‌توانید بگویید: «از اینترنت درباره هوش مصنوعی دانلود کن»، «ساعت چنده؟»، «به علی پیام بده»، «واتساپ رو باز کن» یا «یادت باشه ...».",
                         parsedCommand = parsed,
                     )
                 }

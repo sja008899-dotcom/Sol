@@ -6,6 +6,9 @@ import com.example.sol.brain.SolAction
 import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.knowledge.CapabilityCategory
 import com.example.sol.knowledge.SolCapabilitiesCatalog
+import com.example.sol.voice.FormantSynthesizer
+import com.example.sol.voice.PersianG2P
+import com.example.sol.voice.PersianSpeechTextNormalizer
 import com.example.sol.voice.VoiceEngine
 import com.example.sol.voice.VoiceVocabularyBias
 import org.junit.Assert.assertEquals
@@ -52,6 +55,67 @@ class ExampleUnitTest {
         assertEquals(SolAction.WEB_BOOK_LEARN_ROLE, cmd.action)
         assertEquals("شازده کوچولو", cmd.bookQuery)
         assertTrue(cmd.requireConfirmation)
+    }
+
+    @Test
+    fun parseColloquialPersianDownloadsAndCommands() {
+        val genericDownload = parser.parse("یه چیزی از اینترنت دانلود کن")
+        assertEquals(SolAction.WEB_BOOK_LEARN_ROLE, genericDownload.action)
+        assertNull(genericDownload.bookQuery)
+
+        val topicDownload = parser.parse("از اینترنت درباره هوش مصنوعی دانلود کن")
+        assertEquals(SolAction.WEB_BOOK_LEARN_ROLE, topicDownload.action)
+        assertEquals("هوش مصنوعی", topicDownload.bookQuery)
+
+        val urlRead = parser.parse("https://fa.wikipedia.org/wiki/هوش_مصنوعی رو بخون")
+        assertEquals(SolAction.WEB_BOOK_LEARN_ROLE, urlRead.action)
+        assertEquals("https://fa.wikipedia.org/wiki/هوش_مصنوعی", urlRead.bookQuery)
+
+        val openApp = parser.parse("واتساپ رو باز کن")
+        assertEquals(SolAction.OPEN_APP, openApp.action)
+        assertEquals("واتساپ", openApp.targetApp)
+
+        val volumeUp = parser.parse("صداتو زیاد کن")
+        assertEquals(SolAction.ADJUST_VOLUME, volumeUp.action)
+        assertTrue(volumeUp.volumeDelta > 0)
+
+        val quickReminder = parser.parse("یادم بنداز دارو بخورم")
+        assertEquals(SolAction.SCHEDULE_REMINDER, quickReminder.action)
+        assertEquals("دارو بخورم", quickReminder.message)
+
+        val greeting = parser.parse("سلام خوبی")
+        assertEquals(SolAction.GREETING, greeting.action)
+
+        val ownerName = parser.parse("لطفاً اسم من رضا هست")
+        assertEquals(SolAction.LEARN_FACT, ownerName.action)
+        assertEquals("owner_name", ownerName.aliasKey)
+        assertEquals("رضا", ownerName.aliasValue)
+    }
+
+    @Test
+    fun builtInPersianSpeechNormalizerG2pAndSynthesizerWork() {
+        assertEquals("هزار و چهارصد و چهار", PersianSpeechTextNormalizer.numberToPersianWords(1404))
+        assertEquals("بیست و پنج", PersianSpeechTextNormalizer.numberToPersianWords(25))
+
+        val words = PersianSpeechTextNormalizer.prepareWords("سلام! Sol v2 PDF آماده است 1404")
+        assertTrue(words.contains("سلام"))
+        assertTrue(words.contains("سول"))
+        assertTrue(words.contains("نسخه"))
+        assertTrue(words.contains("دو"))
+        assertTrue(words.contains("پی"))
+        assertTrue(words.contains("هزار"))
+
+        val phonemes = PersianG2P.wordsToPhonemes(words)
+        assertTrue(phonemes.isNotEmpty())
+
+        val pcm = FormantSynthesizer.renderPhonemes(
+            phonemes = phonemes,
+            baseF0 = 192f,
+            rate = 1.0f,
+            risingIntonation = false,
+        )
+        assertTrue(pcm.size > 2000)
+        assertTrue(pcm.any { it.toInt() != 0 })
     }
 
     @Test

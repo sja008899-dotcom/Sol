@@ -203,14 +203,14 @@ fun InternetBookFetchDialog(
                 tint = MaterialTheme.colorScheme.primary,
             )
         },
-        title = { Text("تأیید اتصال اختیاری برای دریافت کتاب") },
+        title = { Text("تأیید اتصال اختیاری به اینترنت") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = "طبق قانون امنیتی Sol، اتصال به اینترنت فقط با تأیید صریح شما برای جست‌وجوی کتاب (Gutendex / Open Library) یا خواندن لینک صفحهٔ وب انجام می‌شود.",
+                    text = "طبق قانون امنیتی Sol، اتصال به اینترنت فقط با تأیید شما برای جست‌وجو در ویکی‌پدیا فارسی، کتابخانه‌های عمومی (Gutendex / Open Library) یا خواندن لینک وب انجام می‌شود.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -220,8 +220,8 @@ fun InternetBookFetchDialog(
                         query = it
                         onUpdateQuery(it, roleHint)
                     },
-                    label = { Text("نام کتاب یا لینک صفحه وب (URL)") },
-                    placeholder = { Text("مثلاً: Atomic Habits یا https://...") },
+                    label = { Text("موضوع، نام کتاب یا لینک وب (URL)") },
+                    placeholder = { Text("مثلاً: هوش مصنوعی، Atomic Habits یا https://...") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -261,7 +261,7 @@ fun InternetBookFetchDialog(
                 onClick = { onConfirmFetch(runBg) },
                 enabled = query.isNotBlank(),
             ) {
-                Text(if (runBg) "زمان‌بندی در پس‌زمینه" else "تأیید و دریافت کتاب")
+                Text(if (runBg) "زمان‌بندی در پس‌زمینه" else "تأیید و دریافت")
             }
         },
         dismissButton = {

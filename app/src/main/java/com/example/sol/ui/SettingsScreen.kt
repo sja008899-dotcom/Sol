@@ -100,6 +100,8 @@ fun SettingsScreen(
     onSpeechRateChange: (Float) -> Unit,
     onAutoSpeakChange: (Boolean) -> Unit,
     onTestVoice: () -> Unit,
+    onOpenSystemTtsSettings: () -> Unit,
+    onRecheckSystemTts: () -> Unit,
     onVoskOfflineToggle: (Boolean) -> Unit,
     onWakeWordToggle: (Boolean) -> Unit,
     onDownloadVoskModel: () -> Unit,
@@ -453,7 +455,10 @@ fun SettingsScreen(
                 Text(
                     text = ttsAvailability.labelFa,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (ttsAvailability == TtsAvailability.READY_PERSIAN) {
+                    color = if (
+                        ttsAvailability == TtsAvailability.READY_PERSIAN ||
+                        ttsAvailability == TtsAvailability.READY_BUILTIN_PERSIAN
+                    ) {
                         MaterialTheme.colorScheme.tertiary
                     } else {
                         MaterialTheme.colorScheme.secondary
@@ -512,10 +517,24 @@ fun SettingsScreen(
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
-                OutlinedButton(onClick = onTestVoice) {
-                    Icon(Icons.Default.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("تست صدای Sol")
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = onTestVoice,
+                        modifier = Modifier.testTag("test_voice_button"),
+                    ) {
+                        Icon(Icons.Default.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("تست صدای Sol")
+                    }
+                    OutlinedButton(onClick = onRecheckSystemTts) {
+                        Text("بررسی مجدد صداهای گوشی")
+                    }
+                    OutlinedButton(onClick = onOpenSystemTtsSettings) {
+                        Text("تنظیمات صدای سیستم")
+                    }
                 }
             }
         }

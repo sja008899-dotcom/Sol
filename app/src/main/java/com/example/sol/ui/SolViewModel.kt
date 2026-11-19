@@ -643,6 +643,13 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         speakText("سلام ${prefs.ownerName}. من Sol دستیار شخصی شما هستم.")
     }
 
+    fun openSystemTtsSettings() = c.persianTts.openSystemTtsSettings()
+
+    fun recheckSystemTts() {
+        c.persianTts.recheckSystemVoices()
+        _statusBannerMessage.value = "در حال بررسی مجدد صداهای فارسی گوشی (و آماده بودن صدای داخلی Sol)…"
+    }
+
     // --- Confirmation & Communication (+ Hands-Free Voice Confirm/Cancel) ---
     fun startVoiceConfirmationListening() {
         _isListeningForConfirm.value = true

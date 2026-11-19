@@ -536,6 +536,8 @@ fun SolAppRoot(
                                         onSpeechRateChange = viewModel::setSpeechRate,
                                         onAutoSpeakChange = viewModel::setAutoSpeak,
                                         onTestVoice = viewModel::testVoiceSample,
+                                        onOpenSystemTtsSettings = viewModel::openSystemTtsSettings,
+                                        onRecheckSystemTts = viewModel::recheckSystemTts,
                                         onVoskOfflineToggle = viewModel::setVoskOfflineEnabled,
                                         onWakeWordToggle = viewModel::setWakeWordEnabled,
                                         onDownloadVoskModel = viewModel::downloadVoskPersianModel,

@@ -126,4 +126,21 @@ class ExampleRobolectricTest {
         app.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
         assertTrue(app.container.memoryOptimizer.ramSnapshot.value.lastTrimActionFa.contains("RAM"))
     }
+
+    @Test
+    fun `built-in persian tts initializes cleanly without error and command brain handles colloquial prompts`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val app = context.applicationContext as SolApplication
+        val c = app.container
+
+        assertEquals(com.example.sol.voice.TtsAvailability.READY_BUILTIN_PERSIAN.labelFa.isNotBlank(), true)
+
+        c.personRepository.savePerson(name = "رضا احمدی", phone = "09123456789", relation = "همکار")
+        val personReply = c.commandBrain.process("شماره رضا احمدی چنده؟")
+        assertTrue(personReply.replyText.contains("09123456789"))
+
+        val genericWeb = c.commandBrain.process("یه چیزی از اینترنت دانلود کن")
+        assertEquals(com.example.sol.brain.SolAction.WEB_BOOK_LEARN_ROLE, genericWeb.parsedCommand.action)
+        assertTrue(genericWeb.pendingTask is com.example.sol.brain.PendingSolTask.InternetBookRoleFetch)
+    }
 }

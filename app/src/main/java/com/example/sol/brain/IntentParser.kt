@@ -8,8 +8,10 @@ class IntentParser(
 ) {
 
     fun parse(raw: String): ParsedCommand {
-        val cleaned = stripWakePrefix(PersianNormalizer.cleanText(raw))
+        val strippedWake = stripWakePrefix(PersianNormalizer.cleanText(raw))
+        val cleaned = stripPoliteFiller(strippedWake)
         val norm = PersianNormalizer.normalize(cleaned)
+        val rawNorm = PersianNormalizer.normalize(strippedWake)
 
         // 0A. Show 20 capabilities catalog
         if (norm.contains("۲۰ قابلیت") || norm.contains("20 قابلیت") || norm.contains("فهرست قابلیت") || norm.contains("امکانات پس زمینه")) {
@@ -21,12 +23,31 @@ class IntentParser(
             )
         }
 
-        // 0B. Advanced Command: Go to internet + fetch book + add to memory & role with voice explanation
+        // 0B. Advanced Internet Fetch / Download / Search + Book & Role Learning
+        // Supports BOTH formal book commands AND natural spoken download/search requests:
+        // e.g. «از اینترنت درباره هوش مصنوعی دانلود کن», «یک چیزی از اینترنت دانلود کن», «برو تو گوگل ... پیدا کن»
+        val hasUrl = cleaned.contains("http://", ignoreCase = true) || cleaned.contains("https://", ignoreCase = true)
         val hasBookWord = norm.contains("کتاب")
-        val hasInternetWord = norm.contains("اینترنت") || norm.contains("آنلاین") || norm.contains("وب") || norm.contains("دانلود") || norm.contains("پیدا کن") || norm.contains("بیار")
-        val hasRoleOrVoiceLearn = norm.contains("نقش") || norm.contains("توضیحات صوتی") || norm.contains("توضیح صوتی") || norm.contains("یاد بگیر") || norm.contains("حافظه")
-        if (hasBookWord && (hasInternetWord || hasRoleOrVoiceLearn) && !norm.startsWith("فراموش") && !norm.contains("طبق نقش")) {
-            val extractedTitle = extractBookTitle(cleaned)
+        val hasInternetWord = norm.contains("اینترنت") || norm.contains("آنلاین") || norm.contains("وب") ||
+            norm.contains("سایت") || norm.contains("گوگل") || norm.contains("لینک") || norm.contains("مقاله") || hasUrl
+        val hasFetchVerb = norm.contains("دانلود") || norm.contains("پیدا") || norm.contains("بیار") ||
+            norm.contains("جستجو") || norm.contains("جست جو") || norm.contains("سرچ") || norm.contains("بگیر") ||
+            norm.contains("بخوان") || norm.contains("بخون") || norm.contains("برو")
+        val hasRoleOrVoiceLearn = norm.contains("نقش") || norm.contains("توضیحات صوتی") ||
+            norm.contains("توضیح صوتی") || norm.contains("یاد بگیر") || norm.contains("حافظه")
+
+        val isOpenSettingsNotDownload = (norm.contains("وای فای") || norm.contains("وایفای") || norm.contains("تنظیمات")) &&
+            !norm.contains("دانلود") && !hasBookWord
+
+        if (!isOpenSettingsNotDownload &&
+            !norm.startsWith("فراموش") &&
+            !norm.contains("طبق نقش") &&
+            (hasUrl ||
+                (norm.contains("دانلود") && !norm.contains("مدل vosk")) ||
+                (hasBookWord && (hasInternetWord || hasRoleOrVoiceLearn)) ||
+                (hasInternetWord && hasFetchVerb))
+        ) {
+            val extractedQuery = extractBookOrWebQuery(cleaned)
             val roleHint = Regex("(?:به عنوان|نقش)\\s+([آ-یa-zA-Z0-9\\s]{2,35})").find(cleaned)
                 ?.groupValues?.getOrNull(1)?.trim().orEmpty()
             val runBg = norm.contains("پس زمینه") || norm.contains("پس‌زمینه")
@@ -34,7 +55,7 @@ class IntentParser(
                 action = SolAction.WEB_BOOK_LEARN_ROLE,
                 rawText = raw,
                 normalizedText = norm,
-                bookQuery = extractedTitle,
+                bookQuery = extractedQuery.ifBlank { null },
                 roleName = roleHint.ifBlank { null },
                 backgroundJobId = if (runBg) "bg_book_fetch_worker" else null,
                 requireConfirmation = true,
@@ -66,8 +87,7 @@ class IntentParser(
             )
         }
 
-        // 0E. Exact Jalali Scheduled Reminder or Timed Message:
-        // e.g. «چهارشنبه ساعت ۹ صبح یادآوری کن ...», «دو روز دیگه به علی پیام یادآوری بفرست», «۵ دقیقه دیگر یادآوری کن ...»
+        // 0E. Exact Jalali Scheduled Reminder or Timed Message
         val reminderMatch = Regex("(\\d+)\\s*(?:دقیقه|ثانیه|ساعت)\\s*(?:دیگر|دیگه|بعد)\\s*(?:یادآوری کن|یادم بنداز|به من بگو)\\s*(.*)$").find(cleaned)
         val parsedDelayMinutes = if (reminderMatch != null) {
             val num = reminderMatch.groupValues[1].toLongOrNull() ?: 1L
@@ -112,6 +132,20 @@ class IntentParser(
                 requireConfirmation = false,
             )
         }
+        // Timeless spoken reminder: «یادم بنداز دارو بخورم»
+        val quickReminderMatch = Regex("(?:یادم بنداز|یادآوری کن|آلارم بذار)\\s*(?:که\\s+)?(.+)$").find(cleaned)
+        if (quickReminderMatch != null) {
+            val msg = quickReminderMatch.groupValues[1].trim().ifBlank { "یادآور Sol" }
+            return ParsedCommand(
+                action = SolAction.SCHEDULE_REMINDER,
+                rawText = raw,
+                normalizedText = norm,
+                delayMinutes = 15L,
+                message = msg,
+                backgroundJobId = "bg_reminder",
+                requireConfirmation = false,
+            )
+        }
 
         // 0F. Background Job Controls
         if (norm.contains("پس زمینه") || norm.contains("پس‌زمینه") || norm.contains("سرویس صوتی") || norm.contains("پشتیبان")) {
@@ -137,7 +171,7 @@ class IntentParser(
 
         // 1. Learning Alias: «هر وقت میگم دفتر، منظورم شرکت کارنو صنعت ماکیان است»
         val aliasRegex = Regex(
-            "(?:از این به بعد\\s+)?هر\\s*وقت\\s+(?:میگم|می‌گم|گفتم)\\s+[«\"]?(.+?)[»\"]?[,،\\s]+(?:منظورم|یعنی)\\s+[«\"]?(.+?)[»\"]?(?:\\s+است)?$"
+            "(?:از این به بعد\\s+)?هر\\s*وقت\\s+(?:میگم|می‌گم|گفتم)\\s+[«\"]?(.+?)[»\"]?[,،\\s]+(?:منظورم|یعنی)\\s+[«\"]?(.+?)[»\"]?(?:\\s+(?:است|هست))?$"
         )
         aliasRegex.find(cleaned)?.let { m ->
             val key = m.groupValues[1].trim()
@@ -152,13 +186,25 @@ class IntentParser(
             )
         }
 
-        // 2. Learning Fact: «یاد بگیر ...» / «به خاطر بسپار ...»
-        if (norm.startsWith("یاد بگیر ") || norm.startsWith("به خاطر بسپار ") || norm.startsWith("ذخیره کن ")) {
-            val fact = cleaned
-                .removePrefix("یاد بگیر ")
-                .removePrefix("به خاطر بسپار ")
-                .removePrefix("ذخیره کن ")
-                .trim()
+        // 2. Learning Fact / Owner Name: «یاد بگیر ...» / «یادت باشه ...» / «اسم من ... هست»
+        val ownerNameMatch = Regex("^(?:اسم|نام)\\s+من\\s+(.+?)\\s+(?:است|هست)$").find(cleaned)
+        if (ownerNameMatch != null) {
+            return ParsedCommand(
+                action = SolAction.LEARN_FACT,
+                rawText = raw,
+                normalizedText = norm,
+                aliasKey = "owner_name",
+                aliasValue = ownerNameMatch.groupValues[1].trim(),
+                message = cleaned,
+                requireConfirmation = false,
+            )
+        }
+
+        val learnFactMatch = Regex(
+            "(?:اینو\\s+|این را\\s+)?(?:یاد بگیر|به خاطر بسپار|ذخیره کن|یادداشت کن|یادت باشه|یادت بمونه|بنویس)\\s*(?:که\\s+)?(.+)$"
+        ).find(cleaned)
+        if (learnFactMatch != null) {
+            val fact = learnFactMatch.groupValues[1].trim()
             if (fact.isNotBlank()) {
                 return ParsedCommand(
                     action = SolAction.LEARN_FACT,
@@ -170,9 +216,12 @@ class IntentParser(
             }
         }
 
-        // 3. Forget memory: «فراموش کن ...»
-        if (norm.startsWith("فراموش کن ")) {
-            val target = cleaned.removePrefix("فراموش کن ").trim()
+        // 3. Forget memory
+        if (norm.contains("فراموش کن") || (norm.contains("پاک کن") && norm.contains("حافظه"))) {
+            val target = cleaned
+                .replace(Regex("(?:از\\s+حافظه\\s+)?(?:فراموش کن|پاک کن)"), "")
+                .replace(Regex("(?:را|رو)$"), "")
+                .trim()
             return ParsedCommand(
                 action = SolAction.FORGET_MEMORY,
                 rawText = raw,
@@ -183,7 +232,7 @@ class IntentParser(
         }
 
         // 4. List memory
-        if (norm.contains("حافظه") || norm.contains("چی یادت") || norm.contains("چی بلدی")) {
+        if (norm.contains("حافظه") || norm.contains("چی یادت") || norm.contains("چیا بلدی") || norm.contains("چیا ذخیره")) {
             return ParsedCommand(
                 action = SolAction.LIST_MEMORY,
                 rawText = raw,
@@ -224,8 +273,9 @@ class IntentParser(
         }
 
         // 6. Current confirmed location
-        val setLocMatch = Regex("^(?:من\\s+)?الان\\s+(?:در\\s+)?(.+?)\\s+هستم$").find(cleaned)
-            ?: Regex("^موقعیت فعلی(?: من)?\\s+(.+?)(?:\\s+است)?$").find(cleaned)
+        val setLocMatch = Regex("^(?:من\\s+)?الان\\s+(?:در|تو|توی|به)?\\s*(.+?)\\s+(?:هستم|ام|رسیدم)$").find(cleaned)
+            ?: Regex("^(?:من\\s+)?(?:رسیدم|اومدم)\\s+(.+)$").find(cleaned)
+            ?: Regex("^موقعیت(?: فعلی)?(?: من)?\\s+(?:الان\\s+)?(.+?)(?:\\s+(?:است|هست))?$").find(cleaned)
         if (setLocMatch != null) {
             val loc = setLocMatch.groupValues[1].trim()
             return ParsedCommand(
@@ -236,7 +286,7 @@ class IntentParser(
                 requireConfirmation = false,
             )
         }
-        if (norm.contains("الان کجام") || norm.contains("موقعیت فعلی") || norm.contains("کجا هستم")) {
+        if (norm.contains("الان کجام") || norm.contains("موقعیت فعلی") || norm.contains("کجا هستم") || norm.contains("موقعیتم")) {
             return ParsedCommand(
                 action = SolAction.GET_CURRENT_LOCATION,
                 rawText = raw,
@@ -246,8 +296,8 @@ class IntentParser(
         }
 
         // 7. Save location
-        val saveLocMatch = Regex("(?:آدرس|محل|مکان)\\s+(شرکت|دفتر|خانه|منزل|[آ-ی]+)\\s+(.+?)(?:\\s+است)?$").find(cleaned)
-        if (saveLocMatch != null && !norm.contains("وضعیت")) {
+        val saveLocMatch = Regex("(?:آدرس|محل|مکان)\\s+(شرکت|دفتر|خانه|منزل|[آ-ی]+)\\s+(.+?)(?:\\s+(?:است|هست))?$").find(cleaned)
+        if (saveLocMatch != null && !norm.contains("وضعیت") && !norm.contains("کجاست") && !norm.contains("چیه")) {
             return ParsedCommand(
                 action = SolAction.SAVE_LOCATION,
                 rawText = raw,
@@ -286,7 +336,9 @@ class IntentParser(
         }
 
         // 9. Call command
-        if (norm.contains("تماس بگیر") || norm.contains("زنگ بزن") || norm.startsWith("تماس با ")) {
+        if (norm.contains("تماس بگیر") || norm.contains("زنگ بزن") || norm.startsWith("تماس با ") ||
+            (norm.contains("شماره") && norm.contains("بگیر"))
+        ) {
             val contact = extractor.extractContactForCall(cleaned)
             val msg = extractor.extractMessageAfterSay(cleaned)
             val locRef = extractor.extractLocationReference(norm)
@@ -327,8 +379,12 @@ class IntentParser(
             )
         }
 
-        if (norm.contains("صدا") && (norm.contains("زیاد") || norm.contains("بلند") || norm.contains("کم") || norm.contains("آروم") || norm.contains("کاهش") || norm.contains("افزایش"))) {
-            val delta = if (norm.contains("زیاد") || norm.contains("بلند") || norm.contains("افزایش")) 2 else -2
+        if ((norm.contains("صدا") || norm.contains("ولوم")) &&
+            (norm.contains("زیاد") || norm.contains("بلند") || norm.contains("بالا") ||
+                norm.contains("کم") || norm.contains("آروم") || norm.contains("پایین") ||
+                norm.contains("کاهش") || norm.contains("افزایش") || norm.contains("ضعیف"))
+        ) {
+            val delta = if (norm.contains("زیاد") || norm.contains("بلند") || norm.contains("افزایش") || norm.contains("بالا") || norm.contains("ضعیف")) 2 else -2
             return ParsedCommand(
                 action = SolAction.ADJUST_VOLUME,
                 rawText = raw,
@@ -339,12 +395,12 @@ class IntentParser(
         }
 
         if (norm.contains("وای فای") || norm.contains("وایفای") || norm.contains("wifi") ||
-            norm.contains("تنظیمات مکان") || norm.contains("مکان یاب") || norm.contains("gps") ||
-            norm.contains("بلوتوث") || norm.contains("تنظیمات صدا") || norm.contains("تنظیمات باتری")
+            norm.contains("تنظیمات مکان") || norm.contains("مکان یاب") || norm.contains("لوکیشن") || norm.contains("gps") ||
+            norm.contains("بلوتوث") || norm.contains("تنظیمات صدا") || norm.contains("تنظیمات باتری") || norm.contains("تنظیمات اینترنت")
         ) {
             val target = when {
-                norm.contains("وای") || norm.contains("wifi") -> "WIFI"
-                norm.contains("مکان") || norm.contains("gps") -> "LOCATION"
+                norm.contains("وای") || norm.contains("wifi") || norm.contains("اینترنت") -> "WIFI"
+                norm.contains("مکان") || norm.contains("لوکیشن") || norm.contains("gps") -> "LOCATION"
                 norm.contains("بلوتوث") -> "BLUETOOTH"
                 norm.contains("صدا") -> "SOUND"
                 else -> "BATTERY"
@@ -369,7 +425,7 @@ class IntentParser(
             )
         }
 
-        val openAppMatch = Regex("(?:برنامه|اپ|اپلیکیشن)?\\s*(.+?)\\s+(?:را\\s+)?باز کن$").find(cleaned)
+        val openAppMatch = Regex("(?:برنامه|اپ|اپلیکیشن)?\\s*(.+?)\\s+(?:را\\s+|رو\\s+)?باز کن$").find(cleaned)
             ?: Regex("^باز کن\\s+(.+)$").find(cleaned)
         if (openAppMatch != null) {
             val targetApp = openAppMatch.groupValues[1].trim()
@@ -384,36 +440,69 @@ class IntentParser(
 
         // 12. Time, Date (Jalali), Identity, Greetings, Help
         if (norm.contains("ساعت") || norm.contains("تاریخ") || norm.contains("امروز") ||
-            norm.contains("چندم برج") || norm.contains("چندمه") || norm.contains("شمسی") || norm.contains("چه روزی")
+            norm.contains("چندم برج") || norm.contains("چندم ماه") || norm.contains("چندمه") ||
+            norm.contains("شمسی") || norm.contains("چه روزی") || norm.contains("چندشنبه") || norm.contains("کبیسه")
         ) {
             return ParsedCommand(action = SolAction.TIME_DATE, rawText = raw, normalizedText = norm, requireConfirmation = false)
         }
-        if (norm.contains("اسم تو") || norm.contains("نام تو") || norm.contains("کی هستی") || norm.contains("چیستی")) {
+        if (norm.contains("اسم تو") || norm.contains("نام تو") || norm.contains("کی هستی") || norm.contains("چیستی") || norm.contains("اسمت چیه")) {
             return ParsedCommand(action = SolAction.IDENTITY, rawText = raw, normalizedText = norm, requireConfirmation = false)
         }
-        if (norm.contains("کمک") || norm.contains("راهنما") || norm.contains("چیکار میتونی") || norm.contains("چه کارهایی")) {
+        if (norm.contains("کمک") || norm.contains("راهنما") || norm.contains("چیکار میتونی") ||
+            norm.contains("چکار میتونی") || norm.contains("چه کارهایی") || norm.contains("کاربردت") || norm.contains("چی بلدی")
+        ) {
             return ParsedCommand(action = SolAction.HELP, rawText = raw, normalizedText = norm, requireConfirmation = false)
         }
-        if (norm == "سلام" || norm.startsWith("سلام ") || norm == "درود" || norm.startsWith("صبح بخیر") || norm.startsWith("شب بخیر")) {
+        if (rawNorm == "سلام" || rawNorm.startsWith("سلام ") || rawNorm == "درود" ||
+            rawNorm.contains("خوبی") || rawNorm.contains("چطوری") ||
+            rawNorm.startsWith("صبح بخیر") || rawNorm.startsWith("شب بخیر") ||
+            rawNorm.contains("مرسی") || rawNorm.contains("ممنون") || rawNorm.contains("متشکرم") || rawNorm.contains("خسته نباشی")
+        ) {
             return ParsedCommand(action = SolAction.GREETING, rawText = raw, normalizedText = norm, requireConfirmation = false)
         }
 
         return ParsedCommand(action = SolAction.UNKNOWN, rawText = raw, normalizedText = norm, requireConfirmation = false)
     }
 
-    private fun extractBookTitle(cleaned: String): String {
-        val afterBook = Regex("کتاب\\s+[«\"]?(.+?)[»\"]?(?:\\s+(?:را|رو)\\s+|\\s+(?:پیدا|دانلود|بیار|بخوان|وانمود|و\\s+با)|$)").find(cleaned)
+    private fun extractBookOrWebQuery(cleaned: String): String {
+        val urlMatch = Regex("(https?://\\S+)").find(cleaned)
+        if (urlMatch != null) return urlMatch.groupValues[1].trim()
+
+        val afterBook = Regex("کتاب\\s+[«\"]?(.+?)[»\"]?(?:\\s+(?:را|رو)\\s+|\\s+(?:پیدا|دانلود|بیار|بخوان|بخون|وانمود|و\\s+با)|$)").find(cleaned)
             ?.groupValues?.getOrNull(1)?.trim()
         if (!afterBook.isNullOrBlank()) return afterBook
-        return cleaned
-            .replace(Regex(".*کتاب\\s+"), "")
-            .replace(Regex("\\s+(?:را|رو|پیدا کن|دانلود کن|بیار|بخوان|به حافظه).*"), "")
+
+        val aboutMatch = Regex("(?:درباره|در مورد|راجب|راجع به)\\s+(.+?)(?:\\s+(?:از اینترنت|تو اینترنت|پیدا کن|دانلود کن|بیار|جستجو کن|جست‌وجو کن|سرچ کن|بگو|بخوان|بخون)|$)").find(cleaned)
+            ?.groupValues?.getOrNull(1)?.trim()
+        if (!aboutMatch.isNullOrBlank() && !isGenericPlaceholder(aboutMatch)) return aboutMatch
+
+        val cleanedCandidate = cleaned
+            .replace(Regex("(?:برو\\s+(?:به|تو|توی)?\\s*(?:اینترنت|وب|گوگل))"), "")
+            .replace(Regex("(?:از|تو|توی|در)\\s*(?:اینترنت|وب|گوگل)"), "")
+            .replace(Regex("(?:برام|برای من|لطفاً|لطفا|میشه|می‌تونی|می تونی|یه|یک)"), "")
+            .replace(Regex("(?:دانلود کن|پیدا کن|جستجو کن|جست‌وجو کن|سرچ کن|بیار|بگیر|بخوان|بخون|باز کن)"), "")
+            .replace(Regex("(?:را|رو|به حافظه|و نقشت اضافه کن)$"), "")
+            .replace(Regex("\\s+"), " ")
             .trim()
+
+        return if (isGenericPlaceholder(cleanedCandidate)) "" else cleanedCandidate
+    }
+
+    private fun isGenericPlaceholder(txt: String): Boolean {
+        val n = PersianNormalizer.normalize(txt)
+        return n.isBlank() || n in setOf("چیز", "چیزی", "یک چیز", "یه چیز", "یه چیزی", "یک چیزی", "مطلب", "مطلبی", "فایل", "فایلی", "کتاب", "صفحه")
     }
 
     private fun stripWakePrefix(text: String): String {
         return text
             .replace(Regex("^(?:سلام\\s+)?(?:sol|سول|سال)[,،:\\s]+", RegexOption.IGNORE_CASE), "")
+            .trim()
+    }
+
+    private fun stripPoliteFiller(text: String): String {
+        return text
+            .replace(Regex("^(?:ببخشید|لطفاً|لطفا|بی\\s*زحمت|بیزحمت|اگر\\s+میشه|اگه\\s+میشه|میشه|می‌تونی|میتونی)\\s+"), "")
+            .replace(Regex("^(?:لطفاً|لطفا)\\s+"), "")
             .trim()
     }
 }

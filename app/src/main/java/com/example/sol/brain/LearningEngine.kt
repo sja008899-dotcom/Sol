@@ -3,6 +3,7 @@ package com.example.sol.brain
 import com.example.sol.memory.LocationRepository
 import com.example.sol.memory.MemoryRepository
 import com.example.sol.memory.PersianNormalizer
+import com.example.sol.memory.PersonEntity
 import com.example.sol.memory.PersonRepository
 
 class LearningEngine(
@@ -63,6 +64,15 @@ class LearningEngine(
             "مورد «${match.valueText}» از حافظه حذف شد."
         } else {
             "این عبارت را در حافظه پیدا نکردم."
+        }
+    }
+
+    suspend fun findMatchingPersonHint(normQuery: String): PersonEntity? {
+        if (normQuery.isBlank()) return null
+        val persons = personRepository.getAllOnce()
+        return persons.firstOrNull { p ->
+            val pNorm = PersianNormalizer.normalize(p.name)
+            pNorm.length >= 2 && normQuery.contains(pNorm)
         }
     }
 

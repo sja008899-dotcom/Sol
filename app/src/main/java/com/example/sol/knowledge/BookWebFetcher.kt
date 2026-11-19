@@ -67,14 +67,26 @@ class BookWebFetcher(private val context: Context) {
                 )
             }
 
+            val hasPersianScript = trimmed.any { it in '\u0600'..'\u06FF' }
+            if (hasPersianScript) {
+                val faWiki = runCatching { queryWikipedia(trimmed, "fa") }.getOrNull()
+                if (faWiki != null) return@withContext Result.success(faWiki)
+            }
+
             val gutendex = runCatching { queryGutendex(trimmed) }.getOrNull()
             if (gutendex != null) return@withContext Result.success(gutendex)
 
             val openLibrary = runCatching { queryOpenLibrary(trimmed) }.getOrNull()
             if (openLibrary != null) return@withContext Result.success(openLibrary)
 
+            val wikiFallback = runCatching {
+                queryWikipedia(trimmed, if (hasPersianScript) "fa" else "en")
+                    ?: queryWikipedia(trimmed, "en")
+            }.getOrNull()
+            if (wikiFallback != null) return@withContext Result.success(wikiFallback)
+
             Result.failure(
-                IllegalStateException("کتابی با عنوان «$trimmed» در مخازن عمومی پیدا نشد یا پاسخ دریافت نشد.")
+                IllegalStateException("موردی با عنوان «$trimmed» در مخازن عمومی پیدا نشد یا پاسخ دریافت نشد.")
             )
         }
 
@@ -354,6 +366,52 @@ class BookWebFetcher(private val context: Context) {
             fullText = summary,
             sourceType = "INTERNET_OPEN_LIBRARY",
             sourceUrl = url,
+        )
+    }
+
+    private fun queryWikipedia(query: String, lang: String): FetchedBookResult? {
+        val encoded = URLEncoder.encode(query.trim(), "UTF-8")
+        val searchUrl =
+            "https://$lang.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&srlimit=1&format=json&utf8=1"
+        val searchJson = httpGet(searchUrl) ?: return null
+        val searchArr = JSONObject(searchJson).optJSONObject("query")?.optJSONArray("search") ?: return null
+        if (searchArr.length() == 0) return null
+
+        val hitTitle = searchArr.getJSONObject(0).optString("title").trim()
+        if (hitTitle.isBlank()) return null
+
+        val encodedTitle = URLEncoder.encode(hitTitle.replace(' ', '_'), "UTF-8")
+        val summaryUrl = "https://$lang.wikipedia.org/api/rest_v1/page/summary/$encodedTitle"
+        val sumJsonStr = httpGet(summaryUrl) ?: return null
+        val sumObj = JSONObject(sumJsonStr)
+        val extract = sumObj.optString("extract").trim()
+        if (extract.isBlank()) return null
+
+        // Also fetch longer plain-text intro/sections when available
+        val fullExtractUrl =
+            "https://$lang.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&exchars=18000&titles=$encodedTitle&format=json&utf8=1"
+        val longerText = runCatching {
+            val raw = httpGet(fullExtractUrl) ?: return@runCatching ""
+            val pages = JSONObject(raw).optJSONObject("query")?.optJSONObject("pages") ?: return@runCatching ""
+            val firstKey = pages.keys().asSequence().firstOrNull() ?: return@runCatching ""
+            pages.optJSONObject(firstKey)?.optString("extract").orEmpty().trim()
+        }.getOrDefault("")
+
+        val pageUrl = sumObj.optJSONObject("content_urls")
+            ?.optJSONObject("desktop")
+            ?.optString("page")
+            ?.ifBlank { "https://$lang.wikipedia.org/wiki/$encodedTitle" }
+            ?: "https://$lang.wikipedia.org/wiki/$encodedTitle"
+
+        val finalFull = longerText.ifBlank { extract }
+        return FetchedBookResult(
+            title = hitTitle,
+            author = if (lang == "fa") "دانشنامه ویکی‌پدیا فارسی" else "Wikipedia",
+            subjects = if (lang == "fa") "محتوای دریافت‌شده از اینترنت (فارسی)" else "Wikipedia Article",
+            summaryText = extract.take(1500),
+            fullText = finalFull,
+            sourceType = if (lang == "fa") "INTERNET_WIKIPEDIA_FA" else "INTERNET_WIKIPEDIA_EN",
+            sourceUrl = pageUrl,
         )
     }
 

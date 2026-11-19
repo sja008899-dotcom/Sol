@@ -106,9 +106,9 @@ class VoiceEngine(
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR")
+            putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, true)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
         }
 
         instance.setRecognitionListener(object : RecognitionListener {
@@ -135,11 +135,11 @@ class VoiceEngine(
                 val msg = when (error) {
                     SpeechRecognizer.ERROR_AUDIO -> "خطا در دریافت صدا از میکروفون"
                     SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "مجوز میکروفون صادر نشده است"
-                    SpeechRecognizer.ERROR_NO_MATCH -> "صدایی تشخیص داده نشد؛ لطفاً دوباره بگو یا تایپ کن"
+                    SpeechRecognizer.ERROR_NO_MATCH -> "صدایی تشخیص داده نشد؛ لطفاً واضح‌تر بگویید یا تایپ کنید"
                     SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "زمان انتظار برای شروع صحبت تمام شد"
                     SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "موتور تشخیص گفتار مشغول است"
                     SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
-                        "بستهٔ آفلاین فارسی گوگل نصب نیست؛ از بخش تنظیمات مدل آفلاین Vosk را نصب کنید."
+                        "اینترنت وصل نیست و بستهٔ آفلاین فارسی گوگل هم نصب نیست؛ از بخش تنظیمات مدل آفلاین Vosk را نصب کنید."
                     else -> "تشخیص گفتار ناموفق بود (کد $error)"
                 }
                 _state.value = VoiceListeningState.Error(msg)
@@ -148,22 +148,22 @@ class VoiceEngine(
             }
 
             override fun onResults(results: Bundle?) {
-                val best = results
+                val candidates = results
                     ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    ?.firstOrNull()
-                    ?.trim()
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotBlank() }
                     .orEmpty()
-                val corrected = if (best.isNotBlank()) {
-                    voskEngine.vocabularyBias.applyBiasCorrection(best)
-                } else {
-                    ""
-                }
+                val correctedCandidates = candidates.map { voskEngine.vocabularyBias.applyBiasCorrection(it) }
+                val best = candidates.zip(correctedCandidates)
+                    .firstOrNull { (orig, corr) -> orig != corr }
+                    ?.second
+                    ?: correctedCandidates.firstOrNull().orEmpty()
                 _rmsDb.value = 0f
                 _partialText.value = ""
                 _state.value = VoiceListeningState.Idle
                 cleanupRecognizer()
-                if (corrected.isNotBlank()) {
-                    onFinalResult(corrected)
+                if (best.isNotBlank()) {
+                    onFinalResult(best)
                 }
             }
 
