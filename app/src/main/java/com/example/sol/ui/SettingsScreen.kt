@@ -73,6 +73,7 @@ import com.example.sol.security.RamUsageSnapshot
 import com.example.sol.security.SecurityAuditItem
 import com.example.sol.voice.AudioVolumeStatus
 import com.example.sol.voice.TtsAvailability
+import com.example.sol.voice.TtsEngineInfo
 import com.example.sol.voice.TtsVoiceInfo
 import com.example.sol.voice.VoskModelStatus
 import kotlin.math.roundToInt
@@ -82,6 +83,8 @@ import kotlin.math.roundToInt
 fun SettingsScreen(
     preferences: SolPreferences,
     ttsAvailability: TtsAvailability,
+    availableTtsEngines: List<TtsEngineInfo>,
+    activeTtsEngineLabel: String,
     persianVoices: List<TtsVoiceInfo>,
     voskModelStatus: VoskModelStatus,
     vocabularyTermsCount: Int,
@@ -96,6 +99,7 @@ fun SettingsScreen(
     securityAudit: List<SecurityAuditItem>,
     onOwnerNameChange: (String) -> Unit,
     onVoicePersonaChange: (VoicePersona) -> Unit,
+    onSelectTtsEngine: (String) -> Unit,
     onSelectTtsVoice: (String) -> Unit,
     onSpeechRateChange: (Float) -> Unit,
     onAutoSpeakChange: (Boolean) -> Unit,
@@ -449,21 +453,44 @@ fun SettingsScreen(
             }
         }
 
-        // 6. Voice & Speech Engine Settings
+        // 6. Voice & Speech Engine Settings (Phone System TTS / SherpaTTS)
         item {
-            SectionCard(title = "صدای Sol و گفتار فارسی (TTS)") {
+            SectionCard(title = "صدای Sol و اتصال به موتور گفتار گوشی (SherpaTTS / سیستم)") {
+                val engineSuffix = if (activeTtsEngineLabel.isNotBlank()) " — موتور فعال: $activeTtsEngineLabel" else ""
                 Text(
-                    text = ttsAvailability.labelFa,
+                    text = "${ttsAvailability.labelFa}$engineSuffix",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (
-                        ttsAvailability == TtsAvailability.READY_PERSIAN ||
-                        ttsAvailability == TtsAvailability.READY_BUILTIN_PERSIAN
-                    ) {
+                    color = if (ttsAvailability == TtsAvailability.READY_PERSIAN) {
                         MaterialTheme.colorScheme.tertiary
                     } else {
-                        MaterialTheme.colorScheme.secondary
+                        MaterialTheme.colorScheme.error
                     },
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("انتخاب موتور صدای نصب‌شده روی گوشی:", style = MaterialTheme.typography.labelMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = preferences.preferredTtsEnginePackage.isBlank(),
+                        onClick = { onSelectTtsEngine("") },
+                        label = { Text("خودکار (SherpaTTS / پیش‌فرض)") },
+                    )
+                    availableTtsEngines.forEach { engineInfo ->
+                        FilterChip(
+                            selected = preferences.preferredTtsEnginePackage == engineInfo.packageName,
+                            onClick = { onSelectTtsEngine(engineInfo.packageName) },
+                            label = {
+                                val badge = when {
+                                    engineInfo.isSherpa -> " ★"
+                                    engineInfo.isDefault -> " (پیش‌فرض)"
+                                    else -> ""
+                                }
+                                Text("${engineInfo.label}$badge")
+                            },
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("سبک صدای Sol:", style = MaterialTheme.typography.labelMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -478,7 +505,7 @@ fun SettingsScreen(
 
                 if (persianVoices.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(6.dp))
-                    Text("صداهای فارسی نصب‌شده روی گوشی:", style = MaterialTheme.typography.labelMedium)
+                    Text("صداهای فارسی در دسترس روی موتور فعلی:", style = MaterialTheme.typography.labelMedium)
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         persianVoices.forEach { v ->
                             FilterChip(

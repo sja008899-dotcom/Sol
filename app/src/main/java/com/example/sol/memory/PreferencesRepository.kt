@@ -41,6 +41,7 @@ enum class ConfirmationPolicy(val labelFa: String) {
 data class SolPreferences(
     val ownerName: String = "کاربر",
     val voicePersona: VoicePersona = VoicePersona.FEMALE_CALM,
+    val preferredTtsEnginePackage: String = "",
     val preferredTtsVoiceName: String = "",
     val speechRate: Float = 1.0f,
     val autoSpeak: Boolean = true,
@@ -64,6 +65,7 @@ class PreferencesRepository(private val context: Context) {
     private object Keys {
         val OWNER_NAME = stringPreferencesKey("owner_name")
         val VOICE_PERSONA = stringPreferencesKey("voice_persona")
+        val TTS_ENGINE_PACKAGE = stringPreferencesKey("tts_engine_package")
         val TTS_VOICE_NAME = stringPreferencesKey("tts_voice_name")
         val SPEECH_RATE = floatPreferencesKey("speech_rate")
         val AUTO_SPEAK = booleanPreferencesKey("auto_speak")
@@ -84,6 +86,7 @@ class PreferencesRepository(private val context: Context) {
         SolPreferences(
             ownerName = p[Keys.OWNER_NAME] ?: "کاربر",
             voicePersona = enumOrDefault(p[Keys.VOICE_PERSONA], VoicePersona.FEMALE_CALM),
+            preferredTtsEnginePackage = p[Keys.TTS_ENGINE_PACKAGE] ?: "",
             preferredTtsVoiceName = p[Keys.TTS_VOICE_NAME] ?: "",
             speechRate = p[Keys.SPEECH_RATE] ?: 1.0f,
             autoSpeak = p[Keys.AUTO_SPEAK] ?: true,
@@ -112,6 +115,10 @@ class PreferencesRepository(private val context: Context) {
 
     suspend fun setVoicePersona(persona: VoicePersona) {
         context.solPrefsDataStore.edit { it[Keys.VOICE_PERSONA] = persona.name }
+    }
+
+    suspend fun setPreferredTtsEnginePackage(packageName: String) {
+        context.solPrefsDataStore.edit { it[Keys.TTS_ENGINE_PACKAGE] = packageName.trim() }
     }
 
     suspend fun setPreferredTtsVoiceName(voiceName: String) {
@@ -180,6 +187,7 @@ class PreferencesRepository(private val context: Context) {
         context.solPrefsDataStore.edit { p ->
             p[Keys.OWNER_NAME] = restored.ownerName
             p[Keys.VOICE_PERSONA] = restored.voicePersona.name
+            p[Keys.TTS_ENGINE_PACKAGE] = restored.preferredTtsEnginePackage
             p[Keys.TTS_VOICE_NAME] = restored.preferredTtsVoiceName
             p[Keys.SPEECH_RATE] = restored.speechRate
             p[Keys.AUTO_SPEAK] = restored.autoSpeak

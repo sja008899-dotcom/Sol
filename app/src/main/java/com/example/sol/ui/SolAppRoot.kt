@@ -515,9 +515,13 @@ fun SolAppRoot(
                                 }
 
                                 composable(ROUTE_SETTINGS) {
+                                    val availableTtsEngines by viewModel.availableTtsEngines.collectAsStateWithLifecycle()
+                                    val activeTtsEngineLabel by viewModel.activeTtsEngineLabel.collectAsStateWithLifecycle()
                                     SettingsScreen(
                                         preferences = preferences,
                                         ttsAvailability = ttsAvailability,
+                                        availableTtsEngines = availableTtsEngines,
+                                        activeTtsEngineLabel = activeTtsEngineLabel,
                                         persianVoices = persianVoices,
                                         voskModelStatus = voskModelStatus,
                                         vocabularyTermsCount = vocabularyTermsCount,
@@ -532,6 +536,7 @@ fun SolAppRoot(
                                         securityAudit = securityAudit,
                                         onOwnerNameChange = viewModel::setOwnerName,
                                         onVoicePersonaChange = viewModel::setVoicePersona,
+                                        onSelectTtsEngine = viewModel::setPreferredTtsEngine,
                                         onSelectTtsVoice = viewModel::setPreferredTtsVoice,
                                         onSpeechRateChange = viewModel::setSpeechRate,
                                         onAutoSpeakChange = viewModel::setAutoSpeak,

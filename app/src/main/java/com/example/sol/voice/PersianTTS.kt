@@ -12,9 +12,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 
 enum class TtsAvailability(val labelFa: String) {
-    INITIALIZING("در حال آماده‌سازی صدای Sol…"),
-    READY_PERSIAN("صدای فارسی سیستم (TTS گوشی) آماده است"),
-    READY_BUILTIN_PERSIAN("صدای فارسی داخلی Sol فعال است (بدون نیاز به نصب روی گوشی)"),
+    INITIALIZING("در حال اتصال به موتور صدای گوشی…"),
+    READY_PERSIAN("متصل به صدای فارسی گوشی"),
+    MISSING_PERSIAN_DATA("صدای فارسی در موتور فعلی پیدا نشد؛ موتور صدای گوشی (مثل SherpaTTS) را انتخاب کنید"),
+    UNAVAILABLE("موتور گفتار روی گوشی در دسترس نیست"),
 }
 
 data class TtsVoiceInfo(
@@ -23,12 +24,22 @@ data class TtsVoiceInfo(
     val isOffline: Boolean,
 )
 
+data class TtsEngineInfo(
+    val packageName: String,
+    val label: String,
+    val isDefault: Boolean,
+    val isSherpa: Boolean,
+)
+
 class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
     private val appContext = context.applicationContext
-    private val builtInEngine = BuiltInPersianSpeechEngine()
 
-    private var tts: TextToSpeech? = TextToSpeech(appContext, this)
-    private var triedGoogleFallback = false
+    private var tts: TextToSpeech? = null
+    private var currentlyBindingPackage: String = ""
+    private var explicitPreferredPackage: String = ""
+    private var pendingProbeQueue: ArrayDeque<String> = ArrayDeque()
+    private var sherpaFallbackPackage: String? = null
+    private var usingFallbackBind = false
 
     private val _availability = MutableStateFlow(TtsAvailability.INITIALIZING)
     val availability: StateFlow<TtsAvailability> = _availability.asStateFlow()
@@ -39,26 +50,162 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
     private val _persianVoices = MutableStateFlow<List<TtsVoiceInfo>>(emptyList())
     val persianVoices: StateFlow<List<TtsVoiceInfo>> = _persianVoices.asStateFlow()
 
-    private var systemPersianReady = false
+    private val _availableEngines = MutableStateFlow<List<TtsEngineInfo>>(emptyList())
+    val availableEngines: StateFlow<List<TtsEngineInfo>> = _availableEngines.asStateFlow()
 
-    @Volatile
-    private var lastSpokenRequest: Triple<String, Float, VoicePersona>? = null
+    private val _activeEnginePackage = MutableStateFlow("")
+    val activeEnginePackage: StateFlow<String> = _activeEnginePackage.asStateFlow()
+
+    private val _activeEngineLabel = MutableStateFlow("")
+    val activeEngineLabel: StateFlow<String> = _activeEngineLabel.asStateFlow()
+
+    init {
+        connectToPhoneTts(preferredPackage = "")
+    }
+
+    /**
+     * Connects to the phone's installed Android TTS engine.
+     * - If [preferredPackage] is set, binds directly to that engine (e.g. SherpaTTS).
+     * - Otherwise checks the system default engine first; if that doesn't support Persian,
+     *   automatically probes all installed engines prioritizing SherpaTTS, then Google TTS, then others.
+     */
+    fun connectToPhoneTts(preferredPackage: String = explicitPreferredPackage) {
+        explicitPreferredPackage = preferredPackage.trim()
+        usingFallbackBind = false
+        sherpaFallbackPackage = null
+        pendingProbeQueue.clear()
+        _availability.value = TtsAvailability.INITIALIZING
+        _persianVoices.value = emptyList()
+
+        bindEngine(explicitPreferredPackage)
+    }
+
+    private fun bindEngine(packageName: String) {
+        currentlyBindingPackage = packageName
+        runCatching {
+            tts?.stop()
+            tts?.shutdown()
+        }
+        tts = runCatching {
+            if (packageName.isBlank()) {
+                TextToSpeech(appContext, this)
+            } else {
+                TextToSpeech(appContext, this, packageName)
+            }
+        }.getOrElse {
+            onEngineBindFailed(packageName)
+            null
+        }
+    }
 
     override fun onInit(status: Int) {
-        if (status != TextToSpeech.SUCCESS) {
-            if (!triedGoogleFallback) {
-                tryGoogleTtsEngine()
+        val engine = tts
+        if (status != TextToSpeech.SUCCESS || engine == null) {
+            onEngineBindFailed(currentlyBindingPackage)
+            return
+        }
+
+        val installedInfos = snapshotEngines(engine)
+        if (installedInfos.isNotEmpty()) {
+            _availableEngines.value = installedInfos
+        }
+
+        val resolvedPackage = currentlyBindingPackage.ifBlank {
+            runCatching { engine.defaultEngine.orEmpty() }.getOrDefault("")
+        }
+        val resolvedLabel = installedInfos.firstOrNull { it.packageName == resolvedPackage }?.label
+            ?: resolvedPackage.ifBlank { "موتور پیش‌فرض گوشی" }
+
+        if (isSherpaEngine(resolvedPackage, resolvedLabel) && sherpaFallbackPackage == null) {
+            sherpaFallbackPackage = resolvedPackage
+        }
+
+        // First probe queued candidates if we were only discovering default engine
+        if (explicitPreferredPackage.isBlank() && !usingFallbackBind && pendingProbeQueue.isEmpty()) {
+            val otherCandidates = installedInfos
+                .map { it.packageName }
+                .filter { it.isNotBlank() && it != resolvedPackage }
+                .sortedWith(
+                    compareByDescending<String> { pkg ->
+                        val lbl = installedInfos.firstOrNull { it.packageName == pkg }?.label.orEmpty()
+                        when {
+                            isSherpaEngine(pkg, lbl) -> 2
+                            pkg == GOOGLE_TTS_PKG -> 1
+                            else -> 0
+                        }
+                    }
+                )
+            // Keep candidate queue ready if the current engine doesn't support Persian
+            pendingProbeQueue.addAll(otherCandidates)
+        }
+
+        val persianReady = configurePersianLanguageAndVoices(engine)
+        val isSherpaOrExplicit = isSherpaEngine(resolvedPackage, resolvedLabel) ||
+            (explicitPreferredPackage.isNotBlank() && resolvedPackage == explicitPreferredPackage)
+
+        if (persianReady || (usingFallbackBind && isSherpaOrExplicit)) {
+            attachProgressListener(engine)
+            _activeEnginePackage.value = resolvedPackage
+            _activeEngineLabel.value = resolvedLabel
+            _availability.value = TtsAvailability.READY_PERSIAN
+            pendingProbeQueue.clear()
+            return
+        }
+
+        // Current engine did not report Persian support — probe next installed engine (SherpaTTS first!)
+        if (explicitPreferredPackage.isBlank() && pendingProbeQueue.isNotEmpty()) {
+            val nextPkg = pendingProbeQueue.removeFirst()
+            bindEngine(nextPkg)
+            return
+        }
+
+        // Some SherpaTTS / Piper builds don't declare fa locale in isLanguageAvailable until speak()
+        val sherpaPkg = sherpaFallbackPackage
+        if (explicitPreferredPackage.isBlank() && !usingFallbackBind && !sherpaPkg.isNullOrBlank()) {
+            if (resolvedPackage == sherpaPkg) {
+                attachProgressListener(engine)
+                _activeEnginePackage.value = resolvedPackage
+                _activeEngineLabel.value = resolvedLabel
+                _availability.value = TtsAvailability.READY_PERSIAN
             } else {
-                activateBuiltInFallback()
+                usingFallbackBind = true
+                bindEngine(sherpaPkg)
             }
             return
         }
 
-        val engine = tts ?: run {
-            activateBuiltInFallback()
+        // If user manually chose an engine, stay bound to it so they can still test/use it
+        if (isSherpaOrExplicit) {
+            attachProgressListener(engine)
+            _activeEnginePackage.value = resolvedPackage
+            _activeEngineLabel.value = resolvedLabel
+            _availability.value = TtsAvailability.READY_PERSIAN
             return
         }
 
+        attachProgressListener(engine)
+        _activeEnginePackage.value = resolvedPackage
+        _activeEngineLabel.value = resolvedLabel
+        _availability.value = TtsAvailability.MISSING_PERSIAN_DATA
+    }
+
+    private fun onEngineBindFailed(failedPkg: String) {
+        if (explicitPreferredPackage.isBlank() && pendingProbeQueue.isNotEmpty()) {
+            val nextPkg = pendingProbeQueue.removeFirst()
+            bindEngine(nextPkg)
+            return
+        }
+        val sherpaPkg = sherpaFallbackPackage
+        if (explicitPreferredPackage.isBlank() && !usingFallbackBind && !sherpaPkg.isNullOrBlank() && sherpaPkg != failedPkg) {
+            usingFallbackBind = true
+            bindEngine(sherpaPkg)
+            return
+        }
+        _isSpeaking.value = false
+        _availability.value = TtsAvailability.UNAVAILABLE
+    }
+
+    private fun attachProgressListener(engine: TextToSpeech) {
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) {
                 _isSpeaking.value = true
@@ -71,84 +218,12 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
             @Deprecated("Deprecated in Java")
             override fun onError(utteranceId: String?) {
                 _isSpeaking.value = false
-                fallbackToBuiltInAfterSystemError()
             }
 
             override fun onError(utteranceId: String?, errorCode: Int) {
                 _isSpeaking.value = false
-                fallbackToBuiltInAfterSystemError()
             }
         })
-
-        val resIr = engine.setLanguage(Locale("fa", "IR"))
-        val resFa = if (resIr == TextToSpeech.LANG_MISSING_DATA || resIr == TextToSpeech.LANG_NOT_SUPPORTED) {
-            engine.setLanguage(Locale("fa"))
-        } else {
-            resIr
-        }
-
-        val availableVoices = runCatching {
-            engine.voices
-                ?.filter { it.locale.language.equals("fa", ignoreCase = true) }
-                ?.map { voice ->
-                    TtsVoiceInfo(
-                        name = voice.name,
-                        localeTag = voice.locale.toLanguageTag(),
-                        isOffline = !voice.isNetworkConnectionRequired,
-                    )
-                }
-                ?.sortedByDescending { it.isOffline }
-                ?: emptyList()
-        }.getOrDefault(emptyList())
-        _persianVoices.value = availableVoices
-
-        val hasOfflineSystemFa = resFa != TextToSpeech.LANG_MISSING_DATA &&
-            resFa != TextToSpeech.LANG_NOT_SUPPORTED &&
-            (availableVoices.isEmpty() || availableVoices.any { it.isOffline } || resFa == TextToSpeech.LANG_COUNTRY_AVAILABLE || resFa == TextToSpeech.LANG_AVAILABLE)
-
-        if (hasOfflineSystemFa) {
-            _availability.value = TtsAvailability.READY_PERSIAN
-            systemPersianReady = true
-        } else if (!triedGoogleFallback && hasGoogleTtsInstalled(engine)) {
-            tryGoogleTtsEngine()
-        } else {
-            activateBuiltInFallback()
-        }
-    }
-
-    private fun hasGoogleTtsInstalled(engine: TextToSpeech): Boolean {
-        return runCatching {
-            engine.engines.any { it.name == GOOGLE_TTS_PKG }
-        }.getOrDefault(false)
-    }
-
-    private fun tryGoogleTtsEngine() {
-        triedGoogleFallback = true
-        runCatching {
-            tts?.stop()
-            tts?.shutdown()
-            tts = TextToSpeech(appContext, this, GOOGLE_TTS_PKG)
-        }.onFailure {
-            activateBuiltInFallback()
-        }
-    }
-
-    private fun activateBuiltInFallback() {
-        systemPersianReady = false
-        _availability.value = TtsAvailability.READY_BUILTIN_PERSIAN
-    }
-
-    private fun fallbackToBuiltInAfterSystemError() {
-        val pending = lastSpokenRequest ?: return
-        lastSpokenRequest = null
-        activateBuiltInFallback()
-        builtInEngine.speak(
-            text = pending.first,
-            speechRate = pending.second,
-            persona = pending.third,
-            onStart = { _isSpeaking.value = true },
-            onDone = { _isSpeaking.value = false },
-        )
     }
 
     fun speak(
@@ -158,45 +233,30 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
         preferredVoiceName: String = "",
     ) {
         if (text.isBlank()) return
+        val engine = tts ?: return
+
+        val cleanForTts = text
+            .replace(Regex("https?://\\S+"), "لینک")
+            .replace("•", "،")
+            .replace(Regex("[🎭📘🔎🎙⚠️✅❌]"), "")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        if (cleanForTts.isBlank()) return
+
         stop()
 
-        val engine = tts
-        if (systemPersianReady && engine != null) {
-            val cleanForTts = text
-                .replace(Regex("https?://\\S+"), "لینک")
-                .replace("•", "،")
-                .replace(Regex("[🎭📘🔎🎙⚠️✅❌🎙]"), "")
-                .trim()
-            if (cleanForTts.isBlank()) return
-
-            if (preferredVoiceName.isNotBlank()) {
-                val match: Voice? = runCatching {
-                    engine.voices?.firstOrNull { it.name == preferredVoiceName }
-                }.getOrNull()
-                if (match != null) {
-                    engine.voice = match
-                }
-            }
-            val rate = speechRate.coerceIn(0.6f, 1.5f)
-            engine.setSpeechRate(rate)
-            engine.setPitch(persona.pitch)
-            lastSpokenRequest = Triple(cleanForTts, rate, persona)
-
-            val result = engine.speak(cleanForTts, TextToSpeech.QUEUE_FLUSH, null, "sol_${System.currentTimeMillis()}")
-            if (result == TextToSpeech.SUCCESS) {
-                return
+        if (preferredVoiceName.isNotBlank()) {
+            val match: Voice? = runCatching {
+                engine.voices?.firstOrNull { it.name == preferredVoiceName }
+            }.getOrNull()
+            if (match != null) {
+                runCatching { engine.voice = match }
             }
         }
 
-        // Built-in in-app Persian speech synthesizer (always speaks!)
-        lastSpokenRequest = null
-        builtInEngine.speak(
-            text = text,
-            speechRate = speechRate,
-            persona = persona,
-            onStart = { _isSpeaking.value = true },
-            onDone = { _isSpeaking.value = false },
-        )
+        engine.setSpeechRate(speechRate.coerceIn(0.6f, 1.5f))
+        engine.setPitch(persona.pitch)
+        engine.speak(cleanForTts, TextToSpeech.QUEUE_FLUSH, null, "sol_${System.currentTimeMillis()}")
     }
 
     fun openSystemTtsSettings() {
@@ -206,23 +266,12 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
         runCatching { appContext.startActivity(intent) }
     }
 
-    fun recheckSystemVoices() {
-        triedGoogleFallback = false
-        systemPersianReady = false
-        _availability.value = TtsAvailability.INITIALIZING
-        runCatching {
-            tts?.stop()
-            tts?.shutdown()
-            tts = TextToSpeech(appContext, this)
-        }.onFailure {
-            activateBuiltInFallback()
-        }
+    fun recheckSystemVoices(preferredEnginePackage: String = explicitPreferredPackage) {
+        connectToPhoneTts(preferredEnginePackage)
     }
 
     fun stop() {
-        lastSpokenRequest = null
         runCatching { tts?.stop() }
-        builtInEngine.stop()
         _isSpeaking.value = false
     }
 
@@ -230,11 +279,90 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
         stop()
         runCatching { tts?.shutdown() }
         tts = null
-        systemPersianReady = false
         _isSpeaking.value = false
     }
 
     companion object {
         private const val GOOGLE_TTS_PKG = "com.google.android.tts"
+
+        private val PERSIAN_LOCALES = listOf(
+            Locale.forLanguageTag("fa-IR"),
+            Locale.forLanguageTag("fa"),
+            Locale.forLanguageTag("fas-IR"),
+            Locale.forLanguageTag("fas"),
+            Locale.forLanguageTag("per"),
+        )
+
+        fun isSherpaEngine(packageName: String, label: String = ""): Boolean {
+            val hay = "$packageName $label".lowercase(Locale.ROOT)
+            return hay.contains("sherpa") || hay.contains("woheller69") || hay.contains("k2fsa")
+        }
+
+        fun isPersianLocale(locale: Locale?): Boolean {
+            if (locale == null) return false
+            val lang = locale.language.lowercase(Locale.ROOT)
+            val tag = locale.toLanguageTag().lowercase(Locale.ROOT)
+            return lang == "fa" || lang == "fas" || lang == "per" ||
+                tag.startsWith("fa-") || tag == "fa" || tag.startsWith("fas")
+        }
+
+        internal fun snapshotEngines(engine: TextToSpeech): List<TtsEngineInfo> {
+            val defaultPkg = runCatching { engine.defaultEngine.orEmpty() }.getOrDefault("")
+            return runCatching {
+                engine.engines.orEmpty().map { info ->
+                    val label = info.label?.trim().orEmpty().ifBlank { info.name }
+                    TtsEngineInfo(
+                        packageName = info.name,
+                        label = label,
+                        isDefault = info.name == defaultPkg,
+                        isSherpa = isSherpaEngine(info.name, label),
+                    )
+                }.sortedWith(
+                    compareByDescending<TtsEngineInfo> { it.isSherpa }
+                        .thenByDescending { it.isDefault }
+                        .thenBy { it.label }
+                )
+            }.getOrDefault(emptyList())
+        }
+
+        internal fun configurePersianLanguageAndVoices(
+            engine: TextToSpeech,
+            updateVoices: (List<TtsVoiceInfo>) -> Unit = {},
+        ): Boolean {
+            var langSupported = false
+            for (loc in PERSIAN_LOCALES) {
+                val res = runCatching { engine.setLanguage(loc) }.getOrDefault(TextToSpeech.LANG_NOT_SUPPORTED)
+                if (res >= TextToSpeech.LANG_AVAILABLE) {
+                    langSupported = true
+                    break
+                }
+            }
+
+            val allVoices = runCatching { engine.voices?.toList().orEmpty() }.getOrDefault(emptyList())
+            val persianMatched = allVoices.filter { isPersianLocale(it.locale) }
+            val mappedVoices = persianMatched
+                .map { v ->
+                    TtsVoiceInfo(
+                        name = v.name,
+                        localeTag = v.locale.toLanguageTag(),
+                        isOffline = !v.isNetworkConnectionRequired,
+                    )
+                }
+                .sortedByDescending { it.isOffline }
+            updateVoices(mappedVoices)
+
+            if (!langSupported && persianMatched.isNotEmpty()) {
+                val chosen = persianMatched.firstOrNull { !it.isNetworkConnectionRequired } ?: persianMatched.first()
+                runCatching { engine.voice = chosen }
+                langSupported = true
+            }
+            return langSupported
+        }
+    }
+
+    private fun configurePersianLanguageAndVoices(engine: TextToSpeech): Boolean {
+        return Companion.configurePersianLanguageAndVoices(engine) { voices ->
+            _persianVoices.value = voices
+        }
     }
 }

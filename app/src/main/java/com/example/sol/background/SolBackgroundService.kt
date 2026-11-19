@@ -26,12 +26,26 @@ class SolBackgroundService : Service(), TextToSpeech.OnInitListener {
     private var pendingSpeakText: String? = null
     private var ttsReady = false
 
+    private var backgroundTtsProbeQueue: ArrayDeque<String> = ArrayDeque()
+    private var bindingPackage: String = ""
+    private var triedAltEngine = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
         SolNotificationHelper.ensureChannels(this)
-        tts = TextToSpeech(this, this)
+        val preferredPkg = runCatching {
+            kotlinx.coroutines.runBlocking {
+                (application as? SolApplication)?.container?.preferencesRepository?.getSnapshot()?.preferredTtsEnginePackage.orEmpty()
+            }
+        }.getOrDefault("")
+        bindingPackage = preferredPkg
+        tts = if (preferredPkg.isNotBlank()) {
+            TextToSpeech(this, this, preferredPkg)
+        } else {
+            TextToSpeech(this, this)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -72,19 +86,45 @@ class SolBackgroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            val res = tts?.setLanguage(Locale("fa", "IR"))
-            ttsReady = res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED
-            val text = pendingSpeakText
-            if (ttsReady && !text.isNullOrBlank()) {
-                speakAndFinish(text)
-            } else if (!text.isNullOrBlank()) {
-                // Keep foreground notification briefly so user sees report even if Persian TTS pack missing
-                serviceScope.launch {
-                    delay(3000)
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
+        val engine = tts
+        if (status == TextToSpeech.SUCCESS && engine != null) {
+            val activePkg = bindingPackage.ifBlank { runCatching { engine.defaultEngine.orEmpty() }.getOrDefault("") }
+            if (!triedAltEngine && backgroundTtsProbeQueue.isEmpty()) {
+                val others = com.example.sol.voice.PersianTTS.snapshotEngines(engine)
+                    .map { it.packageName }
+                    .filter { it.isNotBlank() && it != activePkg }
+                backgroundTtsProbeQueue.addAll(others)
+            }
+            val persianOk = com.example.sol.voice.PersianTTS.configurePersianLanguageAndVoices(engine)
+            val isSherpa = com.example.sol.voice.PersianTTS.isSherpaEngine(packageName = activePkg)
+            if (persianOk || isSherpa) {
+                ttsReady = true
+                val text = pendingSpeakText
+                if (!text.isNullOrBlank()) {
+                    speakAndFinish(text)
                 }
+                return
+            }
+        }
+
+        if (backgroundTtsProbeQueue.isNotEmpty()) {
+            triedAltEngine = true
+            val nextPkg = backgroundTtsProbeQueue.removeFirst()
+            bindingPackage = nextPkg
+            runCatching {
+                tts?.stop()
+                tts?.shutdown()
+            }
+            tts = TextToSpeech(this, this, nextPkg)
+            return
+        }
+
+        val text = pendingSpeakText
+        if (!text.isNullOrBlank()) {
+            serviceScope.launch {
+                delay(3000)
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
             }
         }
     }

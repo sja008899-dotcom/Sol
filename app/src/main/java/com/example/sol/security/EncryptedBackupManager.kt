@@ -143,6 +143,7 @@ class EncryptedBackupManager(
             put("preferences", JSONObject().apply {
                 put("ownerName", prefs.ownerName)
                 put("voicePersona", prefs.voicePersona.name)
+                put("preferredTtsEnginePackage", prefs.preferredTtsEnginePackage)
                 put("preferredTtsVoiceName", prefs.preferredTtsVoiceName)
                 put("speechRate", prefs.speechRate.toDouble())
                 put("autoSpeak", prefs.autoSpeak)
@@ -331,6 +332,7 @@ class EncryptedBackupManager(
                     voicePersona = runCatching {
                         VoicePersona.valueOf(p.optString("voicePersona"))
                     }.getOrDefault(current.voicePersona),
+                    preferredTtsEnginePackage = p.optString("preferredTtsEnginePackage", current.preferredTtsEnginePackage),
                     preferredTtsVoiceName = p.optString("preferredTtsVoiceName", current.preferredTtsVoiceName),
                     speechRate = p.optDouble("speechRate", current.speechRate.toDouble()).toFloat(),
                     autoSpeak = p.optBoolean("autoSpeak", current.autoSpeak),

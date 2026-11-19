@@ -31,6 +31,7 @@ import com.example.sol.tasks.PendingCommunicationConfirmation
 import com.example.sol.voice.ActiveAsrBackend
 import com.example.sol.voice.AudioVolumeStatus
 import com.example.sol.voice.TtsAvailability
+import com.example.sol.voice.TtsEngineInfo
 import com.example.sol.voice.TtsVoiceInfo
 import com.example.sol.voice.VoiceListeningState
 import com.example.sol.voice.VoskModelStatus
@@ -117,6 +118,9 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     val ttsAvailability: StateFlow<TtsAvailability> = c.persianTts.availability
     val isSpeaking: StateFlow<Boolean> = c.persianTts.isSpeaking
     val persianVoices: StateFlow<List<TtsVoiceInfo>> = c.persianTts.persianVoices
+    val availableTtsEngines: StateFlow<List<TtsEngineInfo>> = c.persianTts.availableEngines
+    val activeTtsEnginePackage: StateFlow<String> = c.persianTts.activeEnginePackage
+    val activeTtsEngineLabel: StateFlow<String> = c.persianTts.activeEngineLabel
 
     val activeTask: StateFlow<ActiveTaskState?> = c.taskManager.activeTask
     val pendingConfirmation: StateFlow<PendingCommunicationConfirmation?> = c.confirmationManager.pending
@@ -198,6 +202,8 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         observeDynamicSyncs()
     }
 
+    private var initialTtsSyncDone = false
+
     private fun observeDynamicSyncs() {
         // Keep Home Screen Widget & Quick Settings Tile synchronized with location + active role
         viewModelScope.launch {
@@ -211,6 +217,12 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 c.voiceEngine.refreshBackend(prefs.voskOfflineEnabled)
                 _slmStatus.value = c.localSlmEngine.getStatus(prefs.slmSynthesisEnabled, prefs.slmModelPath)
+                if (!initialTtsSyncDone) {
+                    initialTtsSyncDone = true
+                    if (prefs.preferredTtsEnginePackage.isNotBlank()) {
+                        c.persianTts.connectToPhoneTts(prefs.preferredTtsEnginePackage)
+                    }
+                }
             }
         }
 
@@ -646,8 +658,19 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     fun openSystemTtsSettings() = c.persianTts.openSystemTtsSettings()
 
     fun recheckSystemTts() {
-        c.persianTts.recheckSystemVoices()
-        _statusBannerMessage.value = "در حال بررسی مجدد صداهای فارسی گوشی (و آماده بودن صدای داخلی Sol)…"
+        c.persianTts.recheckSystemVoices(preferences.value.preferredTtsEnginePackage)
+        _statusBannerMessage.value = "در حال بررسی و اتصال به موتورهای صدای نصب‌شده روی گوشی…"
+    }
+
+    fun setPreferredTtsEngine(packageName: String) {
+        viewModelScope.launch {
+            c.preferencesRepository.setPreferredTtsEnginePackage(packageName)
+            c.preferencesRepository.setPreferredTtsVoiceName("")
+            c.persianTts.connectToPhoneTts(packageName)
+            val label = availableTtsEngines.value.firstOrNull { it.packageName == packageName }?.label
+                ?: if (packageName.isBlank()) "تشخیص خودکار (SherpaTTS / پیش‌فرض گوشی)" else packageName
+            _statusBannerMessage.value = "موتور صدای Sol به «$label» متصل شد."
+        }
     }
 
     // --- Confirmation & Communication (+ Hands-Free Voice Confirm/Cancel) ---

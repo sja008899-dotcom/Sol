@@ -6,11 +6,10 @@ import com.example.sol.brain.SolAction
 import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.knowledge.CapabilityCategory
 import com.example.sol.knowledge.SolCapabilitiesCatalog
-import com.example.sol.voice.FormantSynthesizer
-import com.example.sol.voice.PersianG2P
-import com.example.sol.voice.PersianSpeechTextNormalizer
+import com.example.sol.voice.PersianTTS
 import com.example.sol.voice.VoiceEngine
 import com.example.sol.voice.VoiceVocabularyBias
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -93,29 +92,16 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun builtInPersianSpeechNormalizerG2pAndSynthesizerWork() {
-        assertEquals("هزار و چهارصد و چهار", PersianSpeechTextNormalizer.numberToPersianWords(1404))
-        assertEquals("بیست و پنج", PersianSpeechTextNormalizer.numberToPersianWords(25))
+    fun sherpaEngineAndPersianLocaleDetectionWorkCorrectly() {
+        assertTrue(PersianTTS.isSherpaEngine("org.woheller69.ttsengine", "SherpaTTS"))
+        assertTrue(PersianTTS.isSherpaEngine("com.k2fsa.sherpa.onnx.tts.engine", "Sherpa ONNX"))
+        assertFalse(PersianTTS.isSherpaEngine("com.samsung.SMT", "Samsung TTS"))
 
-        val words = PersianSpeechTextNormalizer.prepareWords("سلام! Sol v2 PDF آماده است 1404")
-        assertTrue(words.contains("سلام"))
-        assertTrue(words.contains("سول"))
-        assertTrue(words.contains("نسخه"))
-        assertTrue(words.contains("دو"))
-        assertTrue(words.contains("پی"))
-        assertTrue(words.contains("هزار"))
-
-        val phonemes = PersianG2P.wordsToPhonemes(words)
-        assertTrue(phonemes.isNotEmpty())
-
-        val pcm = FormantSynthesizer.renderPhonemes(
-            phonemes = phonemes,
-            baseF0 = 192f,
-            rate = 1.0f,
-            risingIntonation = false,
-        )
-        assertTrue(pcm.size > 2000)
-        assertTrue(pcm.any { it.toInt() != 0 })
+        assertTrue(PersianTTS.isPersianLocale(Locale.forLanguageTag("fa-IR")))
+        assertTrue(PersianTTS.isPersianLocale(Locale.forLanguageTag("fa")))
+        assertTrue(PersianTTS.isPersianLocale(Locale.forLanguageTag("fas")))
+        assertTrue(PersianTTS.isPersianLocale(Locale.forLanguageTag("per")))
+        assertFalse(PersianTTS.isPersianLocale(Locale.forLanguageTag("en-US")))
     }
 
     @Test

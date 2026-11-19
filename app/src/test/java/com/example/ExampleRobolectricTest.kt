@@ -128,12 +128,16 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `built-in persian tts initializes cleanly without error and command brain handles colloquial prompts`() = runBlocking {
+    fun `phone tts availability and sherpa engine preference persist alongside command brain memory lookup`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val app = context.applicationContext as SolApplication
         val c = app.container
 
-        assertEquals(com.example.sol.voice.TtsAvailability.READY_BUILTIN_PERSIAN.labelFa.isNotBlank(), true)
+        assertTrue(com.example.sol.voice.TtsAvailability.READY_PERSIAN.labelFa.isNotBlank())
+        assertTrue(com.example.sol.voice.TtsAvailability.MISSING_PERSIAN_DATA.labelFa.contains("SherpaTTS"))
+
+        c.preferencesRepository.setPreferredTtsEnginePackage("org.woheller69.ttsengine")
+        assertEquals("org.woheller69.ttsengine", c.preferencesRepository.getSnapshot().preferredTtsEnginePackage)
 
         c.personRepository.savePerson(name = "رضا احمدی", phone = "09123456789", relation = "همکار")
         val personReply = c.commandBrain.process("شماره رضا احمدی چنده؟")
