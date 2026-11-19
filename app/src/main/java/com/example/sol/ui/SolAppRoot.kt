@@ -104,6 +104,8 @@ fun SolAppRoot(
     val vocabularyTermsCount by viewModel.vocabularyTermsCount.collectAsStateWithLifecycle()
     val ramSnapshot by viewModel.ramSnapshot.collectAsStateWithLifecycle()
     val slmStatus by viewModel.slmStatus.collectAsStateWithLifecycle()
+    val slmRuntimeState by viewModel.slmRuntimeState.collectAsStateWithLifecycle()
+    val isSlmGenerating by viewModel.isSlmGenerating.collectAsStateWithLifecycle()
     val canScheduleExactAlarms by viewModel.canScheduleExactAlarms.collectAsStateWithLifecycle()
 
     val ttsAvailability by viewModel.ttsAvailability.collectAsStateWithLifecycle()
@@ -188,6 +190,14 @@ fun SolAppRoot(
     ) { uri ->
         if (uri != null) {
             viewModel.importVoskModelZip(uri)
+        }
+    }
+
+    val slmModelPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importLocalSlmModel(uri)
         }
     }
 
@@ -433,6 +443,8 @@ fun SolAppRoot(
                                         ttsAvailability = ttsAvailability,
                                         isSpeaking = isSpeaking,
                                         isFetchingBook = isFetchingBook,
+                                        slmRuntimeState = slmRuntimeState,
+                                        isSlmGenerating = isSlmGenerating,
                                         activeRoles = roles.filter { it.isActive },
                                         messages = messages,
                                         inputText = inputText,
@@ -446,6 +458,8 @@ fun SolAppRoot(
                                         onClearVoiceError = viewModel::clearVoiceError,
                                         onSpeakMessage = viewModel::speakText,
                                         onStopSpeaking = viewModel::stopSpeaking,
+                                        onStopSlmGeneration = viewModel::stopSlmGeneration,
+                                        onResetSlmConversation = viewModel::resetSlmConversation,
                                         onConfirmCurrentLocation = viewModel::confirmCurrentLocation,
                                         onDismissTaskCard = viewModel::dismissActiveTaskCard,
                                         onOpenCapabilities = { viewModel.openCapabilitiesSheet(true) },
@@ -527,6 +541,7 @@ fun SolAppRoot(
                                         vocabularyTermsCount = vocabularyTermsCount,
                                         bookChunkCount = bookChunkCount,
                                         slmStatus = slmStatus,
+                                        slmRuntimeState = slmRuntimeState,
                                         ramSnapshot = ramSnapshot,
                                         canScheduleExactAlarms = canScheduleExactAlarms,
                                         scheduledAlarms = scheduledAlarms,
@@ -552,6 +567,15 @@ fun SolAppRoot(
                                         onUnloadVoskRam = viewModel::unloadVoskModelFromRam,
                                         onDeleteVoskModel = viewModel::deleteVoskModel,
                                         onSlmToggle = viewModel::setSlmSynthesisEnabled,
+                                        onSlmPreferGpuToggle = viewModel::setSlmPreferGpu,
+                                        onDownloadSlmModel = viewModel::downloadSlmModel,
+                                        onCancelSlmDownload = viewModel::cancelSlmDownload,
+                                        onPickSlmFile = {
+                                            slmModelPickerLauncher.launch(arrayOf("application/octet-stream", "*/*"))
+                                        },
+                                        onTestLoadSlmInRam = viewModel::testLoadSlmInRam,
+                                        onUnloadSlmRam = viewModel::unloadSlmFromRam,
+                                        onDeleteSlmModel = viewModel::deleteSlmModel,
                                         onAddQuickSettingsTile = viewModel::requestAddQuickSettingsTile,
                                         onRequestExactAlarmPermission = viewModel::requestExactAlarmPermission,
                                         onCancelScheduledAlarm = viewModel::cancelScheduledAlarm,

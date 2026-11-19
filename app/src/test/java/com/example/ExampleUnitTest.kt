@@ -5,6 +5,8 @@ import com.example.sol.brain.IntentParser
 import com.example.sol.brain.SolAction
 import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.knowledge.CapabilityCategory
+import com.example.sol.knowledge.LocalSlmEngine
+import com.example.sol.knowledge.SlmModelCatalog
 import com.example.sol.knowledge.SolCapabilitiesCatalog
 import com.example.sol.voice.PersianTTS
 import com.example.sol.voice.VoiceEngine
@@ -188,5 +190,36 @@ class ExampleUnitTest {
         assertEquals(2, bias.currentTermsCount())
         val corrected = bias.applyBiasCorrection("ارسال گزارش به شرکت کارنو   صنعت ماکیان")
         assertTrue(corrected.contains("شرکت کارنو صنعت ماکیان"))
+    }
+
+    @Test
+    fun phase3SlmHelpersCatalogAndThinkingTagStripperWorkProperly() {
+        val rawComplete = "<think>Let me analyze in English first.</think>\nسلام! من آماده‌ام کمک کنم."
+        assertEquals("سلام! من آماده‌ام کمک کنم.", LocalSlmEngine.stripThinkingTags(rawComplete, hideUnclosedThinkWhileStreaming = true))
+
+        val rawStreamingUnclosed = "سلام عزیز؛ <think>thinking tokens"
+        assertEquals("سلام عزیز؛", LocalSlmEngine.stripThinkingTags(rawStreamingUnclosed, hideUnclosedThinkWhileStreaming = true))
+
+        val noThinkEcho = "/no_think\nپاسخ نهایی فارسی"
+        assertEquals("پاسخ نهایی فارسی", LocalSlmEngine.stripThinkingTags(noThinkEcho))
+
+        val rec = SlmModelCatalog.models.first { it.isRecommendedFor4Gb }
+        assertTrue(rec.approxSizeMb <= 520)
+        assertTrue(LocalSlmEngine.hasEnoughRamForModel(availableRamMb = 900L, minRequiredRamMb = rec.minFreeRamMb))
+        assertFalse(LocalSlmEngine.hasEnoughRamForModel(availableRamMb = 420L, minRequiredRamMb = rec.minFreeRamMb))
+        assertEquals(1400L, SlmModelCatalog.minRequiredRamForFile("Qwen2.5-1.5B-Instruct_q8.litertlm"))
+
+        val sysPrompt = LocalSlmEngine.buildSystemInstruction(
+            ownerName = "رضا",
+            confirmedLocation = "شرکت کارنو صنعت ماکیان",
+            activeRoleName = "مربی بهره‌وری",
+            activeRoleInstructions = "اولویت‌بندی کارها",
+            memoryHighlights = listOf("کار مهم فردا ساعت ۹"),
+            groundedBookChunks = emptyList(),
+            voiceNotes = "",
+        )
+        assertTrue(sysPrompt.contains("رضا"))
+        assertTrue(sysPrompt.contains("کارنو صنعت ماکیان"))
+        assertTrue(sysPrompt.contains("مربی بهره‌وری"))
     }
 }

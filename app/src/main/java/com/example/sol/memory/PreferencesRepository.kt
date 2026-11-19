@@ -57,6 +57,7 @@ data class SolPreferences(
     val wakeWordEnabled: Boolean = false,
     val slmSynthesisEnabled: Boolean = false,
     val slmModelPath: String = "",
+    val slmPreferGpu: Boolean = true,
     val lastBackupAt: Long = 0L,
 )
 
@@ -79,6 +80,7 @@ class PreferencesRepository(private val context: Context) {
         val WAKE_WORD_ENABLED = booleanPreferencesKey("wake_word_enabled")
         val SLM_SYNTHESIS_ENABLED = booleanPreferencesKey("slm_synthesis_enabled")
         val SLM_MODEL_PATH = stringPreferencesKey("slm_model_path")
+        val SLM_PREFER_GPU = booleanPreferencesKey("slm_prefer_gpu")
         val LAST_BACKUP_AT = longPreferencesKey("last_backup_at")
     }
 
@@ -103,6 +105,7 @@ class PreferencesRepository(private val context: Context) {
             wakeWordEnabled = p[Keys.WAKE_WORD_ENABLED] ?: false,
             slmSynthesisEnabled = p[Keys.SLM_SYNTHESIS_ENABLED] ?: false,
             slmModelPath = p[Keys.SLM_MODEL_PATH] ?: "",
+            slmPreferGpu = p[Keys.SLM_PREFER_GPU] ?: true,
             lastBackupAt = p[Keys.LAST_BACKUP_AT] ?: 0L,
         )
     }
@@ -179,6 +182,10 @@ class PreferencesRepository(private val context: Context) {
         context.solPrefsDataStore.edit { it[Keys.SLM_MODEL_PATH] = path }
     }
 
+    suspend fun setSlmPreferGpu(preferGpu: Boolean) {
+        context.solPrefsDataStore.edit { it[Keys.SLM_PREFER_GPU] = preferGpu }
+    }
+
     suspend fun recordBackupTimestamp(timestamp: Long = System.currentTimeMillis()) {
         context.solPrefsDataStore.edit { it[Keys.LAST_BACKUP_AT] = timestamp }
     }
@@ -201,6 +208,7 @@ class PreferencesRepository(private val context: Context) {
             p[Keys.WAKE_WORD_ENABLED] = restored.wakeWordEnabled
             p[Keys.SLM_SYNTHESIS_ENABLED] = restored.slmSynthesisEnabled
             p[Keys.SLM_MODEL_PATH] = restored.slmModelPath
+            p[Keys.SLM_PREFER_GPU] = restored.slmPreferGpu
         }
     }
 

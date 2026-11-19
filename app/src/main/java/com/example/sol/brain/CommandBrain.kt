@@ -178,12 +178,24 @@ class CommandBrain(
             }
 
             SolAction.CONSULT_ROLE_BOOK -> {
-                val rag = bookRagEngine.consultOffline(
-                    query = parsed.rawText,
-                    slmEngine = localSlmEngine,
-                    useSlm = prefs.slmSynthesisEnabled,
-                )
-                BrainExecutionResult(replyText = rag.answerText, parsedCommand = parsed)
+                val rag = bookRagEngine.consultOffline(query = parsed.rawText)
+                val canRunNeuralSlm = prefs.slmSynthesisEnabled && localSlmEngine.hasInstalledModel(prefs.slmModelPath)
+                if (canRunNeuralSlm && (rag.topChunks.isNotEmpty() || rag.activeRole != null)) {
+                    val sysPrompt = buildSlmSystemInstruction(rag.activeRole, rag.topChunks, rag.referencedBook?.voiceNotes.orEmpty())
+                    BrainExecutionResult(
+                        replyText = "",
+                        parsedCommand = parsed,
+                        speakReply = false,
+                        pendingTask = PendingSolTask.RunLocalSlmChat(
+                            userPrompt = parsed.rawText,
+                            systemInstruction = sysPrompt,
+                            fallbackReplyText = rag.answerText,
+                            hasBookGrounding = rag.topChunks.isNotEmpty(),
+                        ),
+                    )
+                } else {
+                    BrainExecutionResult(replyText = rag.answerText, parsedCommand = parsed)
+                }
             }
 
             SolAction.LEARN_ALIAS -> {
@@ -473,23 +485,78 @@ class CommandBrain(
                 }
 
                 // Try on-device BM25 search over stored books + active role
-                val rag = bookRagEngine.consultOffline(
-                    query = rawInput,
-                    slmEngine = localSlmEngine,
-                    useSlm = prefs.slmSynthesisEnabled,
-                )
-                if (rag.topChunks.isNotEmpty() || rag.activeRole != null) {
-                    BrainExecutionResult(
-                        replyText = rag.answerText,
-                        parsedCommand = parsed,
-                    )
-                } else {
-                    BrainExecutionResult(
-                        replyText = "منظورتان از «${rawInput.take(50)}» را دقیق متوجه نشدم. می‌توانید بگویید: «از اینترنت درباره هوش مصنوعی دانلود کن»، «ساعت چنده؟»، «به علی پیام بده»، «واتساپ رو باز کن» یا «یادت باشه ...».",
-                        parsedCommand = parsed,
-                    )
+                val rag = bookRagEngine.consultOffline(query = rawInput)
+                val hasInstalledSlm = localSlmEngine.hasInstalledModel(prefs.slmModelPath)
+                val canRunNeuralSlm = prefs.slmSynthesisEnabled && hasInstalledSlm
+
+                when {
+                    canRunNeuralSlm -> {
+                        val sysPrompt = buildSlmSystemInstruction(
+                            activeRole = rag.activeRole,
+                            groundedChunks = rag.topChunks,
+                            voiceNotes = rag.referencedBook?.voiceNotes.orEmpty(),
+                        )
+                        val fallbackText = if (rag.topChunks.isNotEmpty() || rag.activeRole != null) {
+                            rag.answerText
+                        } else {
+                            ""
+                        }
+                        BrainExecutionResult(
+                            replyText = "",
+                            parsedCommand = parsed,
+                            speakReply = false,
+                            pendingTask = PendingSolTask.RunLocalSlmChat(
+                                userPrompt = rawInput,
+                                systemInstruction = sysPrompt,
+                                fallbackReplyText = fallbackText,
+                                hasBookGrounding = rag.topChunks.isNotEmpty(),
+                            ),
+                        )
+                    }
+
+                    rag.topChunks.isNotEmpty() || rag.activeRole != null -> {
+                        BrainExecutionResult(
+                            replyText = rag.answerText,
+                            parsedCommand = parsed,
+                        )
+                    }
+
+                    hasInstalledSlm -> {
+                        BrainExecutionResult(
+                            replyText = "این مورد در حافظه یا کتاب‌ها پیدا نشد. فایل مدل زبانی آفلاین روی گوشی نصب است؛ برای گفت‌وگوی آزاد، در «تنظیمات ← بخش ۳» سوئیچ مدل زبانی آفلاین (فاز ۳) را روشن کنید.",
+                            parsedCommand = parsed,
+                        )
+                    }
+
+                    else -> {
+                        BrainExecutionResult(
+                            replyText = "این مورد در فرمان‌ها، حافظهٔ شخصی و کتاب‌های شما پیدا نشد و هنوز فایل مدل زبانی آفلاین (فاز ۳) نصب نشده است.\n" +
+                                "برای گفت‌وگوی آزاد، هم‌فکری و پاسخ‌گویی عصبی بدون اینترنت، در «تنظیمات ← بخش ۳» مدل Qwen3-0.6B (~۴۹۸ مگابایت) را دانلود یا فایل .litertlm انتخاب کنید.",
+                            parsedCommand = parsed,
+                        )
+                    }
                 }
             }
         }
+    }
+
+    private suspend fun buildSlmSystemInstruction(
+        activeRole: com.example.sol.memory.SolRoleEntity?,
+        groundedChunks: List<com.example.sol.knowledge.RankedBookChunk>,
+        voiceNotes: String,
+    ): String {
+        val prefs = preferencesRepository.getSnapshot()
+        val highlights = memoryRepository.getAllOnce().take(8).map { m ->
+            if (m.kind == "alias") "${m.keyText.removePrefix("alias:")} یعنی ${m.valueText}" else m.valueText
+        }
+        return LocalSlmEngine.buildSystemInstruction(
+            ownerName = prefs.ownerName,
+            confirmedLocation = prefs.confirmedCurrentLocation,
+            activeRoleName = activeRole?.roleName,
+            activeRoleInstructions = activeRole?.instructions,
+            memoryHighlights = highlights,
+            groundedBookChunks = groundedChunks,
+            voiceNotes = voiceNotes,
+        )
     }
 }

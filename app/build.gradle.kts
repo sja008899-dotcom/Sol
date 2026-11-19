@@ -109,6 +109,7 @@ dependencies {
   implementation(libs.vosk.android)
   implementation(libs.pdfbox.android)
   implementation(libs.jsoup)
+  implementation(libs.litertlm.android)
   // implementation(libs.coil.compose)
   // implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)

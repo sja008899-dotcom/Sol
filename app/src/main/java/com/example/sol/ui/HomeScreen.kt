@@ -69,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.device.BatteryStatus
+import com.example.sol.knowledge.SlmRuntimeState
 import com.example.sol.memory.LocationEntity
 import com.example.sol.memory.SolPreferences
 import com.example.sol.memory.SolRoleEntity
@@ -101,6 +102,8 @@ fun HomeScreen(
     ttsAvailability: TtsAvailability,
     isSpeaking: Boolean,
     isFetchingBook: Boolean,
+    slmRuntimeState: SlmRuntimeState,
+    isSlmGenerating: Boolean,
     activeRoles: List<SolRoleEntity>,
     messages: List<ChatMessageItem>,
     inputText: String,
@@ -114,6 +117,8 @@ fun HomeScreen(
     onClearVoiceError: () -> Unit,
     onSpeakMessage: (String) -> Unit,
     onStopSpeaking: () -> Unit,
+    onStopSlmGeneration: () -> Unit,
+    onResetSlmConversation: () -> Unit,
     onConfirmCurrentLocation: (String) -> Unit,
     onDismissTaskCard: () -> Unit,
     onOpenCapabilities: () -> Unit,
@@ -490,6 +495,39 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("توقف صدا", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            if (isSlmGenerating || slmRuntimeState is SlmRuntimeState.Ready) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                ) {
+                    if (isSlmGenerating) {
+                        Text(
+                            text = "هوش آفلاین در حال نگارش پاسخ…",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        TextButton(
+                            onClick = onStopSlmGeneration,
+                            modifier = Modifier.testTag("stop_slm_button"),
+                        ) {
+                            Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("توقف تولید", style = MaterialTheme.typography.labelSmall)
+                        }
+                    } else if (slmRuntimeState is SlmRuntimeState.Ready) {
+                        Text(
+                            text = "SLM آماده (${slmRuntimeState.activeBackend.name})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
+                        TextButton(onClick = onResetSlmConversation) {
+                            Text("گفت‌وگوی تازه", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }

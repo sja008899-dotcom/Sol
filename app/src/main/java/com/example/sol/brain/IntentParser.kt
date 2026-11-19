@@ -439,10 +439,13 @@ class IntentParser(
         }
 
         // 12. Time, Date (Jalali), Identity, Greetings, Help
-        if (norm.contains("ساعت") || norm.contains("تاریخ") || norm.contains("امروز") ||
+        val isTimeQuestion = norm == "ساعت" || norm.contains("ساعت چنده") || norm.contains("ساعت چند") ||
+            norm.startsWith("ساعت ") || norm.contains("چند ساعت") && norm.contains("الان")
+        val isDateQuestion = norm == "امروز" || norm.contains("تاریخ") || norm.contains("امروز چند") ||
+            norm.contains("امروز چه روز") || norm.contains("امروز چیه") ||
             norm.contains("چندم برج") || norm.contains("چندم ماه") || norm.contains("چندمه") ||
             norm.contains("شمسی") || norm.contains("چه روزی") || norm.contains("چندشنبه") || norm.contains("کبیسه")
-        ) {
+        if (isTimeQuestion || isDateQuestion) {
             return ParsedCommand(action = SolAction.TIME_DATE, rawText = raw, normalizedText = norm, requireConfirmation = false)
         }
         if (norm.contains("اسم تو") || norm.contains("نام تو") || norm.contains("کی هستی") || norm.contains("چیستی") || norm.contains("اسمت چیه")) {

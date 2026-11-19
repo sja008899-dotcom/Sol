@@ -80,4 +80,11 @@ sealed interface PendingSolTask {
     data class OpenCapabilitiesCatalog(
         val focusBackgroundOnly: Boolean = false,
     ) : PendingSolTask
+
+    data class RunLocalSlmChat(
+        val userPrompt: String,
+        val systemInstruction: String,
+        val fallbackReplyText: String,
+        val hasBookGrounding: Boolean,
+    ) : PendingSolTask
 }

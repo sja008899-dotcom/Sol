@@ -17,6 +17,7 @@ import com.example.sol.widget.SolWidgetStateMirror
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -146,5 +147,27 @@ class ExampleRobolectricTest {
         val genericWeb = c.commandBrain.process("یه چیزی از اینترنت دانلود کن")
         assertEquals(com.example.sol.brain.SolAction.WEB_BOOK_LEARN_ROLE, genericWeb.parsedCommand.action)
         assertTrue(genericWeb.pendingTask is com.example.sol.brain.PendingSolTask.InternetBookRoleFetch)
+    }
+
+    @Test
+    fun `phase3 slm stays honest when no litertlm model exists and persists gpu preference`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val app = context.applicationContext as SolApplication
+        val c = app.container
+
+        assertFalse(c.localSlmEngine.hasInstalledModel())
+        assertTrue(c.localSlmEngine.runtimeState.value is com.example.sol.knowledge.SlmRuntimeState.NotInstalled)
+        val status = c.localSlmEngine.getStatus(enabled = true, modelPath = "")
+        assertFalse(status.hasModelFile)
+        assertTrue(status.statusLabelFa.contains("نصب نیست"))
+
+        c.preferencesRepository.setSlmSynthesisEnabled(true)
+        c.preferencesRepository.setSlmPreferGpu(false)
+        assertFalse(c.preferencesRepository.getSnapshot().slmPreferGpu)
+
+        // With no model installed and no matching books/memory, CommandBrain must NOT pretend to run an SLM
+        val openPrompt = c.commandBrain.process("امروز خیلی خسته‌ام و دلم گرفته برام حرف بزن")
+        assertNull(openPrompt.pendingTask)
+        assertTrue(openPrompt.replyText.contains(".litertlm") || openPrompt.replyText.contains("نصب نشده"))
     }
 }

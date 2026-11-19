@@ -156,6 +156,7 @@ class EncryptedBackupManager(
                 put("voskOfflineEnabled", prefs.voskOfflineEnabled)
                 put("wakeWordEnabled", prefs.wakeWordEnabled)
                 put("slmSynthesisEnabled", prefs.slmSynthesisEnabled)
+                put("slmPreferGpu", prefs.slmPreferGpu)
             })
             put("memories", JSONArray().apply {
                 memories.forEach { m ->
@@ -354,6 +355,7 @@ class EncryptedBackupManager(
                     voskOfflineEnabled = p.optBoolean("voskOfflineEnabled", current.voskOfflineEnabled),
                     wakeWordEnabled = p.optBoolean("wakeWordEnabled", current.wakeWordEnabled),
                     slmSynthesisEnabled = p.optBoolean("slmSynthesisEnabled", current.slmSynthesisEnabled),
+                    slmPreferGpu = p.optBoolean("slmPreferGpu", current.slmPreferGpu),
                 )
             )
         }

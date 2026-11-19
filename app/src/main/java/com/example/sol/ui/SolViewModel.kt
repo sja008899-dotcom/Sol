@@ -9,6 +9,9 @@ import com.example.sol.brain.PendingSolTask
 import com.example.sol.contacts.ResolvedContact
 import com.example.sol.device.BatteryStatus
 import com.example.sol.device.InstalledAppShortcut
+import com.example.sol.knowledge.LocalSlmEngine
+import com.example.sol.knowledge.SlmModelSpec
+import com.example.sol.knowledge.SlmRuntimeState
 import com.example.sol.knowledge.SlmStatus
 import com.example.sol.memory.BackgroundJobLogEntity
 import com.example.sol.memory.BookKnowledgeEntity
@@ -158,6 +161,11 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     private val _slmStatus = MutableStateFlow(c.localSlmEngine.getStatus(false, ""))
     val slmStatus: StateFlow<SlmStatus> = _slmStatus.asStateFlow()
 
+    val slmRuntimeState: StateFlow<SlmRuntimeState> = c.localSlmEngine.runtimeState
+
+    private val _isSlmGenerating = MutableStateFlow(false)
+    val isSlmGenerating: StateFlow<Boolean> = _isSlmGenerating.asStateFlow()
+
     private val _inputText = MutableStateFlow("")
     val inputText: StateFlow<String> = _inputText.asStateFlow()
 
@@ -205,9 +213,9 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     private var initialTtsSyncDone = false
 
     private fun observeDynamicSyncs() {
-        // Keep Home Screen Widget & Quick Settings Tile synchronized with location + active role
+        // Keep Home Screen Widget, Quick Settings Tile, Voice & SLM status synchronized
         viewModelScope.launch {
-            combine(preferences, roles) { prefs, roleList ->
+            combine(preferences, roles, slmRuntimeState) { prefs, roleList, _ ->
                 prefs to (roleList.firstOrNull { it.isActive }?.roleName.orEmpty())
             }.collect { (prefs, activeRole) ->
                 SolWidgetStateMirror.saveAndRefresh(
@@ -216,6 +224,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                     activeRoleName = activeRole,
                 )
                 c.voiceEngine.refreshBackend(prefs.voskOfflineEnabled)
+                c.localSlmEngine.refreshRuntimeStatus(prefs.slmModelPath)
                 _slmStatus.value = c.localSlmEngine.getStatus(prefs.slmSynthesisEnabled, prefs.slmModelPath)
                 if (!initialTtsSyncDone) {
                     initialTtsSyncDone = true
@@ -260,6 +269,11 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         )
         c.memoryOptimizer.refresh()
         c.voiceEngine.voskEngine.refreshInstalledStatus()
+        c.localSlmEngine.refreshRuntimeStatus(preferences.value.slmModelPath)
+        _slmStatus.value = c.localSlmEngine.getStatus(
+            preferences.value.slmSynthesisEnabled,
+            preferences.value.slmModelPath,
+        )
         viewModelScope.launch {
             _contacts.value = c.contactManager.loadMergedContacts()
             _launchableApps.value = c.deviceController.appLauncher.getLaunchableApps().take(12)
@@ -287,18 +301,20 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
         viewModelScope.launch {
             val result = c.commandBrain.process(raw)
-            appendMessage(
-                isUser = false,
-                text = result.replyText,
-                actionBadge = result.parsedCommand.action.name,
-            )
-            c.historyRepository.record(
-                userText = raw,
-                solText = result.replyText,
-                intentAction = result.parsedCommand.action.name,
-            )
-            if (result.speakReply && preferences.value.autoSpeak) {
-                speakText(result.replyText)
+            if (result.replyText.isNotBlank()) {
+                appendMessage(
+                    isUser = false,
+                    text = result.replyText,
+                    actionBadge = result.parsedCommand.action.name,
+                )
+                c.historyRepository.record(
+                    userText = raw,
+                    solText = result.replyText,
+                    intentAction = result.parsedCommand.action.name,
+                )
+                if (result.speakReply && preferences.value.autoSpeak) {
+                    speakText(result.replyText)
+                }
             }
             refreshSystemSnapshots()
 
@@ -319,7 +335,78 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                 is PendingSolTask.OpenCapabilitiesCatalog -> {
                     _showCapabilitiesSheet.value = true
                 }
+                is PendingSolTask.RunLocalSlmChat -> {
+                    runLocalSlmStreamingReply(
+                        rawInput = raw,
+                        actionName = result.parsedCommand.action.name,
+                        task = pending,
+                    )
+                }
                 null -> Unit
+            }
+        }
+    }
+
+    private fun runLocalSlmStreamingReply(
+        rawInput: String,
+        actionName: String,
+        task: PendingSolTask.RunLocalSlmChat,
+    ) {
+        if (_isSlmGenerating.value) {
+            c.localSlmEngine.stopGeneration()
+        }
+        val placeholderId = appendMessage(
+            isUser = false,
+            text = "⏳ در حال بارگذاری و پردازش آفلاین با مدل زبانی…",
+            actionBadge = "SLM_OFFLINE",
+        )
+        _isSlmGenerating.value = true
+
+        viewModelScope.launch {
+            try {
+                val prefs = preferences.value
+                val res = c.localSlmEngine.generateReplyStream(
+                    userPrompt = task.userPrompt,
+                    systemInstruction = task.systemInstruction,
+                    preferredPath = prefs.slmModelPath,
+                    preferGpu = prefs.slmPreferGpu,
+                ) { partialClean ->
+                    updateMessageText(placeholderId, partialClean)
+                }
+
+                res.fold(
+                    onSuccess = { finalText ->
+                        val tagged = if (task.hasBookGrounding) {
+                            "$finalText\n\n(مبتنی بر کتاب‌های آفلاین شما)"
+                        } else {
+                            finalText
+                        }
+                        updateMessageText(placeholderId, tagged)
+                        c.historyRepository.record(
+                            userText = rawInput,
+                            solText = finalText,
+                            intentAction = "${actionName}_SLM",
+                        )
+                        if (prefs.autoSpeak) {
+                            speakText(finalText)
+                        }
+                    },
+                    onFailure = { err ->
+                        val reason = err.localizedMessage ?: "امکان اجرای مدل زبانی در این لحظه وجود ندارد."
+                        val fallbackBlock = if (task.fallbackReplyText.isNotBlank()) {
+                            "⚠️ اجرای مدل زبانی ممکن نشد ($reason).\n\n${task.fallbackReplyText}"
+                        } else {
+                            "⚠️ اجرای مدل زبانی آفلاین ممکن نشد: $reason"
+                        }
+                        updateMessageText(placeholderId, fallbackBlock)
+                        if (prefs.autoSpeak) {
+                            speakText(fallbackBlock)
+                        }
+                    }
+                )
+            } finally {
+                _isSlmGenerating.value = false
+                refreshSystemSnapshots()
             }
         }
     }
@@ -825,15 +912,122 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     fun setDarkTheme(dark: Boolean) = viewModelScope.launch { c.preferencesRepository.setDarkTheme(dark) }
     fun setVoskOfflineEnabled(enabled: Boolean) = viewModelScope.launch { c.preferencesRepository.setVoskOfflineEnabled(enabled) }
     fun setWakeWordEnabled(enabled: Boolean) = viewModelScope.launch { c.preferencesRepository.setWakeWordEnabled(enabled) }
-    fun setSlmSynthesisEnabled(enabled: Boolean) = viewModelScope.launch { c.preferencesRepository.setSlmSynthesisEnabled(enabled) }
+    fun setSlmSynthesisEnabled(enabled: Boolean) = viewModelScope.launch {
+        c.preferencesRepository.setSlmSynthesisEnabled(enabled)
+        if (!enabled) {
+            c.localSlmEngine.unloadFromRam("غیرفعال‌سازی ماژول هوش زبانی")
+        }
+    }
+    fun setSlmPreferGpu(preferGpu: Boolean) = viewModelScope.launch {
+        c.preferencesRepository.setSlmPreferGpu(preferGpu)
+        if (c.localSlmEngine.isLoadedInRam()) {
+            c.localSlmEngine.unloadFromRam("تغییر شتاب‌دهنده سخت‌افزاری؛ در نوبت بعد اعمال می‌شود")
+        }
+    }
 
-    private fun appendMessage(isUser: Boolean, text: String, actionBadge: String = "") {
+    // --- Phase 3: Real On-Device SLM (LiteRT-LM) Controls ---
+    fun downloadSlmModel(spec: SlmModelSpec) {
+        c.localSlmEngine.downloadModel(spec) { savedPath ->
+            viewModelScope.launch {
+                c.preferencesRepository.setSlmModelPath(savedPath)
+                c.preferencesRepository.setSlmSynthesisEnabled(true)
+                _statusBannerMessage.value = "مدل «${spec.titleFa}» دانلود و متصل شد."
+            }
+        }
+    }
+
+    fun cancelSlmDownload() {
+        c.localSlmEngine.cancelDownload()
+        _statusBannerMessage.value = "دانلود مدل متوقف شد."
+    }
+
+    fun importLocalSlmModel(uri: Uri) {
+        c.localSlmEngine.importLocalModel(uri) { result ->
+            result.fold(
+                onSuccess = { savedFile ->
+                    viewModelScope.launch {
+                        c.preferencesRepository.setSlmModelPath(savedFile.absolutePath)
+                        c.preferencesRepository.setSlmSynthesisEnabled(true)
+                        _statusBannerMessage.value = "فایل «${savedFile.name}» با موفقیت وارد و فعال شد."
+                    }
+                },
+                onFailure = { err ->
+                    _statusBannerMessage.value = err.localizedMessage ?: "وارد کردن فایل مدل ناموفق بود."
+                }
+            )
+        }
+    }
+
+    fun testLoadSlmInRam() {
+        viewModelScope.launch {
+            val prefs = preferences.value
+            val sysPrompt = LocalSlmEngine.buildSystemInstruction(
+                ownerName = prefs.ownerName,
+                confirmedLocation = prefs.confirmedCurrentLocation,
+                activeRoleName = roles.value.firstOrNull { it.isActive }?.roleName,
+                activeRoleInstructions = roles.value.firstOrNull { it.isActive }?.instructions,
+                memoryHighlights = emptyList(),
+                groundedBookChunks = emptyList(),
+                voiceNotes = "",
+            )
+            val res = c.localSlmEngine.loadModel(
+                preferredPath = prefs.slmModelPath,
+                preferGpu = prefs.slmPreferGpu,
+                systemInstruction = sysPrompt,
+            )
+            res.fold(
+                onSuccess = { backend ->
+                    _statusBannerMessage.value = "مدل با موفقیت در RAM بارگذاری شد (${backend.labelFa})."
+                },
+                onFailure = { err ->
+                    _statusBannerMessage.value = err.localizedMessage ?: "بارگذاری مدل در RAM ناموفق بود."
+                }
+            )
+            refreshSystemSnapshots()
+        }
+    }
+
+    fun unloadSlmFromRam() {
+        c.localSlmEngine.unloadFromRam("آزادسازی دستی مدل زبانی از RAM")
+        c.memoryOptimizer.refresh("مدل زبانی از RAM آزاد شد")
+        _statusBannerMessage.value = "مدل زبانی از RAM آزاد شد."
+    }
+
+    fun deleteSlmModel() {
+        viewModelScope.launch {
+            c.localSlmEngine.deleteModel(preferences.value.slmModelPath)
+            c.preferencesRepository.setSlmModelPath("")
+            c.preferencesRepository.setSlmSynthesisEnabled(false)
+            _statusBannerMessage.value = "فایل مدل زبانی از حافظه گوشی پاک شد."
+            refreshSystemSnapshots()
+        }
+    }
+
+    fun stopSlmGeneration() {
+        c.localSlmEngine.stopGeneration()
+        _isSlmGenerating.value = false
+    }
+
+    fun resetSlmConversation() {
+        c.localSlmEngine.resetConversation()
+        _statusBannerMessage.value = "حافظهٔ گفت‌وگوی فعلی مدل تازه شد (مدل در RAM باقی ماند)."
+    }
+
+    private fun appendMessage(isUser: Boolean, text: String, actionBadge: String = ""): Long {
+        val msgId = System.nanoTime()
         val next = ChatMessageItem(
-            id = System.nanoTime(),
+            id = msgId,
             isUser = isUser,
             text = text,
             actionBadge = actionBadge,
         )
         _messages.value = _messages.value + next
+        return msgId
+    }
+
+    private fun updateMessageText(messageId: Long, updatedText: String) {
+        _messages.value = _messages.value.map { msg ->
+            if (msg.id == messageId) msg.copy(text = updatedText) else msg
+        }
     }
 }

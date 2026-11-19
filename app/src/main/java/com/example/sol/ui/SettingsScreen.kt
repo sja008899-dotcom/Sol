@@ -62,6 +62,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.sol.device.BatteryStatus
 import com.example.sol.device.InstalledAppShortcut
+import com.example.sol.knowledge.SlmModelCatalog
+import com.example.sol.knowledge.SlmModelSpec
+import com.example.sol.knowledge.SlmRuntimeState
 import com.example.sol.knowledge.SlmStatus
 import com.example.sol.memory.ConfirmationPolicy
 import com.example.sol.memory.DeliveryPreference
@@ -90,6 +93,7 @@ fun SettingsScreen(
     vocabularyTermsCount: Int,
     bookChunkCount: Int,
     slmStatus: SlmStatus,
+    slmRuntimeState: SlmRuntimeState,
     ramSnapshot: RamUsageSnapshot,
     canScheduleExactAlarms: Boolean,
     scheduledAlarms: List<ScheduledAlarmEntity>,
@@ -113,6 +117,13 @@ fun SettingsScreen(
     onUnloadVoskRam: () -> Unit,
     onDeleteVoskModel: () -> Unit,
     onSlmToggle: (Boolean) -> Unit,
+    onSlmPreferGpuToggle: (Boolean) -> Unit,
+    onDownloadSlmModel: (SlmModelSpec) -> Unit,
+    onCancelSlmDownload: () -> Unit,
+    onPickSlmFile: () -> Unit,
+    onTestLoadSlmInRam: () -> Unit,
+    onUnloadSlmRam: () -> Unit,
+    onDeleteSlmModel: () -> Unit,
     onAddQuickSettingsTile: () -> Unit,
     onRequestExactAlarmPermission: () -> Unit,
     onCancelScheduledAlarm: (ScheduledAlarmEntity) -> Unit,
@@ -338,14 +349,36 @@ fun SettingsScreen(
             }
         }
 
-        // 3. Offline BM25 Book RAG + Optional Local SLM Module
+        // 3. Phase 3: Offline Neural LLM (LiteRT-LM) + BM25 RAG
         item {
-            SectionCard(title = "۳. موتور معنایی کتاب‌ها (BM25) و ماژول اختیاری SLM") {
+            SectionCard(title = "۳. هوش زبانی آفلاین روی گوشی (فاز ۳: LiteRT-LM + BM25)") {
                 Text(
-                    text = "بخش‌های نمایه‌شدهٔ کتاب‌ها (PDF / EPUB / وب / متن) در Room: $bookChunkCount بخش آمادهٔ جست‌وجوی آفلاین",
+                    text = "بخش‌های نمایه‌شدهٔ کتاب‌ها (PDF / EPUB / وب / متن) در Room: $bookChunkCount بخش آمادهٔ جست‌وجوی BM25",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("فعال‌سازی مدل زبانی آفلاین (فاز ۳)", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = slmStatus.statusLabelFa,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = preferences.slmSynthesisEnabled,
+                        onCheckedChange = onSlmToggle,
+                        modifier = Modifier.testTag("slm_enable_switch"),
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -353,14 +386,248 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("ماژول اختیاری SLM محلی روی گوشی", style = MaterialTheme.typography.bodyMedium)
+                        Text("اولویت با شتاب‌دهنده گرافیکی GPU", style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            text = slmStatus.statusLabelFa,
-                            style = MaterialTheme.typography.bodySmall,
+                            text = "در صورت نبود OpenCL یا خطای تراشه، خودکار روی CPU اجرا می‌شود.",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(checked = preferences.slmSynthesisEnabled, onCheckedChange = onSlmToggle)
+                    Switch(
+                        checked = preferences.slmPreferGpu,
+                        onCheckedChange = onSlmPreferGpuToggle,
+                        modifier = Modifier.testTag("slm_prefer_gpu_switch"),
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                when (val state = slmRuntimeState) {
+                    is SlmRuntimeState.Downloading -> {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "در حال دریافت: ${state.modelTitleFa} (${state.downloadedMb}/${state.totalMb} MB • ${state.progressPercent}٪)",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                LinearProgressIndicator(
+                                    progress = { state.progressPercent / 100f },
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                OutlinedButton(onClick = onCancelSlmDownload) {
+                                    Text("لغو دانلود")
+                                }
+                            }
+                        }
+                    }
+
+                    is SlmRuntimeState.Loading -> {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "در حال بارگذاری واقعی «${state.modelName}» در RAM روی ${state.targetBackendFa}…",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            }
+                        }
+                    }
+
+                    is SlmRuntimeState.LowRamBlocked -> {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "⚠️ محدودیت RAM روی گوشی ۴ گیگابایتی",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                                Text(
+                                    text = "برای بارگذاری «${state.modelName}» حداقل ${state.requiredRamMb}MB RAM آزاد لازم است اما اکنون ${state.availableRamMb}MB آزاد است.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Button(onClick = onTrimRamNow) {
+                                        Text("آزادسازی فوری کش و Vosk")
+                                    }
+                                    OutlinedButton(onClick = onDeleteSlmModel) {
+                                        Text("حذف این مدل")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    is SlmRuntimeState.Ready, is SlmRuntimeState.Generating -> {
+                        val modelName = if (state is SlmRuntimeState.Ready) state.modelName else (state as SlmRuntimeState.Generating).modelName
+                        val backend = if (state is SlmRuntimeState.Ready) state.activeBackend else (state as SlmRuntimeState.Generating).activeBackend
+                        val fallbackNote = (state as? SlmRuntimeState.Ready)?.lastFallbackNoteFa.orEmpty()
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = "✅ مدل عصبی در RAM آماده است: $modelName",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                )
+                                Text(
+                                    text = "موتور اجرا: ${backend.labelFa} • RAM آزاد فعلی: ${ramSnapshot.availableDeviceRamMb}MB",
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                                if (fallbackNote.isNotBlank()) {
+                                    Text(
+                                        text = fallbackNote,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    OutlinedButton(onClick = onUnloadSlmRam) {
+                                        Text("آزادسازی از RAM")
+                                    }
+                                    OutlinedButton(onClick = onDeleteSlmModel) {
+                                        Text("حذف مدل")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    is SlmRuntimeState.InstalledUnloaded -> {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = "📦 فایل مدل نصب است (${state.fileSizeMb}MB): ${state.modelName}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Text(
+                                    text = "حداقل RAM لازم: ${state.minRamMb}MB • RAM آزاد فعلی: ${state.availableRamMb}MB\nبرای فشار نیاوردن به گوشی ۴GB، مدل در حالت بیکاری آزاد می‌ماند و فقط هنگام نیاز بارگذاری می‌شود.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (state.lastNoteFa.isNotBlank()) {
+                                    Text(
+                                        text = state.lastNoteFa,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Button(
+                                        onClick = onTestLoadSlmInRam,
+                                        modifier = Modifier.testTag("test_load_slm_button"),
+                                    ) {
+                                        Text("بارگذاری و تست در RAM")
+                                    }
+                                    OutlinedButton(onClick = onPickSlmFile) {
+                                        Text("تغییر فایل .litertlm")
+                                    }
+                                    OutlinedButton(onClick = onDeleteSlmModel) {
+                                        Text("حذف")
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    is SlmRuntimeState.NotInstalled, is SlmRuntimeState.Error -> {
+                        if (state is SlmRuntimeState.Error) {
+                            Text(
+                                text = state.messageFa,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+                        Text(
+                            text = "هیچ فایل مدل زبانی واقعی (.litertlm) نصب نیست. برای گفت‌وگوی آزاد، هم‌فکری و جمع‌بندی عصبی کاملاً آفلاین، یکی از مدل‌های زیر را دانلود کنید یا فایل .litertlm از حافظه گوشی انتخاب نمایید:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SlmModelCatalog.models.forEach { spec ->
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        Text(
+                                            text = spec.titleFa,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (spec.isRecommendedFor4Gb) {
+                                                MaterialTheme.colorScheme.tertiary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            },
+                                        )
+                                        Text(
+                                            text = "${spec.descriptionFa}\nحجم تقریبی: ~${spec.approxSizeMb}MB • حداقل RAM آزاد لازم: ${spec.minFreeRamMb}MB",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Button(
+                                            onClick = { onDownloadSlmModel(spec) },
+                                            modifier = Modifier.testTag("download_slm_${spec.id}"),
+                                        ) {
+                                            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("دانلود (${spec.approxSizeMb}MB)")
+                                        }
+                                    }
+                                }
+                            }
+                            OutlinedButton(
+                                onClick = onPickSlmFile,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("pick_local_slm_button"),
+                            ) {
+                                Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("انتخاب فایل .litertlm از حافظه گوشی")
+                            }
+                        }
+                    }
                 }
             }
         }

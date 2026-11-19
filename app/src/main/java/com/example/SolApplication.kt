@@ -138,6 +138,7 @@ class SolApplication : Application() {
         if (::container.isInitialized) {
             container.persianTts.shutdown()
             container.voiceEngine.stopListening()
+            container.localSlmEngine.releaseSessionMemory()
         }
         super.onTerminate()
     }

@@ -45,6 +45,7 @@ voskAndroid = "0.3.47"
 jna = "5.13.0"
 pdfboxAndroid = "2.0.27.0"
 jsoup = "1.18.3"
+litertlmAndroid = "0.19.1"
 
 
 [libraries]
@@ -104,6 +105,7 @@ vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref =
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfboxAndroid" }
 jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
+litertlm-android = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", version.ref = "litertlmAndroid" }
 
 
 [plugins]

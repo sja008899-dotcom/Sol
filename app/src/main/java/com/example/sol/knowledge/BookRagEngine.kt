@@ -205,8 +205,6 @@ class BookRagEngine(
 
     suspend fun consultOffline(
         query: String,
-        slmEngine: LocalSlmEngine?,
-        useSlm: Boolean,
     ): RagConsultationResult {
         val roles = knowledgeRepository.getAllRolesOnce().filter { it.isActive }
         val books = knowledgeRepository.getAllBooksOnce()
@@ -243,7 +241,7 @@ class BookRagEngine(
             }
 
             if (ranked.isNotEmpty()) {
-                append("🔎 نتایج جست‌وجوی معنایی آفلاین (BM25):\n")
+                append("🔎 نتایج جست‌وجوی مستقیم از کتاب‌ها (BM25):\n")
                 ranked.forEachIndexed { idx, hit ->
                     val scoreStr = String.format(java.util.Locale.US, "%.2f", hit.score)
                     append("${idx + 1}) از «${hit.chunk.bookTitle}» [بخش ${hit.chunk.chunkIndex + 1} • امتیاز $scoreStr]:\n")
@@ -262,20 +260,8 @@ class BookRagEngine(
             }
         }.trim()
 
-        val finalAnswer = if (useSlm && slmEngine != null) {
-            slmEngine.synthesizeAnswer(
-                query = query,
-                activeRole = activeRole,
-                rankedChunks = ranked,
-                voiceNotes = referencedBook?.voiceNotes.orEmpty(),
-                fallbackAnswer = baseAnswer,
-            )
-        } else {
-            baseAnswer
-        }
-
         return RagConsultationResult(
-            answerText = finalAnswer,
+            answerText = baseAnswer,
             topChunks = ranked,
             referencedBook = referencedBook,
             activeRole = activeRole,
