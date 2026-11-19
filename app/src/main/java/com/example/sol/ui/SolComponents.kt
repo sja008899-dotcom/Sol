@@ -666,6 +666,17 @@ fun BackupPasswordDialog(
     var password by remember { mutableStateOf("") }
     var replaceExisting by remember { mutableStateOf(false) }
 
+    val minLength = if (mode == BackupDialogMode.EXPORT) 8 else 1
+    val strengthLabel = when {
+        password.isEmpty() -> ""
+        password.length < 8 -> "ضعیف — حداقل ۸ کاراکتر لازم است"
+        password.length >= 12 &&
+            password.any { it.isDigit() } &&
+            password.any { !it.isLetterOrDigit() } -> "قدرت رمز: قوی ✓"
+        password.length >= 10 && password.any { it.isDigit() } -> "قدرت رمز: خوب"
+        else -> "قدرت رمز: متوسط (افزودن عدد یا نشانه پیشنهاد می‌شود)"
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
@@ -688,9 +699,9 @@ fun BackupPasswordDialog(
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     text = if (mode == BackupDialogMode.EXPORT) {
-                        "کل حافظه، مترادف‌ها، مخاطبین، کتاب‌ها (همراه با بخش‌های BM25) و نقش‌ها با AES-256-GCM رمزنگاری می‌شوند."
+                        "کل حافظه، مترادف‌ها، مخاطبین، کتاب‌ها (همراه بخش‌های BM25)، نقش‌ها و تنظیمات به‌صورت جریانی با PBKDF2-600k و AES-256-GCM (فرمت V3) رمزنگاری می‌شوند."
                     } else {
-                        "رمز فایل پشتیبان را وارد کنید تا داده‌های رمزدار روی این گوشی بازیابی شوند."
+                        "رمز فایل پشتیبان را وارد کنید تا داده‌های رمزدار پس از اعتبارسنجی کامل روی این گوشی بازیابی شوند."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -698,10 +709,31 @@ fun BackupPasswordDialog(
                 OutlinedTextField(
                     value = password,
                     onValueChange = { password = it },
-                    label = { Text("رمز عبور پشتیبان (حداقل ۴ کاراکتر)") },
+                    label = {
+                        Text(
+                            if (mode == BackupDialogMode.EXPORT) {
+                                "رمز عبور پشتیبان (حداقل ۸ کاراکتر)"
+                            } else {
+                                "رمز عبور پشتیبان"
+                            }
+                        )
+                    },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("backup_password_input"),
                 )
+                if (mode == BackupDialogMode.EXPORT && strengthLabel.isNotBlank()) {
+                    Text(
+                        text = strengthLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (password.length < 8) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.tertiary
+                        },
+                    )
+                }
                 if (mode == BackupDialogMode.IMPORT) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -716,7 +748,8 @@ fun BackupPasswordDialog(
         confirmButton = {
             Button(
                 onClick = { onConfirm(password, replaceExisting) },
-                enabled = password.length >= 4,
+                enabled = password.length >= minLength,
+                modifier = Modifier.testTag("confirm_backup_password_button"),
             ) {
                 Text(if (mode == BackupDialogMode.EXPORT) "رمزنگاری و ذخیره" else "رمزگشایی و بازیابی")
             }

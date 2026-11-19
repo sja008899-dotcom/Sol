@@ -18,6 +18,7 @@ import com.example.sol.memory.BookKnowledgeEntity
 import com.example.sol.memory.ConfirmationPolicy
 import com.example.sol.memory.DeliveryPreference
 import com.example.sol.memory.HistoryEntity
+import com.example.sol.memory.HistoryRetentionMode
 import com.example.sol.memory.InvocationMode
 import com.example.sol.memory.LocationEntity
 import com.example.sol.memory.MemoryFactEntity
@@ -47,6 +48,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class ChatMessageItem(
     val id: Long,
@@ -207,6 +209,10 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     init {
         refreshSystemSnapshots()
         observeDynamicSyncs()
+        viewModelScope.launch {
+            val prefs = c.preferencesRepository.getSnapshot()
+            c.historyRepository.enforceRetention(prefs.historyRetentionMode)
+        }
     }
 
     private var initialTtsSyncDone = false
@@ -254,6 +260,22 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                 _vocabularyTermsCount.value = c.voiceEngine.voskEngine.vocabularyBias.currentTermsCount()
             }
         }
+        // Keep Security Audit synchronized with runtime ASR/TTS/Privacy states
+        viewModelScope.launch {
+            combine(preferences, activeAsrBackend, voskModelStatus, persianVoices) { prefs, asrBackend, _, voices ->
+                val ttsNeedsNet = voices.firstOrNull { it.name == prefs.preferredTtsVoiceName }?.isOffline == false
+                c.privacyManager.getSecurityAudit(
+                    alwaysConfirmCommunication = prefs.confirmationPolicy == ConfirmationPolicy.ALWAYS_COMMUNICATION,
+                    activeAsrBackend = asrBackend,
+                    voskInstalled = c.voiceEngine.voskEngine.isModelInstalled(),
+                    ttsRequiresNetwork = ttsNeedsNet,
+                    historyRetentionMode = prefs.historyRetentionMode,
+                    privateModeEnabled = prefs.privateModeEnabled,
+                )
+            }.collect { items ->
+                _securityAudit.value = items
+            }
+        }
     }
 
     fun refreshSystemSnapshots() {
@@ -263,15 +285,24 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         c.exactAlarmScheduler.refreshExactAlarmState()
         _batteryStatus.value = c.deviceController.getBatteryStatus()
         _volumeStatus.value = c.deviceController.getVolumeStatus()
+        val currentPrefs = preferences.value
+        val ttsNeedsNet = persianVoices.value
+            .firstOrNull { it.name == currentPrefs.preferredTtsVoiceName }
+            ?.isOffline == false
         _securityAudit.value = c.privacyManager.getSecurityAudit(
-            preferences.value.confirmationPolicy == ConfirmationPolicy.ALWAYS_COMMUNICATION
+            alwaysConfirmCommunication = currentPrefs.confirmationPolicy == ConfirmationPolicy.ALWAYS_COMMUNICATION,
+            activeAsrBackend = activeAsrBackend.value,
+            voskInstalled = c.voiceEngine.voskEngine.isModelInstalled(),
+            ttsRequiresNetwork = ttsNeedsNet,
+            historyRetentionMode = currentPrefs.historyRetentionMode,
+            privateModeEnabled = currentPrefs.privateModeEnabled,
         )
         c.memoryOptimizer.refresh()
         c.voiceEngine.voskEngine.refreshInstalledStatus()
-        c.localSlmEngine.refreshRuntimeStatus(preferences.value.slmModelPath)
+        c.localSlmEngine.refreshRuntimeStatus(currentPrefs.slmModelPath)
         _slmStatus.value = c.localSlmEngine.getStatus(
-            preferences.value.slmSynthesisEnabled,
-            preferences.value.slmModelPath,
+            currentPrefs.slmSynthesisEnabled,
+            currentPrefs.slmModelPath,
         )
         viewModelScope.launch {
             _contacts.value = c.contactManager.loadMergedContacts()
@@ -306,10 +337,13 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                     text = result.replyText,
                     actionBadge = result.parsedCommand.action.name,
                 )
-                c.historyRepository.record(
+                val currentPrefs = preferences.value
+                c.historyRepository.recordIfAllowed(
                     userText = raw,
                     solText = result.replyText,
                     intentAction = result.parsedCommand.action.name,
+                    retentionMode = currentPrefs.historyRetentionMode,
+                    privateModeEnabled = currentPrefs.privateModeEnabled,
                 )
                 if (result.speakReply && preferences.value.autoSpeak) {
                     speakText(result.replyText)
@@ -381,10 +415,12 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                             finalText
                         }
                         updateMessageText(placeholderId, tagged)
-                        c.historyRepository.record(
+                        c.historyRepository.recordIfAllowed(
                             userText = rawInput,
                             solText = finalText,
                             intentAction = "${actionName}_SLM",
+                            retentionMode = prefs.historyRetentionMode,
+                            privateModeEnabled = prefs.privateModeEnabled,
                         )
                         if (prefs.autoSpeak) {
                             speakText(finalText)
@@ -458,10 +494,13 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                     val savedBook = entity.copy(id = savedId)
                     val msg = "📘 منبع «${fetched.title}» اثر ${fetched.author} ذخیره و به $chunksCount بخش معنایی (BM25) تبدیل شد.\nاکنون می‌توانید با توضیحات صوتی خود، نقش جدید Sol را آموزش دهید."
                     appendMessage(isUser = false, text = msg, actionBadge = "BOOK_SAVED")
-                    c.historyRepository.record(
+                    val currentPrefs = preferences.value
+                    c.historyRepository.recordIfAllowed(
                         userText = "دریافت کتاب/صفحه ${req.query}",
                         solText = msg,
                         intentAction = "WEB_BOOK_LEARN_ROLE",
+                        retentionMode = currentPrefs.historyRetentionMode,
+                        privateModeEnabled = currentPrefs.privateModeEnabled,
                     )
                     if (preferences.value.autoSpeak) speakText(msg)
 
@@ -573,10 +612,13 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
             }
             val confirmText = "یاد گرفتم! نقش «$roleName» با توضیحات شما${session.book?.let { " و کتاب «${it.title}»" } ?: ""} ثبت، نمایه‌سازی و روی ویجت فعال شد."
             appendMessage(isUser = false, text = confirmText, actionBadge = "ROLE_LEARNED")
-            c.historyRepository.record(
+            val currentPrefs = preferences.value
+            c.historyRepository.recordIfAllowed(
                 userText = "آموزش نقش $roleName",
                 solText = confirmText,
                 intentAction = "TEACH_ROLE_VOICE",
+                retentionMode = currentPrefs.historyRetentionMode,
+                privateModeEnabled = currentPrefs.privateModeEnabled,
             )
             if (preferences.value.autoSpeak) speakText(confirmText)
         }
@@ -630,7 +672,8 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                 BackupDialogMode.EXPORT -> {
                     c.encryptedBackupManager.exportEncryptedBackup(req.uri, password).fold(
                         onSuccess = { stats ->
-                            val msg = "پشتیبان رمزنگاری‌شده (.solbackup) صادر شد: ${stats.memoriesCount} حافظه، ${stats.personsCount} شخص، ${stats.booksCount} کتاب (${stats.chunksCount} بخش) و ${stats.rolesCount} نقش."
+                            val sizeLabel = formatByteSizeFa(stats.fileSizeBytes)
+                            val msg = "پشتیبان رمزنگاری‌شده (.solbackup • $sizeLabel) صادر شد: ${stats.memoriesCount} حافظه، ${stats.personsCount} شخص، ${stats.booksCount} کتاب (${stats.chunksCount} بخش) و ${stats.rolesCount} نقش."
                             _statusBannerMessage.value = msg
                         },
                         onFailure = { err ->
@@ -641,7 +684,8 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                 BackupDialogMode.IMPORT -> {
                     c.encryptedBackupManager.importEncryptedBackup(req.uri, password, replaceOnImport).fold(
                         onSuccess = { stats ->
-                            val msg = "بازیابی رمزنگاری‌شده موفق بود: ${stats.memoriesCount} حافظه، ${stats.booksCount} کتاب و ${stats.rolesCount} نقش وارد شدند."
+                            val sizeLabel = formatByteSizeFa(stats.fileSizeBytes)
+                            val msg = "بازیابی رمزنگاری‌شده ($sizeLabel) موفق بود: ${stats.memoriesCount} حافظه، ${stats.booksCount} کتاب و ${stats.rolesCount} نقش وارد شدند."
                             _statusBannerMessage.value = msg
                             refreshSystemSnapshots()
                         },
@@ -651,6 +695,17 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
             }
+        }
+    }
+
+    private fun formatByteSizeFa(bytes: Long): String {
+        if (bytes <= 0L) return "۰ بایت"
+        val kb = bytes / 1024.0
+        val mb = kb / 1024.0
+        return when {
+            mb >= 1.0 -> String.format("%.1f MB", mb)
+            kb >= 1.0 -> String.format("%.0f KB", kb)
+            else -> "$bytes B"
         }
     }
 
@@ -922,6 +977,53 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         if (c.localSlmEngine.isLoadedInRam()) {
             c.localSlmEngine.unloadFromRam("تغییر شتاب‌دهنده سخت‌افزاری؛ در نوبت بعد اعمال می‌شود")
         }
+    }
+    fun setHistoryRetentionMode(mode: HistoryRetentionMode) = viewModelScope.launch {
+        c.preferencesRepository.setHistoryRetentionMode(mode)
+        c.historyRepository.enforceRetention(mode)
+        _statusBannerMessage.value = "سیاست نگهداری سوابق روی «${mode.labelFa}» تنظیم شد."
+        refreshSystemSnapshots()
+    }
+    fun setPrivateModeEnabled(enabled: Boolean) = viewModelScope.launch {
+        c.preferencesRepository.setPrivateModeEnabled(enabled)
+        _statusBannerMessage.value = if (enabled) {
+            "حالت خصوصی فعال شد؛ گفتگوها در سوابق ذخیره نمی‌شوند."
+        } else {
+            "حالت خصوصی غیرفعال شد."
+        }
+        refreshSystemSnapshots()
+    }
+    fun deleteAllUserData() = viewModelScope.launch {
+        c.voiceEngine.stopListening()
+        c.persianTts.stop()
+        c.localSlmEngine.stopGeneration()
+        c.localSlmEngine.unloadFromRam("پاک‌سازی کامل داده‌های کاربر")
+        c.confirmationManager.dismiss()
+        c.taskManager.dismissTaskCard()
+        _pendingBookFetch.value = null
+        _voiceRoleSession.value = null
+        _pendingBackupRequest.value = null
+
+        c.knowledgeRepository.getAllAlarmsOnce().forEach { alarm ->
+            c.exactAlarmScheduler.cancelAlarm(alarm)
+        }
+        c.knowledgeRepository.deleteAllUserData()
+        c.preferencesRepository.resetAllPreferences()
+        c.bookRagEngine.evictCache()
+        runCatching {
+            File(getApplication<Application>().filesDir, "backups").deleteRecursively()
+        }
+
+        _messages.value = listOf(
+            ChatMessageItem(
+                id = System.nanoTime(),
+                isUser = false,
+                text = "همهٔ داده‌ها، حافظه‌ها، کتاب‌ها، نقش‌ها، سوابق و تنظیمات Sol با موفقیت پاک شدند.",
+                actionBadge = "پاک‌سازی کامل",
+            )
+        )
+        refreshSystemSnapshots()
+        _statusBannerMessage.value = "همهٔ داده‌ها، حافظه‌ها، کتاب‌ها، نقش‌ها و تنظیمات Sol پاک شدند."
     }
 
     // --- Phase 3: Real On-Device SLM (LiteRT-LM) Controls ---

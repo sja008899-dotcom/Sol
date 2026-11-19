@@ -9,6 +9,9 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import com.example.sol.memory.PersianNormalizer
+import com.example.sol.network.SolHttpClient
+import com.example.sol.network.SolNetworkException
+import com.example.sol.network.SolStorageGuard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,8 +30,6 @@ import org.vosk.Recognizer
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.ZipInputStream
 import kotlin.math.abs
@@ -89,7 +90,11 @@ class VoiceVocabularyBias {
     }
 }
 
-class VoskVoiceEngine(private val context: Context) {
+class VoskVoiceEngine(
+    private val context: Context,
+    private val httpClient: SolHttpClient = SolHttpClient(),
+    private val availableBytesProvider: (File) -> Long = SolStorageGuard::readAvailableBytes,
+) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -154,24 +159,67 @@ class VoskVoiceEngine(private val context: Context) {
     fun downloadPersianSmallModel() {
         if (_modelStatus.value is VoskModelStatus.Downloading) return
         scope.launch {
-            runCatching {
-                _modelStatus.value = VoskModelStatus.Downloading(2, "در حال اتصال به مخزن رسمی Vosk Persian…")
-                val zipFile = File(context.cacheDir, "vosk-fa-small.zip")
-                downloadFileWithProgress(VOSK_FA_SMALL_URL, zipFile) { pct ->
+            downloadPersianSmallModelSync()
+        }
+    }
+
+    internal suspend fun downloadPersianSmallModelSync(
+        downloadUrl: String = VOSK_FA_SMALL_URL,
+        expectedBytes: Long = VOSK_FA_SMALL_EXPECTED_BYTES,
+        expectedSha256: String = VOSK_FA_SMALL_SHA256,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        val partFile = File(context.cacheDir, "vosk-fa-small.zip.part")
+        try {
+            if (!SolHttpClient.isValidSha256Hex(expectedSha256) || expectedBytes <= 0L) {
+                partFile.delete()
+                throw SolNetworkException.IntegrityMetadataMissingException()
+            }
+
+            val diskCheck = SolStorageGuard.checkFreeSpace(
+                targetPath = context.filesDir,
+                payloadBytes = expectedBytes,
+                availableBytesProvider = availableBytesProvider,
+            )
+            if (!diskCheck.hasEnoughSpace) {
+                throw SolNetworkException.InsufficientDiskSpaceException(
+                    availableMb = diskCheck.availableMb,
+                    requiredMb = diskCheck.requiredMb,
+                )
+            }
+
+            _modelStatus.value = VoskModelStatus.Downloading(2, "در حال اتصال امن به مخزن رسمی Vosk Persian…")
+            httpClient.downloadVerifiedFile(
+                urlString = downloadUrl,
+                partFile = partFile,
+                expectedBytes = expectedBytes,
+                expectedSha256 = expectedSha256,
+                allowedHostSuffixes = setOf("alphacephei.com"),
+                onProgress = { pct, _, _ ->
                     _modelStatus.value = VoskModelStatus.Downloading(
                         progressPercent = pct.coerceIn(5, 88),
                         stageFa = "در حال دانلود مدل آفلاین فارسی ($pct٪)…",
                     )
-                }
-                _modelStatus.value = VoskModelStatus.Downloading(90, "در حال استخراج امن فایل‌های مدل…")
-                zipFile.inputStream().use { extractZipSafely(it) }
-                zipFile.delete()
-                refreshInstalledStatus("مدل آفلاین فارسی Vosk با موفقیت نصب شد")
-            }.onFailure { err ->
-                _modelStatus.value = VoskModelStatus.Error(
-                    "نصب مدل Vosk ناموفق بود: ${err.localizedMessage ?: "خطای شبکه یا فایل"}"
-                )
+                },
+            )
+
+            _modelStatus.value = VoskModelStatus.Downloading(90, "در حال استخراج امن فایل‌های مدل…")
+            partFile.inputStream().use { extractZipSafely(it) }
+            partFile.delete()
+            refreshInstalledStatus("مدل آفلاین فارسی Vosk با موفقیت تأیید و نصب شد")
+            Result.success(Unit)
+        } catch (err: Throwable) {
+            if (err is SolNetworkException.IntegrityMismatchException ||
+                err is SolNetworkException.IntegrityMetadataMissingException
+            ) {
+                partFile.delete()
             }
+            val msg = if (err is SolNetworkException) {
+                err.userMessageFa
+            } else {
+                "نصب مدل Vosk ناموفق بود: ${err.localizedMessage ?: "خطای شبکه یا فایل"}"
+            }
+            _modelStatus.value = VoskModelStatus.Error(msg)
+            Result.failure(err)
         }
     }
 
@@ -386,38 +434,7 @@ class VoskVoiceEngine(private val context: Context) {
         return file.listFiles()?.sumOf { dirSizeBytes(it) } ?: 0L
     }
 
-    private fun downloadFileWithProgress(urlString: String, target: File, onProgress: (Int) -> Unit) {
-        val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 15_000
-            readTimeout = 30_000
-            instanceFollowRedirects = true
-        }
-        try {
-            val code = conn.responseCode
-            require(code in 200..299) { "پاسخ سرور: HTTP $code" }
-            val total = conn.contentLengthLong.coerceAtLeast(1L)
-            conn.inputStream.use { input ->
-                FileOutputStream(target).use { out ->
-                    val buf = ByteArray(16_384)
-                    var downloaded = 0L
-                    var lastPct = -1
-                    var read: Int
-                    while (input.read(buf).also { read = it } != -1) {
-                        out.write(buf, 0, read)
-                        downloaded += read
-                        val pct = ((downloaded * 100L) / total).toInt().coerceIn(0, 100)
-                        if (pct != lastPct) {
-                            lastPct = pct
-                            onProgress(pct)
-                        }
-                    }
-                }
-            }
-        } finally {
-            conn.disconnect()
-        }
-    }
+    // Legacy direct HttpURLConnection downloader removed; SolHttpClient handles HTTPS redirects, Range resume & SHA-256.
 
     private fun extractZipSafely(inputStream: InputStream) {
         val root = modelRootDir
@@ -465,5 +482,11 @@ class VoskVoiceEngine(private val context: Context) {
         private const val VAD_SPEECH_THRESHOLD = 0.08f
         private const val IDLE_UNLOAD_DELAY_MS = 90_000L
         const val VOSK_FA_SMALL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.4.zip"
+        // TODO(verify): Alpha Cephei repository index does not publish raw SHA-256 / byte length; keep fail-safe until verified.
+        const val VOSK_FA_SMALL_SHA256 = "TODO(verify)"
+        const val VOSK_FA_SMALL_EXPECTED_BYTES = -1L
+
+        fun hasVerifiedDownloadMetadata(): Boolean =
+            SolHttpClient.isValidSha256Hex(VOSK_FA_SMALL_SHA256) && VOSK_FA_SMALL_EXPECTED_BYTES > 0L
     }
 }

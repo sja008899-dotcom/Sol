@@ -158,6 +158,49 @@ class HistoryRepository(private val dao: MemoryDao) {
         )
     }
 
+    suspend fun recordIfAllowed(
+        userText: String,
+        solText: String,
+        intentAction: String = "GENERAL",
+        status: String = "COMPLETED",
+        retentionMode: HistoryRetentionMode,
+        privateModeEnabled: Boolean,
+        nowMillis: Long = System.currentTimeMillis(),
+    ) {
+        if (privateModeEnabled || retentionMode == HistoryRetentionMode.OFF) {
+            return
+        }
+        dao.insertHistory(
+            HistoryEntity(
+                userText = userText,
+                solText = solText,
+                intentAction = intentAction,
+                status = status,
+                createdAt = nowMillis,
+            )
+        )
+        enforceRetention(retentionMode, nowMillis)
+    }
+
+    suspend fun enforceRetention(
+        retentionMode: HistoryRetentionMode,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): Int {
+        return when (retentionMode) {
+            HistoryRetentionMode.OFF -> {
+                dao.clearHistory()
+                0
+            }
+            HistoryRetentionMode.SEVEN_DAYS -> {
+                val cutoff = nowMillis - SEVEN_DAYS_MILLIS
+                dao.deleteHistoryOlderThan(cutoff)
+            }
+            HistoryRetentionMode.TWO_HUNDRED_ITEMS -> {
+                dao.trimHistoryKeepingLatest(200)
+            }
+        }
+    }
+
     suspend fun deleteEntry(id: Long) {
         dao.deleteHistoryById(id)
     }
@@ -166,8 +209,12 @@ class HistoryRepository(private val dao: MemoryDao) {
         dao.clearHistory()
     }
 
-    suspend fun trimKeepingLatest(keepCount: Int = 100): Int {
+    suspend fun trimKeepingLatest(keepCount: Int = 200): Int {
         return dao.trimHistoryKeepingLatest(keepCount)
+    }
+
+    companion object {
+        private const val SEVEN_DAYS_MILLIS = 7L * 24L * 60L * 60L * 1000L
     }
 }
 
@@ -270,4 +317,6 @@ class KnowledgeRepository(private val dao: MemoryDao) {
     suspend fun markAlarmTriggeredById(id: Long) = dao.markAlarmTriggeredById(id)
 
     suspend fun deleteScheduledAlarm(id: Long) = dao.deleteAlarmById(id)
+
+    suspend fun deleteAllUserData() = dao.deleteAllUserData()
 }

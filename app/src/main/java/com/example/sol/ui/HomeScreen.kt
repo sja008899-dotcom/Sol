@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -495,6 +496,58 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("توقف صدا", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            if (activeAsrBackend == ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER || preferences.privateModeEnabled) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (activeAsrBackend == ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f),
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.testTag("online_asr_badge"),
+                        ) {
+                            Text(
+                                text = "تشخیص گفتار سیستم (احتمال ارسال صدا به اینترنت — برای ۱۰۰٪ آفلاین Vosk را نصب کنید)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                    if (preferences.privateModeEnabled) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f),
+                            shape = RoundedCornerShape(50),
+                            modifier = Modifier.testTag("private_mode_badge"),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.VisibilityOff,
+                                    contentDescription = "حالت خصوصی فعال",
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.size(13.dp),
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "حالت خصوصی",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                )
+                            }
+                        }
                     }
                 }
             }

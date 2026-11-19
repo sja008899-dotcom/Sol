@@ -6,6 +6,8 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.provider.OpenableColumns
 import com.example.sol.memory.BookKnowledgeEntity
+import com.example.sol.network.SolHttpClient
+import com.example.sol.network.SolNetworkException
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
@@ -14,8 +16,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.jsoup.Jsoup
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.InputStreamReader
-import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.util.zip.ZipInputStream
@@ -35,7 +37,10 @@ data class ImportedLocalBook(
     val fullText: String,
 )
 
-class BookWebFetcher(private val context: Context) {
+class BookWebFetcher(
+    private val context: Context,
+    private val httpClient: SolHttpClient = SolHttpClient(),
+) {
 
     @Volatile
     private var pdfBoxInitialized = false
@@ -53,41 +58,62 @@ class BookWebFetcher(private val context: Context) {
             if (trimmed.isBlank()) {
                 return@withContext Result.failure(IllegalArgumentException("نام کتاب یا نشانی وب خالی است"))
             }
+
+            val looksLikeUrl = trimmed.contains("://") ||
+                trimmed.startsWith("http:", ignoreCase = true) ||
+                trimmed.startsWith("https:", ignoreCase = true)
+
             if (!isNetworkConnected()) {
                 return@withContext Result.failure(
                     IllegalStateException("اتصال اینترنت برقرار نیست. می‌توانید فایل PDF / EPUB / TXT کتاب را به‌صورت آفلاین وارد کنید.")
                 )
             }
 
-            if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
-                val webRes = runCatching { fetchFullWebpage(trimmed) }.getOrNull()
-                if (webRes != null) return@withContext Result.success(webRes)
-                return@withContext Result.failure(
-                    IllegalStateException("صفحهٔ وب «$trimmed» قابل دریافت یا خواندن نبود.")
-                )
+            if (looksLikeUrl) {
+                return@withContext try {
+                    val webRes = fetchFullWebpage(trimmed)
+                    if (webRes != null) {
+                        Result.success(webRes)
+                    } else {
+                        Result.failure(IllegalStateException("متن قابل خواندن در این نشانی وب پیدا نشد."))
+                    }
+                } catch (netErr: SolNetworkException) {
+                    Result.failure(netErr)
+                } catch (t: Throwable) {
+                    Result.failure(IllegalStateException("خطا در خواندن صفحهٔ وب: ${t.localizedMessage ?: "نامشخص"}", t))
+                }
             }
 
             val hasPersianScript = trimmed.any { it in '\u0600'..'\u06FF' }
-            if (hasPersianScript) {
-                val faWiki = runCatching { queryWikipedia(trimmed, "fa") }.getOrNull()
-                if (faWiki != null) return@withContext Result.success(faWiki)
+            var lastNetworkError: SolNetworkException? = null
+
+            suspend fun attempt(block: () -> FetchedBookResult?): FetchedBookResult? {
+                return try {
+                    block()
+                } catch (e: SolNetworkException) {
+                    lastNetworkError = e
+                    null
+                }
             }
 
-            val gutendex = runCatching { queryGutendex(trimmed) }.getOrNull()
-            if (gutendex != null) return@withContext Result.success(gutendex)
-
-            val openLibrary = runCatching { queryOpenLibrary(trimmed) }.getOrNull()
-            if (openLibrary != null) return@withContext Result.success(openLibrary)
-
-            val wikiFallback = runCatching {
+            if (hasPersianScript) {
+                attempt { queryWikipedia(trimmed, "fa") }?.let { return@withContext Result.success(it) }
+            }
+            attempt { queryGutendex(trimmed) }?.let { return@withContext Result.success(it) }
+            attempt { queryOpenLibrary(trimmed) }?.let { return@withContext Result.success(it) }
+            attempt {
                 queryWikipedia(trimmed, if (hasPersianScript) "fa" else "en")
                     ?: queryWikipedia(trimmed, "en")
-            }.getOrNull()
-            if (wikiFallback != null) return@withContext Result.success(wikiFallback)
+            }?.let { return@withContext Result.success(it) }
 
-            Result.failure(
-                IllegalStateException("موردی با عنوان «$trimmed» در مخازن عمومی پیدا نشد یا پاسخ دریافت نشد.")
-            )
+            val err = lastNetworkError
+            if (err != null) {
+                Result.failure(err)
+            } else {
+                Result.failure(
+                    IllegalStateException("موردی با عنوان «$trimmed» در مخازن عمومی پیدا نشد.")
+                )
+            }
         }
 
     // Backwards-compatible wrapper used by BookFetchWorker
@@ -163,11 +189,19 @@ class BookWebFetcher(private val context: Context) {
             ZipInputStream(rawStream).use { zis ->
                 var entry = zis.nextEntry
                 var totalChars = 0
+                val entryBuf = ByteArray(8192)
                 while (entry != null && totalChars < 350_000) {
                     val name = entry.name.lowercase()
                     if (!entry.isDirectory && (name.endsWith(".xhtml") || name.endsWith(".html") || name.endsWith(".htm"))) {
-                        val bytes = zis.readBytes()
-                        val html = bytes.toString(Charsets.UTF_8)
+                        val baos = ByteArrayOutputStream()
+                        var entryBytes = 0
+                        while (entryBytes < MAX_LOCAL_ENTRY_BYTES) {
+                            val n = zis.read(entryBuf, 0, minOf(entryBuf.size, MAX_LOCAL_ENTRY_BYTES - entryBytes))
+                            if (n <= 0) break
+                            baos.write(entryBuf, 0, n)
+                            entryBytes += n
+                        }
+                        val html = baos.toString(Charsets.UTF_8.name())
                         val doc = Jsoup.parse(html)
                         doc.select("script, style, nav").remove()
                         val text = doc.body()?.text().orEmpty().trim()
@@ -186,7 +220,7 @@ class BookWebFetcher(private val context: Context) {
 
     private fun extractHtmlText(uri: Uri): String {
         val html = context.contentResolver.openInputStream(uri)?.use { stream ->
-            BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).readText()
+            readBoundedChars(BufferedReader(InputStreamReader(stream, Charsets.UTF_8)), 1_000_000)
         }.orEmpty()
         val doc = Jsoup.parse(html)
         doc.select("script, style, nav, footer, header").remove()
@@ -195,14 +229,25 @@ class BookWebFetcher(private val context: Context) {
 
     private fun extractPlainText(uri: Uri): String {
         return context.contentResolver.openInputStream(uri)?.use { stream ->
-            BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).readText()
+            readBoundedChars(BufferedReader(InputStreamReader(stream, Charsets.UTF_8)), 500_000)
         }.orEmpty()
     }
 
+    private fun readBoundedChars(reader: BufferedReader, maxChars: Int): String {
+        val sb = StringBuilder()
+        val buf = CharArray(4096)
+        while (sb.length < maxChars) {
+            val read = reader.read(buf, 0, minOf(buf.size, maxChars - sb.length))
+            if (read == -1) break
+            sb.append(buf, 0, read)
+        }
+        return sb.toString()
+    }
+
     private fun fetchFullWebpage(urlString: String): FetchedBookResult? {
-        val html = httpGet(urlString) ?: return null
+        val html = httpClient.fetchText(urlString, maxBytes = SolHttpClient.DEFAULT_TEXT_MAX_BYTES)
         val doc = Jsoup.parse(html, urlString)
-        val title = doc.title().trim().ifBlank { urlString }
+        val title = doc.title().trim().ifBlank { URL(urlString).host }
         doc.select("script, style, nav, aside, footer, noscript").remove()
         val article = doc.select("article, main").text().trim()
         val bodyText = (article.ifBlank { doc.body()?.text().orEmpty() }).trim()
@@ -235,7 +280,7 @@ class BookWebFetcher(private val context: Context) {
     private fun queryGutendex(query: String): FetchedBookResult? {
         val encoded = URLEncoder.encode(query.trim(), "UTF-8")
         val endpoint = "https://gutendex.com/books?search=$encoded"
-        val jsonStr = httpGet(endpoint) ?: return null
+        val jsonStr = httpClient.fetchText(endpoint)
         val root = JSONObject(jsonStr)
         val results = root.optJSONArray("results") ?: return null
         if (results.length() == 0) return null
@@ -272,14 +317,17 @@ class BookWebFetcher(private val context: Context) {
         val bookId = first.optInt("id", 0)
         val url = if (bookId > 0) "https://www.gutenberg.org/ebooks/$bookId" else endpoint
 
-        // Try downloading public-domain plain text snippet if available in Gutendex formats
         val formats = first.optJSONObject("formats")
         val txtUrl = formats?.optString("text/plain; charset=utf-8")
             ?.ifBlank { formats.optString("text/plain; charset=us-ascii") }
             ?.ifBlank { formats.optString("text/plain") }
             .orEmpty()
         val fetchedText = if (txtUrl.startsWith("https://")) {
-            runCatching { httpGet(txtUrl, maxChars = 120_000) }.getOrNull().orEmpty()
+            try {
+                httpClient.fetchText(txtUrl, maxBytes = 1_048_576L).take(120_000)
+            } catch (_: Throwable) {
+                ""
+            }
         } else {
             ""
         }
@@ -315,7 +363,7 @@ class BookWebFetcher(private val context: Context) {
     private fun queryOpenLibrary(query: String): FetchedBookResult? {
         val encoded = URLEncoder.encode(query.trim(), "UTF-8")
         val endpoint = "https://openlibrary.org/search.json?q=$encoded&limit=3"
-        val jsonStr = httpGet(endpoint) ?: return null
+        val jsonStr = httpClient.fetchText(endpoint)
         val root = JSONObject(jsonStr)
         val docs = root.optJSONArray("docs") ?: return null
         if (docs.length() == 0) return null
@@ -373,7 +421,7 @@ class BookWebFetcher(private val context: Context) {
         val encoded = URLEncoder.encode(query.trim(), "UTF-8")
         val searchUrl =
             "https://$lang.wikipedia.org/w/api.php?action=query&list=search&srsearch=$encoded&srlimit=1&format=json&utf8=1"
-        val searchJson = httpGet(searchUrl) ?: return null
+        val searchJson = httpClient.fetchText(searchUrl)
         val searchArr = JSONObject(searchJson).optJSONObject("query")?.optJSONArray("search") ?: return null
         if (searchArr.length() == 0) return null
 
@@ -382,20 +430,21 @@ class BookWebFetcher(private val context: Context) {
 
         val encodedTitle = URLEncoder.encode(hitTitle.replace(' ', '_'), "UTF-8")
         val summaryUrl = "https://$lang.wikipedia.org/api/rest_v1/page/summary/$encodedTitle"
-        val sumJsonStr = httpGet(summaryUrl) ?: return null
+        val sumJsonStr = httpClient.fetchText(summaryUrl)
         val sumObj = JSONObject(sumJsonStr)
         val extract = sumObj.optString("extract").trim()
         if (extract.isBlank()) return null
 
-        // Also fetch longer plain-text intro/sections when available
         val fullExtractUrl =
             "https://$lang.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&exchars=18000&titles=$encodedTitle&format=json&utf8=1"
-        val longerText = runCatching {
-            val raw = httpGet(fullExtractUrl) ?: return@runCatching ""
-            val pages = JSONObject(raw).optJSONObject("query")?.optJSONObject("pages") ?: return@runCatching ""
-            val firstKey = pages.keys().asSequence().firstOrNull() ?: return@runCatching ""
-            pages.optJSONObject(firstKey)?.optString("extract").orEmpty().trim()
-        }.getOrDefault("")
+        val longerText = try {
+            val raw = httpClient.fetchText(fullExtractUrl)
+            val pages = JSONObject(raw).optJSONObject("query")?.optJSONObject("pages")
+            val firstKey = pages?.keys()?.asSequence()?.firstOrNull()
+            if (firstKey != null) pages.optJSONObject(firstKey)?.optString("extract").orEmpty().trim() else ""
+        } catch (_: Throwable) {
+            ""
+        }
 
         val pageUrl = sumObj.optJSONObject("content_urls")
             ?.optJSONObject("desktop")
@@ -415,31 +464,7 @@ class BookWebFetcher(private val context: Context) {
         )
     }
 
-    private fun httpGet(urlString: String, maxChars: Int = 500_000): String? {
-        val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 9000
-            readTimeout = 9000
-            instanceFollowRedirects = true
-            setRequestProperty("User-Agent", "SolOfflineLifeAssistant/2.0")
-        }
-        return try {
-            if (conn.responseCode in 200..299) {
-                conn.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
-                    val sb = StringBuilder()
-                    val buf = CharArray(4096)
-                    var read: Int
-                    while (reader.read(buf).also { read = it } != -1 && sb.length < maxChars) {
-                        val take = minOf(read, maxChars - sb.length)
-                        sb.append(buf, 0, take)
-                    }
-                    sb.toString()
-                }
-            } else {
-                null
-            }
-        } finally {
-            conn.disconnect()
-        }
+    companion object {
+        private const val MAX_LOCAL_ENTRY_BYTES = 2 * 1024 * 1024
     }
 }

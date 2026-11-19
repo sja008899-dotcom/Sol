@@ -522,9 +522,14 @@ fun SolAppRoot(
                                 composable(ROUTE_HISTORY) {
                                     HistoryScreen(
                                         history = history,
+                                        retentionMode = preferences.historyRetentionMode,
+                                        privateModeEnabled = preferences.privateModeEnabled,
+                                        onRetentionModeChange = viewModel::setHistoryRetentionMode,
+                                        onPrivateModeChange = viewModel::setPrivateModeEnabled,
                                         onSpeakText = viewModel::speakText,
                                         onDeleteItem = viewModel::deleteHistoryEntry,
                                         onClearAll = viewModel::clearHistory,
+                                        onDeleteAllData = viewModel::deleteAllUserData,
                                     )
                                 }
 

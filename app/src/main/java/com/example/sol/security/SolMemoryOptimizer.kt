@@ -60,8 +60,7 @@ class SolMemoryOptimizer(private val context: Context) {
         evictRagCache()
         unloadVoskIfIdle()
         releaseSlmCache()
-        System.gc()
-        return refresh("آزادسازی دستی کش کتاب، مدل صوتی و حافظه RAM انجام شد")
+        return refresh("آزادسازی دستی کش کتاب، مدل صوتی و حافظه انجام شد")
     }
 
     private fun captureSnapshot(note: String): RamUsageSnapshot {

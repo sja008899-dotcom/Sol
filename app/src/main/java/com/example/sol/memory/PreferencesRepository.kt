@@ -38,6 +38,12 @@ enum class ConfirmationPolicy(val labelFa: String) {
     ROUTINE_AUTO_SENSITIVE_CONFIRM("کارهای معمول خودکار؛ حساس با تأیید"),
 }
 
+enum class HistoryRetentionMode(val labelFa: String) {
+    OFF("خاموش"),
+    SEVEN_DAYS("۷ روز"),
+    TWO_HUNDRED_ITEMS("۲۰۰ مورد اخیر"),
+}
+
 data class SolPreferences(
     val ownerName: String = "کاربر",
     val voicePersona: VoicePersona = VoicePersona.FEMALE_CALM,
@@ -59,6 +65,9 @@ data class SolPreferences(
     val slmModelPath: String = "",
     val slmPreferGpu: Boolean = true,
     val lastBackupAt: Long = 0L,
+    // M2 Privacy honesty & retention controls
+    val historyRetentionMode: HistoryRetentionMode = HistoryRetentionMode.TWO_HUNDRED_ITEMS,
+    val privateModeEnabled: Boolean = false,
 )
 
 class PreferencesRepository(private val context: Context) {
@@ -82,6 +91,8 @@ class PreferencesRepository(private val context: Context) {
         val SLM_MODEL_PATH = stringPreferencesKey("slm_model_path")
         val SLM_PREFER_GPU = booleanPreferencesKey("slm_prefer_gpu")
         val LAST_BACKUP_AT = longPreferencesKey("last_backup_at")
+        val HISTORY_RETENTION_MODE = stringPreferencesKey("history_retention_mode")
+        val PRIVATE_MODE_ENABLED = booleanPreferencesKey("private_mode_enabled")
     }
 
     val preferences: Flow<SolPreferences> = context.solPrefsDataStore.data.map { p ->
@@ -107,6 +118,11 @@ class PreferencesRepository(private val context: Context) {
             slmModelPath = p[Keys.SLM_MODEL_PATH] ?: "",
             slmPreferGpu = p[Keys.SLM_PREFER_GPU] ?: true,
             lastBackupAt = p[Keys.LAST_BACKUP_AT] ?: 0L,
+            historyRetentionMode = enumOrDefault(
+                p[Keys.HISTORY_RETENTION_MODE],
+                HistoryRetentionMode.TWO_HUNDRED_ITEMS
+            ),
+            privateModeEnabled = p[Keys.PRIVATE_MODE_ENABLED] ?: false,
         )
     }
 
@@ -190,6 +206,18 @@ class PreferencesRepository(private val context: Context) {
         context.solPrefsDataStore.edit { it[Keys.LAST_BACKUP_AT] = timestamp }
     }
 
+    suspend fun setHistoryRetentionMode(mode: HistoryRetentionMode) {
+        context.solPrefsDataStore.edit { it[Keys.HISTORY_RETENTION_MODE] = mode.name }
+    }
+
+    suspend fun setPrivateModeEnabled(enabled: Boolean) {
+        context.solPrefsDataStore.edit { it[Keys.PRIVATE_MODE_ENABLED] = enabled }
+    }
+
+    suspend fun resetAllPreferences() {
+        context.solPrefsDataStore.edit { it.clear() }
+    }
+
     suspend fun restoreSnapshot(restored: SolPreferences) {
         context.solPrefsDataStore.edit { p ->
             p[Keys.OWNER_NAME] = restored.ownerName
@@ -209,6 +237,8 @@ class PreferencesRepository(private val context: Context) {
             p[Keys.SLM_SYNTHESIS_ENABLED] = restored.slmSynthesisEnabled
             p[Keys.SLM_MODEL_PATH] = restored.slmModelPath
             p[Keys.SLM_PREFER_GPU] = restored.slmPreferGpu
+            p[Keys.HISTORY_RETENTION_MODE] = restored.historyRetentionMode.name
+            p[Keys.PRIVATE_MODE_ENABLED] = restored.privateModeEnabled
         }
     }
 

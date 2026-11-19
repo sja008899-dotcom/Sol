@@ -168,10 +168,18 @@ fun SettingsScreen(
                 when (voskModelStatus) {
                     is VoskModelStatus.NotInstalled -> {
                         Text(
-                            text = "مدل آفلاین فارسی Vosk (~۴۷ مگابایت) هنوز نصب نشده است. پس از دانلود یک‌باره، تشخیص گفتار بدون اینترنت و با لغت‌نامه تقویتی کار می‌کند.",
+                            text = "مدل آفلاین فارسی Vosk (~۴۷ مگابایت) هنوز نصب نشده است. پس از نصب، تشخیص گفتار بدون اینترنت و با لغت‌نامه تقویتی کار می‌کند.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        if (!com.example.sol.voice.VoskVoiceEngine.hasVerifiedDownloadMetadata()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "🔒 هشدار امنیتی: اثر انگشت SHA-256 نسخهٔ آنلاین Vosk هنوز تأیید نشده؛ دانلود خودکار برای ایمنی متوقف است. لطفاً فایل ZIP مدل را با دکمه «نصب از فایل ZIP گوشی» وارد کنید.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
                         Spacer(modifier = Modifier.height(8.dp))
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -589,7 +597,10 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            SlmModelCatalog.models.forEach { spec ->
+                            val deviceModels = remember(ramSnapshot.totalDeviceRamMb) {
+                                SlmModelCatalog.modelsForDevice(ramSnapshot.totalDeviceRamMb)
+                            }
+                            deviceModels.forEach { spec ->
                                 Surface(
                                     color = MaterialTheme.colorScheme.surfaceVariant,
                                     shape = RoundedCornerShape(12.dp),
@@ -614,6 +625,13 @@ fun SettingsScreen(
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
+                                        if (!spec.hasVerifiedIntegrityMetadata()) {
+                                            Text(
+                                                text = "🔒 هشدار امنیتی: اثر انگشت SHA-256 این نسخه هنوز تأیید نشده (دانلود خودکار تا زمان تأیید متوقف است؛ از انتخاب فایل محلی .litertlm استفاده کنید).",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.error,
+                                            )
+                                        }
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Button(
                                             onClick = { onDownloadSlmModel(spec) },

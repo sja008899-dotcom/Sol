@@ -87,6 +87,7 @@ class ExampleRobolectricTest {
             val dao = db.memoryDao()
             val backupManager = EncryptedBackupManager(
                 context = context,
+                database = db,
                 memoryRepository = MemoryRepository(dao),
                 personRepository = PersonRepository(dao),
                 locationRepository = LocationRepository(dao),

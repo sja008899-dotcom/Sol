@@ -3,8 +3,10 @@ package com.example.sol.knowledge
 import android.app.ActivityManager
 import android.content.Context
 import android.net.Uri
-import android.os.StatFs
 import android.provider.OpenableColumns
+import com.example.sol.network.SolHttpClient
+import com.example.sol.network.SolNetworkException
+import com.example.sol.network.SolStorageGuard
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Conversation
@@ -29,8 +31,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -40,13 +40,29 @@ data class SlmModelSpec(
     val descriptionFa: String,
     val fileName: String,
     val downloadUrl: String,
+    val sha256: String,
+    val expectedBytes: Long,
     val approxSizeMb: Int,
     val minFreeRamMb: Long,
     val requiredFreeDiskMb: Long,
     val isRecommendedFor4Gb: Boolean,
-)
+) {
+    fun hasVerifiedIntegrityMetadata(): Boolean =
+        SolHttpClient.isValidSha256Hex(sha256) && expectedBytes > 0L
+}
 
 object SlmModelCatalog {
+    // Samsung Galaxy A12 / 4 GB devices typically report ~3,600–4,096 MB totalMem; 6 GB devices report >= 5,400 MB
+    private const val SIX_GB_TOTAL_RAM_THRESHOLD_MB = 5_400L
+
+    // TODO(verify): verify exact SHA-256 and byte counts against official Hugging Face LFS metadata for each release
+    const val QWEN3_0_6B_INT4_SHA256 = "TODO(verify)"
+    const val QWEN3_0_6B_INT4_BYTES = -1L
+    const val QWEN3_0_6B_INT8_SHA256 = "TODO(verify)"
+    const val QWEN3_0_6B_INT8_BYTES = -1L
+    const val QWEN2_5_1_5B_Q8_SHA256 = "TODO(verify)"
+    const val QWEN2_5_1_5B_Q8_BYTES = -1L
+
     val models: List<SlmModelSpec> = listOf(
         SlmModelSpec(
             id = "qwen3_0_6b_int4",
@@ -54,9 +70,11 @@ object SlmModelCatalog {
             descriptionFa = "مدل کوانتیزه Mixed-INT4 با پشتیبانی خوب از فارسی؛ سبک‌ترین و پایدارترین گزینه واقعی برای گوشی‌های ۴ گیگابایتی.",
             fileName = "qwen3_0.6b_torchao_mixed_int4_runtime_bmm_kv2048_prefill256.litertlm",
             downloadUrl = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/qwen3_0.6b_torchao_mixed_int4_runtime_bmm_kv2048_prefill256.litertlm",
+            sha256 = QWEN3_0_6B_INT4_SHA256,
+            expectedBytes = QWEN3_0_6B_INT4_BYTES,
             approxSizeMb = 498,
             minFreeRamMb = 620L,
-            requiredFreeDiskMb = 650L,
+            requiredFreeDiskMb = 1647L,
             isRecommendedFor4Gb = true,
         ),
         SlmModelSpec(
@@ -65,23 +83,36 @@ object SlmModelCatalog {
             descriptionFa = "کیفیت جمله‌بندی کمی بهتر از INT4 اما با مصرف RAM و فضای ذخیره‌سازی بیشتر.",
             fileName = "Qwen3-0.6B.litertlm",
             downloadUrl = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B.litertlm",
+            sha256 = QWEN3_0_6B_INT8_SHA256,
+            expectedBytes = QWEN3_0_6B_INT8_BYTES,
             approxSizeMb = 586,
             minFreeRamMb = 760L,
-            requiredFreeDiskMb = 750L,
+            requiredFreeDiskMb = 1757L,
             isRecommendedFor4Gb = false,
         ),
         SlmModelSpec(
             id = "qwen2_5_1_5b_q8",
-            titleFa = "Qwen2.5-1.5B Instruct (سنگین — هشدار RAM)",
-            descriptionFa = "هوش و انسجام بالاتر در فارسی، اما روی گوشی ۴GB ممکن است به‌خاطر محدودیت حافظه سیستم‌عامل بارگذاری نشود.",
+            titleFa = "Qwen2.5-1.5B Instruct (نیازمند ۶GB+ RAM)",
+            descriptionFa = "هوش و انسجام بالاتر در فارسی، مخصوص گوشی‌های با ۶ گیگابایت RAM یا بیشتر.",
             fileName = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
             downloadUrl = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.litertlm",
+            sha256 = QWEN2_5_1_5B_Q8_SHA256,
+            expectedBytes = QWEN2_5_1_5B_Q8_BYTES,
             approxSizeMb = 1600,
             minFreeRamMb = 1400L,
-            requiredFreeDiskMb = 1850L,
+            requiredFreeDiskMb = 3024L,
             isRecommendedFor4Gb = false,
         ),
     )
+
+    fun modelsForDevice(totalDeviceRamMb: Long): List<SlmModelSpec> {
+        val isSub6Gb = totalDeviceRamMb in 1L until SIX_GB_TOTAL_RAM_THRESHOLD_MB
+        return if (isSub6Gb) {
+            models.filter { it.minFreeRamMb < 1200L && !it.id.contains("1_5b") }
+        } else {
+            models
+        }
+    }
 
     fun minRequiredRamForFile(fileName: String): Long {
         val lower = fileName.lowercase()
@@ -169,7 +200,11 @@ data class SlmStatus(
  *   cancelProcess() -> drain streaming flow -> close conversation -> close engine.
  * - Checks free system RAM before loading and releases automatically on `onTrimMemory`.
  */
-class LocalSlmEngine(private val context: Context) {
+class LocalSlmEngine(
+    private val context: Context,
+    private val httpClient: SolHttpClient = SolHttpClient(),
+    private val availableBytesProvider: (File) -> Long = SolStorageGuard::readAvailableBytes,
+) {
 
     private val slmExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "Sol-LiteRT-LM").apply {
@@ -325,77 +360,113 @@ class LocalSlmEngine(private val context: Context) {
         if (activeDownloadJob?.isActive == true) return
         downloadCancelled.set(false)
         activeDownloadJob = downloadScope.launch {
-            val destDir = modelsDir.apply { mkdirs() }
-            val finalFile = File(destDir, spec.fileName)
-            val partFile = File(destDir, "${spec.fileName}.part")
+            downloadModelSync(spec, onSavedPath)
+        }
+    }
 
-            try {
-                // Free storage guard before downloading hundreds of MB
-                val freeDiskMb = readAvailableDiskMb(destDir)
-                if (freeDiskMb in 0 until spec.requiredFreeDiskMb) {
-                    _runtimeState.value = SlmRuntimeState.Error(
-                        messageFa = "فضای ذخیره‌سازی آزاد کافی نیست (موجود: ${freeDiskMb}MB، موردنیاز: ${spec.requiredFreeDiskMb}MB).",
-                        hasInstalledModel = hasInstalledModel(),
-                    )
-                    return@launch
-                }
+    internal suspend fun downloadModelSync(
+        spec: SlmModelSpec,
+        onSavedPath: (String) -> Unit,
+    ): Result<File> = withContext(Dispatchers.IO) {
+        val destDir = modelsDir.apply { mkdirs() }
+        val finalFile = File(destDir, spec.fileName)
+        val partFile = File(destDir, "${spec.fileName}.part")
 
-                // Unload existing model from RAM first if swapping models on 4GB device
-                unloadFromRam("آزادسازی حافظه پیش از دانلود مدل")
+        try {
+            // Rule 7 fail-safe: refuse to download/activate without verified SHA-256 and exact byte count
+            if (!spec.hasVerifiedIntegrityMetadata()) {
+                partFile.delete()
+                throw SolNetworkException.IntegrityMetadataMissingException()
+            }
 
-                _runtimeState.value = SlmRuntimeState.Downloading(
-                    modelTitleFa = spec.titleFa,
-                    progressPercent = 1,
-                    downloadedMb = 0L,
-                    totalMb = spec.approxSizeMb.toLong(),
+            // Disk guard: size * 1.25 + 1 GB
+            val diskCheck = SolStorageGuard.checkFreeSpace(
+                targetPath = destDir,
+                payloadBytes = spec.expectedBytes,
+                availableBytesProvider = availableBytesProvider,
+            )
+            if (!diskCheck.hasEnoughSpace) {
+                throw SolNetworkException.InsufficientDiskSpaceException(
+                    availableMb = diskCheck.availableMb,
+                    requiredMb = diskCheck.requiredMb,
                 )
+            }
 
-                downloadWithRedirects(
-                    urlString = spec.downloadUrl,
-                    partFile = partFile,
-                    fallbackExpectedBytes = spec.approxSizeMb.toLong() * 1024L * 1024L,
-                ) { pct, doneMb, totalMb ->
+            // Unload existing model from RAM first if swapping models on 4GB device
+            unloadFromRam("آزادسازی حافظه پیش از دانلود مدل")
+
+            _runtimeState.value = SlmRuntimeState.Downloading(
+                modelTitleFa = spec.titleFa,
+                progressPercent = 1,
+                downloadedMb = 0L,
+                totalMb = (spec.expectedBytes / (1024L * 1024L)).coerceAtLeast(1L),
+            )
+
+            httpClient.downloadVerifiedFile(
+                urlString = spec.downloadUrl,
+                partFile = partFile,
+                expectedBytes = spec.expectedBytes,
+                expectedSha256 = spec.sha256,
+                allowedHostSuffixes = setOf("huggingface.co", "hf.co"),
+                isCancelled = { downloadCancelled.get() },
+                onProgress = { pct, doneBytes, totalBytes ->
                     _runtimeState.value = SlmRuntimeState.Downloading(
                         modelTitleFa = spec.titleFa,
                         progressPercent = pct,
-                        downloadedMb = doneMb,
-                        totalMb = totalMb,
+                        downloadedMb = doneBytes / (1024L * 1024L),
+                        totalMb = (totalBytes / (1024L * 1024L)).coerceAtLeast(1L),
                     )
-                }
+                },
+            )
 
-                if (downloadCancelled.get()) {
-                    partFile.delete()
-                    refreshRuntimeStatus("", "دانلود مدل لغو شد")
-                    return@launch
-                }
-
-                if (partFile.length() < MIN_VALID_MODEL_BYTES) {
-                    partFile.delete()
-                    error("فایل دریافت‌شده معتبر یا کامل نیست (حجم کمتر از حد مجاز).")
-                }
-
-                if (finalFile.exists()) finalFile.delete()
-                if (!partFile.renameTo(finalFile)) {
-                    partFile.copyTo(finalFile, overwrite = true)
-                    partFile.delete()
-                }
-
-                onSavedPath(finalFile.absolutePath)
-                refreshRuntimeStatus(
-                    preferredPath = finalFile.absolutePath,
-                    noteFa = "مدل «${spec.titleFa}» آمادهٔ اجراست.",
-                )
-            } catch (t: Throwable) {
+            if (downloadCancelled.get()) {
                 partFile.delete()
-                if (downloadCancelled.get() || t is CancellationException) {
-                    refreshRuntimeStatus("", "دانلود توسط کاربر متوقف شد")
-                } else {
-                    _runtimeState.value = SlmRuntimeState.Error(
-                        messageFa = "خطا در دانلود مدل: ${t.localizedMessage ?: "بررسی اتصال اینترنت و فضای حافظه"}",
-                        hasInstalledModel = hasInstalledModel(),
-                    )
+                refreshRuntimeStatus("", "دانلود مدل لغو شد")
+                return@withContext Result.failure(SolNetworkException.CancelledException())
+            }
+
+            if (partFile.length() < MIN_VALID_MODEL_BYTES) {
+                partFile.delete()
+                error("فایل دریافت‌شده معتبر یا کامل نیست (حجم کمتر از حد مجاز).")
+            }
+
+            if (finalFile.exists()) finalFile.delete()
+            if (!partFile.renameTo(finalFile)) {
+                partFile.copyTo(finalFile, overwrite = true)
+                partFile.delete()
+            }
+
+            onSavedPath(finalFile.absolutePath)
+            refreshRuntimeStatus(
+                preferredPath = finalFile.absolutePath,
+                noteFa = "مدل «${spec.titleFa}» پس از تأیید SHA-256 آمادهٔ اجراست.",
+            )
+            Result.success(finalFile)
+        } catch (t: Throwable) {
+            if (t !is SolNetworkException.TransportException && t !is SolNetworkException.HttpStatusException) {
+                // On integrity mismatch or cancellation, remove .part; keep recoverable .part only on transient transport interruptions
+                if (t is SolNetworkException.IntegrityMismatchException ||
+                    t is SolNetworkException.IntegrityMetadataMissingException ||
+                    t is SolNetworkException.CancelledException
+                ) {
+                    partFile.delete()
                 }
             }
+            if (downloadCancelled.get() || t is CancellationException) {
+                partFile.delete()
+                refreshRuntimeStatus("", "دانلود توسط کاربر متوقف شد")
+            } else {
+                val msg = if (t is SolNetworkException) {
+                    t.userMessageFa
+                } else {
+                    "خطا در دانلود مدل: ${t.localizedMessage ?: "بررسی اتصال اینترنت و فضای حافظه"}"
+                }
+                _runtimeState.value = SlmRuntimeState.Error(
+                    messageFa = msg,
+                    hasInstalledModel = hasInstalledModel(),
+                )
+            }
+            Result.failure(t)
         }
     }
 
@@ -426,10 +497,9 @@ class LocalSlmEngine(private val context: Context) {
 
                 val declaredSize = resolveFileSize(uri)
                 if (declaredSize > 0L) {
-                    val freeMb = readAvailableDiskMb(destDir)
-                    val neededMb = (declaredSize / (1024L * 1024L)) + 64L
-                    require(freeMb < 0L || freeMb >= neededMb) {
-                        "فضای ذخیره‌سازی کافی نیست (آزاد: ${freeMb}MB، موردنیاز: ${neededMb}MB)."
+                    val diskCheck = SolStorageGuard.checkFreeSpace(destDir, declaredSize, availableBytesProvider)
+                    require(diskCheck.hasEnoughSpace) {
+                        "فضای آزاد ذخیره‌سازی کافی نیست (آزاد: ${diskCheck.availableMb}MB، موردنیاز با حاشیه امن: ${diskCheck.requiredMb}MB)."
                     }
                 }
 
@@ -772,71 +842,7 @@ class LocalSlmEngine(private val context: Context) {
         }
     }
 
-    private fun downloadWithRedirects(
-        urlString: String,
-        partFile: File,
-        fallbackExpectedBytes: Long,
-        onProgress: (pct: Int, downloadedMb: Long, totalMb: Long) -> Unit,
-    ) {
-        var currentUrl = urlString
-        var conn: HttpURLConnection? = null
-        var hops = 0
-
-        while (hops < 8) {
-            val nextConn = (URL(currentUrl).openConnection() as HttpURLConnection).apply {
-                instanceFollowRedirects = false
-                requestMethod = "GET"
-                connectTimeout = 20_000
-                readTimeout = 45_000
-                setRequestProperty("User-Agent", "SolAndroidAssistant/2.0")
-            }
-            val code = nextConn.responseCode
-            if (code in listOf(301, 302, 303, 307, 308)) {
-                val location = nextConn.getHeaderField("Location").orEmpty()
-                nextConn.disconnect()
-                require(location.isNotBlank()) { "تغییر مسیر نامعتبر سرور دانلود" }
-                currentUrl = URL(URL(currentUrl), location).toString()
-                hops++
-            } else {
-                conn = nextConn
-                break
-            }
-        }
-
-        val activeConn = conn ?: error("تعداد تغییر مسیرهای دانلود بیش از حد مجاز شد.")
-        try {
-            val code = activeConn.responseCode
-            require(code in 200..299) { "پاسخ سرور مخزن مدل: HTTP $code" }
-            val contentType = activeConn.contentType.orEmpty().lowercase()
-            require(!contentType.contains("text/html")) {
-                "سرور به جای فایل مدل صفحهٔ وب ارسال کرد؛ آدرس یا اتصال اینترنت را بررسی کنید."
-            }
-
-            val totalBytes = activeConn.contentLengthLong.takeIf { it > 0L } ?: fallbackExpectedBytes
-            val totalMb = (totalBytes / (1024L * 1024L)).coerceAtLeast(1L)
-
-            activeConn.inputStream.use { input ->
-                FileOutputStream(partFile).use { output ->
-                    val buffer = ByteArray(32 * 1024)
-                    var downloaded = 0L
-                    var lastPct = -1
-                    var read: Int
-                    while (input.read(buffer).also { read = it } != -1) {
-                        if (downloadCancelled.get()) break
-                        output.write(buffer, 0, read)
-                        downloaded += read
-                        val pct = ((downloaded * 100L) / totalBytes.coerceAtLeast(1L)).toInt().coerceIn(0, 100)
-                        if (pct != lastPct) {
-                            lastPct = pct
-                            onProgress(pct, downloaded / (1024L * 1024L), totalMb)
-                        }
-                    }
-                }
-            }
-        } finally {
-            activeConn.disconnect()
-        }
-    }
+    // Legacy direct HttpURLConnection downloader removed; SolHttpClient handles HTTPS redirects, Range resume & SHA-256.
 
     private fun resolveDisplayName(uri: Uri): String {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
@@ -866,13 +872,6 @@ class LocalSlmEngine(private val context: Context) {
         val info = ActivityManager.MemoryInfo()
         am.getMemoryInfo(info)
         return info.availMem / (1024L * 1024L)
-    }
-
-    private fun readAvailableDiskMb(targetDir: File): Long {
-        return runCatching {
-            val stat = StatFs(targetDir.absolutePath)
-            stat.availableBytes / (1024L * 1024L)
-        }.getOrDefault(-1L)
     }
 
     companion object {

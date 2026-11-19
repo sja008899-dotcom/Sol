@@ -65,6 +65,7 @@ class SolAppContainer(private val application: Application) {
     val encryptedBackupManager by lazy {
         EncryptedBackupManager(
             context = application,
+            database = database,
             memoryRepository = memoryRepository,
             personRepository = personRepository,
             locationRepository = locationRepository,

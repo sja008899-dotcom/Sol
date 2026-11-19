@@ -156,8 +156,13 @@ class HistoryMaintenanceWorker(
 ) : CoroutineWorker(appContext, params) {
     override suspend fun doWork(): Result {
         val app = applicationContext as? SolApplication ?: return Result.failure()
-        val removed = app.container.historyRepository.trimKeepingLatest(120)
-        val detail = if (removed > 0) "$removed سابقه قدیمی‌تر هرس شد." else "حجم سوابق بهینه است."
+        val prefs = app.container.preferencesRepository.getSnapshot()
+        val removed = app.container.historyRepository.enforceRetention(prefs.historyRetentionMode)
+        val detail = if (removed > 0) {
+            "$removed سابقه قدیمی‌تر طبق سیاست «${prefs.historyRetentionMode.labelFa}» پاک‌سازی شد."
+        } else {
+            "سوابق مطابق سیاست «${prefs.historyRetentionMode.labelFa}» بهینه است."
+        }
         logToDb("bg_history_cleanup", "بهینه‌سازی سوابق", "COMPLETED", detail)
         return Result.success()
     }

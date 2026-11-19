@@ -180,6 +180,10 @@ class TaskManager(
             "برنامهٔ $actionLabel روی این دستگاه باز نشد."
         }
 
+        val currentPrefs = preferencesRepository.getSnapshot()
+        val historySaved = !currentPrefs.privateModeEnabled &&
+            currentPrefs.historyRetentionMode != com.example.sol.memory.HistoryRetentionMode.OFF
+
         _activeTask.value?.let { current ->
             val updated = current.steps.toMutableList()
             if (updated.size >= 6) {
@@ -188,16 +192,21 @@ class TaskManager(
                     status = if (launched) TaskStepStatus.DONE else TaskStepStatus.FAILED,
                     detailFa = actionLabel,
                 )
-                updated[5] = updated[5].copy(status = TaskStepStatus.DONE, detailFa = "در سوابق ثبت شد")
+                updated[5] = updated[5].copy(
+                    status = TaskStepStatus.DONE,
+                    detailFa = if (historySaved) "در سوابق ثبت شد" else "ثبت سابقه غیرفعال است (حالت خصوصی)",
+                )
             }
             _activeTask.value = current.copy(steps = updated, isComplete = true)
         }
 
-        historyRepository.record(
+        historyRepository.recordIfAllowed(
             userText = "تأیید ${confirmation.channel.labelFa} با ${confirmation.selectedContact.name}",
             solText = report,
             intentAction = confirmation.channel.name,
             status = if (launched) "CONFIRMED" else "FAILED",
+            retentionMode = currentPrefs.historyRetentionMode,
+            privateModeEnabled = currentPrefs.privateModeEnabled,
         )
 
         confirmationManager.dismiss()

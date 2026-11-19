@@ -79,6 +79,9 @@ interface MemoryDao {
     @Query("DELETE FROM history WHERE id NOT IN (SELECT id FROM history ORDER BY createdAt DESC LIMIT :keepCount)")
     suspend fun trimHistoryKeepingLatest(keepCount: Int): Int
 
+    @Query("DELETE FROM history WHERE createdAt < :cutoffMillis")
+    suspend fun deleteHistoryOlderThan(cutoffMillis: Long): Int
+
     // --- Learned Books ---
     @Query("SELECT * FROM books ORDER BY createdAt DESC LIMIT :limit")
     fun observeBooks(limit: Int = 200): Flow<List<BookKnowledgeEntity>>
@@ -176,12 +179,43 @@ interface MemoryDao {
     @Query("DELETE FROM scheduled_alarms WHERE id = :id")
     suspend fun deleteAlarmById(id: Long)
 
+    @Query("DELETE FROM persons")
+    suspend fun clearAllPersons()
+
+    @Query("DELETE FROM locations")
+    suspend fun clearAllLocations()
+
+    @Query("DELETE FROM books")
+    suspend fun clearAllBooks()
+
+    @Query("DELETE FROM book_chunks")
+    suspend fun clearAllBookChunks()
+
+    @Query("DELETE FROM sol_roles")
+    suspend fun clearAllRoles()
+
+    @Query("DELETE FROM scheduled_alarms")
+    suspend fun clearAllScheduledAlarms()
+
     @Transaction
     suspend fun insertAlarmWithUniqueRequestCode(alarm: ScheduledAlarmEntity): ScheduledAlarmEntity {
         val insertedId = upsertAlarm(alarm.copy(id = 0, requestCode = 0))
         val uniqueRequestCode = deriveRequestCodeFromId(insertedId)
         updateAlarmRequestCode(insertedId, uniqueRequestCode)
         return alarm.copy(id = insertedId, requestCode = uniqueRequestCode)
+    }
+
+    @Transaction
+    suspend fun deleteAllUserData() {
+        clearHistory()
+        clearAllMemories()
+        clearAllPersons()
+        clearAllLocations()
+        clearAllBookChunks()
+        clearAllBooks()
+        clearAllRoles()
+        clearAllScheduledAlarms()
+        clearBackgroundLogs()
     }
 
     companion object {
