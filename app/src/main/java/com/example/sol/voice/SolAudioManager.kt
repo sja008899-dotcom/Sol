@@ -2,6 +2,8 @@ package com.example.sol.voice
 
 import android.content.Context
 import android.media.AudioManager
+import android.os.SystemClock
+import android.view.KeyEvent
 
 data class AudioVolumeStatus(
     val mediaCurrent: Int,
@@ -44,5 +46,16 @@ class SolAudioManager(context: Context) {
         val target = ((percent.coerceIn(0, 100) / 100f) * max).toInt()
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
         return getVolumeStatus()
+    }
+
+    fun dispatchMediaKey(keyCode: Int): Boolean {
+        return runCatching {
+            val eventTime = SystemClock.uptimeMillis()
+            val downEvent = KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, keyCode, 0)
+            val upEvent = KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, keyCode, 0)
+            audioManager.dispatchMediaKeyEvent(downEvent)
+            audioManager.dispatchMediaKeyEvent(upEvent)
+            true
+        }.getOrDefault(false)
     }
 }

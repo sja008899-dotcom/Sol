@@ -138,3 +138,16 @@ data class UserUtteranceExampleEntity(
     val createdAt: Long = System.currentTimeMillis(),
 )
 
+@Entity(
+    tableName = "notes_todos",
+    indices = [Index(value = ["kind", "isDone", "updatedAt"])]
+)
+data class NoteTodoEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val kind: String, // "NOTE", "TODO", "SHOPPING"
+    val content: String,
+    val isDone: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+

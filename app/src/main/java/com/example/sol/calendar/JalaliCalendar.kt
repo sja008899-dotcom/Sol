@@ -153,8 +153,29 @@ object JalaliCalendar {
         return "${j.formatFullFa()} ساعت $hh:$mm"
     }
 
+    private val GREGORIAN_MONTHS = mapOf(
+        "ژانویه" to 1, "january" to 1, "jan" to 1,
+        "فوریه" to 2, "february" to 2, "feb" to 2,
+        "مارس" to 3, "march" to 3, "mar" to 3,
+        "آوریل" to 4, "اوريل" to 4, "april" to 4, "apr" to 4,
+        "مه" to 5, "می" to 5, "may" to 5,
+        "ژوئن" to 6, "june" to 6, "jun" to 6,
+        "ژوئیه" to 7, "ژوئيه" to 7, "july" to 7, "jul" to 7,
+        "اوت" to 8, "آگوست" to 8, "august" to 8, "aug" to 8,
+        "سپتامبر" to 9, "september" to 9, "sep" to 9,
+        "اکتبر" to 10, "october" to 10, "oct" to 10,
+        "نوامبر" to 11, "november" to 11, "nov" to 11,
+        "دسامبر" to 12, "december" to 12, "dec" to 12,
+    )
+
+    private val GREGORIAN_MONTH_NAMES_FA = listOf(
+        "ژانویه", "فوریه", "مارس", "آوریل", "مه", "ژوئن",
+        "ژوئیه", "اوت", "سپتامبر", "اکتبر", "نوامبر", "دسامبر",
+    )
+
     fun answerCalendarQuestion(raw: String, nowMillis: Long = System.currentTimeMillis()): String {
-        val norm = PersianNormalizer.normalize(raw)
+        val cleaned = PersianNormalizer.cleanText(raw)
+        val norm = normalizePersianNumberWords(PersianNormalizer.normalize(cleaned))
         val cal = Calendar.getInstance().apply { timeInMillis = nowMillis }
         val today = fromMillis(nowMillis)
         val timeStr = String.format(
@@ -163,6 +184,70 @@ object JalaliCalendar {
             cal.get(Calendar.HOUR_OF_DAY),
             cal.get(Calendar.MINUTE),
         )
+
+        // 1. Leap year Q&A (supports explicit year: 1399, 1403, 1404, 1408, ...)
+        if (norm.contains("کبیسه")) {
+            val explicitYear = Regex("\\b(1[2-5]\\d{2})\\b").find(norm)?.groupValues?.getOrNull(1)?.toIntOrNull()
+            val targetYear = explicitYear ?: today.year
+            return if (isJalaliLeapYear(targetYear)) {
+                "بله، سال $targetYear هجری شمسی کبیسه است (اسفند ۳۰ روز دارد)."
+            } else {
+                "خیر، سال $targetYear هجری شمسی عادی است و کبیسه نیست (اسفند ۲۹ روز دارد)."
+            }
+        }
+
+        // 2. Days until target date / Nowruz / end of year ("چند روز تا ... مانده؟")
+        if (norm.contains("چند روز") || norm.contains("چقدر مونده") || norm.contains("چقدر مانده") ||
+            ((norm.contains("مانده") || norm.contains("مونده")) && (norm.contains("تا ") || norm.contains("نوروز") || norm.contains("عید")))
+        ) {
+            val target = resolveDaysUntilTarget(norm, today)
+            if (target != null) {
+                val (labelFa, jTarget) = target
+                val diffDays = daysBetweenJalaliDates(today, jTarget)
+                val gregorianTriple = jalaliToGregorian(jTarget.year, jTarget.month, jTarget.day)
+                val targetDow = weekdayForGregorian(gregorianTriple.first, gregorianTriple.second, gregorianTriple.third)
+                return when {
+                    diffDays > 0 -> "$diffDays روز تا $labelFa (${weekdayNameFa(targetDow)} ${jTarget.day} ${jTarget.monthNameFa} ${jTarget.year}) مانده است."
+                    diffDays == 0L -> "امروز دقیقاً $labelFa (${jTarget.formatShortFa()}) است."
+                    else -> "${-diffDays} روز از $labelFa (${jTarget.formatShortFa()}) گذشته است."
+                }
+            }
+        }
+
+        // 3. Date conversions (Gregorian <-> Jalali) or Weekday of explicit date
+        val gDate = parseExplicitGregorianDateOrNull(norm)
+        val jDate = parseExplicitJalaliDateOrNull(norm, today.year)
+
+        if (norm.contains("شمسی") && gDate != null) {
+            val (gy, gm, gd) = gDate
+            val dow = weekdayForGregorian(gy, gm, gd)
+            val converted = gregorianToJalali(gy, gm, gd, dow)
+            val gMonthFa = GREGORIAN_MONTH_NAMES_FA.getOrElse(gm - 1) { gm.toString() }
+            return "$gd $gMonthFa $gy میلادی برابر با ${converted.formatFullFa()} (${converted.formatShortFa()}) است."
+        }
+
+        if (norm.contains("میلادی") && jDate != null) {
+            val (gy, gm, gd) = jalaliToGregorian(jDate.first, jDate.second, jDate.third)
+            val dow = weekdayForGregorian(gy, gm, gd)
+            val fullJ = JalaliDate(jDate.first, jDate.second, jDate.third, dow)
+            val gFormatted = "$gy/${gm.toString().padStart(2, '0')}/${gd.toString().padStart(2, '0')}"
+            return "${fullJ.day} ${fullJ.monthNameFa} ${fullJ.year} (${fullJ.weekdayNameFa}) برابر با $gFormatted میلادی است."
+        }
+
+        if ((norm.contains("چه روزی") || norm.contains("چندشنبه") || norm.contains("چند شنبه")) && !norm.contains("امروز")) {
+            if (jDate != null) {
+                val (gy, gm, gd) = jalaliToGregorian(jDate.first, jDate.second, jDate.third)
+                val dow = weekdayForGregorian(gy, gm, gd)
+                val fullJ = JalaliDate(jDate.first, jDate.second, jDate.third, dow)
+                return "تاریخ ${fullJ.formatShortFa()} مصادف با ${fullJ.formatFullFa()} است."
+            }
+            if (gDate != null) {
+                val (gy, gm, gd) = gDate
+                val dow = weekdayForGregorian(gy, gm, gd)
+                val converted = gregorianToJalali(gy, gm, gd, dow)
+                return "تاریخ $gy/${gm.toString().padStart(2, '0')}/${gd.toString().padStart(2, '0')} برابر با ${converted.formatFullFa()} (${converted.formatShortFa()}) است."
+            }
+        }
 
         if (norm.contains("پس فردا") || norm.contains("پس‌فردا")) {
             val dayAfter = fromMillis(nowMillis + 2 * 86_400_000L)
@@ -182,6 +267,135 @@ object JalaliCalendar {
         val leapText = if (isJalaliLeapYear(today.year)) "کبیسه" else "عادی"
         return "امروز ${today.formatFullFa()} (${today.formatShortFa()}) و ساعت $timeStr است.\n" +
             "${daysLeft} روز تا پایان ${today.monthNameFa} مانده (سال ${today.year} $leapText است)."
+    }
+
+    fun parseExplicitJalaliDateOrNull(normText: String, defaultYear: Int = fromMillis().year): Triple<Int, Int, Int>? {
+        val norm = normalizePersianNumberWords(PersianNormalizer.normalize(normText))
+        Regex("\\b(1[2-5]\\d{2})[/-](\\d{1,2})[/-](\\d{1,2})\\b").find(norm)?.let { m ->
+            val y = m.groupValues[1].toIntOrNull() ?: return@let
+            val mo = m.groupValues[2].toIntOrNull() ?: return@let
+            val d = m.groupValues[3].toIntOrNull() ?: return@let
+            if (mo in 1..12 && d in 1..daysInJalaliMonth(y, mo)) {
+                return Triple(y, mo, d)
+            }
+        }
+        MONTH_NAMES_FA.forEachIndexed { idx, monthName ->
+            val m = Regex("(\\d{1,2})\\s*$monthName(?:\\s*(1[2-5]\\d{2}))?").find(norm)
+            if (m != null) {
+                val day = m.groupValues[1].toIntOrNull() ?: return@forEachIndexed
+                val month = idx + 1
+                val year = m.groupValues[2].toIntOrNull() ?: defaultYear
+                if (day in 1..daysInJalaliMonth(year, month)) {
+                    return Triple(year, month, day)
+                }
+            }
+        }
+        return null
+    }
+
+    fun parseExplicitGregorianDateOrNull(normText: String): Triple<Int, Int, Int>? {
+        val norm = normalizePersianNumberWords(PersianNormalizer.normalize(normText)).lowercase(Locale.US)
+        Regex("\\b(19\\d{2}|20\\d{2}|21\\d{2})[/-](\\d{1,2})[/-](\\d{1,2})\\b").find(norm)?.let { m ->
+            val y = m.groupValues[1].toIntOrNull() ?: return@let
+            val mo = m.groupValues[2].toIntOrNull() ?: return@let
+            val d = m.groupValues[3].toIntOrNull() ?: return@let
+            if (mo in 1..12 && d in 1..31) {
+                return Triple(y, mo, d)
+            }
+        }
+        for ((mName, mNum) in GREGORIAN_MONTHS) {
+            val pattern = Regex("(\\d{1,2})\\s*$mName(?:\\s*(19\\d{2}|20\\d{2}|21\\d{2}))?")
+            val match = pattern.find(norm)
+            if (match != null) {
+                val day = match.groupValues[1].toIntOrNull() ?: continue
+                val year = match.groupValues[2].toIntOrNull() ?: Calendar.getInstance().get(Calendar.YEAR)
+                if (day in 1..31) {
+                    return Triple(year, mNum, day)
+                }
+            }
+        }
+        return null
+    }
+
+    fun parseEventDateTimeRange(
+        raw: String,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): Pair<Long, JalaliDate>? {
+        val cleaned = PersianNormalizer.cleanText(raw)
+        val norm = normalizePersianNumberWords(PersianNormalizer.normalize(cleaned))
+        val today = fromMillis(nowMillis)
+        val parsedTime = parsePersianTime(norm) ?: (9 to 0)
+
+        val explicitJ = parseExplicitJalaliDateOrNull(norm, today.year)
+        if (explicitJ != null) {
+            val (jy, jm, jd) = explicitJ
+            val (gy, gm, gd) = jalaliToGregorian(jy, jm, jd)
+            val cal = Calendar.getInstance().apply {
+                set(gy, gm - 1, gd, parsedTime.first, parsedTime.second, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            return cal.timeInMillis to JalaliDate(jy, jm, jd, cal.get(Calendar.DAY_OF_WEEK))
+        }
+
+        val scheduled = parseDateTimeSlot(raw, nowMillis)
+        if (scheduled != null) {
+            return scheduled.triggerAtMillis to fromMillis(scheduled.triggerAtMillis)
+        }
+        return null
+    }
+
+    private fun resolveDaysUntilTarget(norm: String, today: JalaliDate): Pair<String, JalaliDate>? {
+        if (norm.contains("نوروز") || norm.contains("عید") || norm.contains("سال نو")) {
+            val nextYear = today.year + 1
+            return "نوروز $nextYear" to JalaliDate(nextYear, 1, 1, Calendar.SATURDAY)
+        }
+        if (norm.contains("اخر سال") || norm.contains("آخر سال") || norm.contains("پایان سال")) {
+            val lastDay = daysInJalaliMonth(today.year, 12)
+            return "پایان سال ${today.year}" to JalaliDate(today.year, 12, lastDay, Calendar.SATURDAY)
+        }
+        if (norm.contains("اخر ماه") || norm.contains("آخر ماه") || norm.contains("پایان ماه")) {
+            val lastDay = daysInJalaliMonth(today.year, today.month)
+            return "پایان ${today.monthNameFa}" to JalaliDate(today.year, today.month, lastDay, Calendar.SATURDAY)
+        }
+        if (norm.contains("یلدا")) {
+            val y = if (today.month > 9 || (today.month == 9 && today.day > 30)) today.year + 1 else today.year
+            return "شب یلدای $y" to JalaliDate(y, 9, 30, Calendar.SATURDAY)
+        }
+
+        val explicitJ = parseExplicitJalaliDateOrNull(norm, today.year)
+        if (explicitJ != null) {
+            var (y, m, d) = explicitJ
+            val hadYearInInput = Regex("\\b1[2-5]\\d{2}\\b").containsMatchIn(norm)
+            if (!hadYearInInput && (m < today.month || (m == today.month && d < today.day))) {
+                y = today.year + 1
+            }
+            val j = JalaliDate(y, m, d, Calendar.SATURDAY)
+            return "${j.day} ${j.monthNameFa} ${j.year}" to j
+        }
+        return null
+    }
+
+    private fun daysBetweenJalaliDates(from: JalaliDate, to: JalaliDate): Long {
+        val g1 = jalaliToGregorian(from.year, from.month, from.day)
+        val g2 = jalaliToGregorian(to.year, to.month, to.day)
+        val tz = java.util.TimeZone.getTimeZone("UTC")
+        val c1 = Calendar.getInstance(tz).apply {
+            clear()
+            set(g1.first, g1.second - 1, g1.third, 12, 0, 0)
+        }
+        val c2 = Calendar.getInstance(tz).apply {
+            clear()
+            set(g2.first, g2.second - 1, g2.third, 12, 0, 0)
+        }
+        return (c2.timeInMillis - c1.timeInMillis) / 86_400_000L
+    }
+
+    private fun weekdayForGregorian(gy: Int, gm: Int, gd: Int): Int {
+        val cal = Calendar.getInstance().apply {
+            clear()
+            set(gy, gm - 1, gd, 12, 0, 0)
+        }
+        return cal.get(Calendar.DAY_OF_WEEK)
     }
 
     /**

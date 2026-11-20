@@ -20,8 +20,9 @@ import com.example.BuildConfig
         BookChunkEntity::class,
         ScheduledAlarmEntity::class,
         UserUtteranceExampleEntity::class,
+        NoteTodoEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class MemoryDatabase : RoomDatabase() {
@@ -189,7 +190,25 @@ abstract class MemoryDatabase : RoomDatabase() {
             }
         }
 
-        internal val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `notes_todos` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `kind` TEXT NOT NULL,
+                        `content` TEXT NOT NULL,
+                        `isDone` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_notes_todos_kind_isDone_updatedAt` ON `notes_todos` (`kind`, `isDone`, `updatedAt`)")
+            }
+        }
+
+        internal val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
 
         internal fun buildDatabase(
             context: Context,

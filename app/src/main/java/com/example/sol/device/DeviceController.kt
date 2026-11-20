@@ -1,23 +1,55 @@
 package com.example.sol.device
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Environment
+import android.os.StatFs
 import android.provider.AlarmClock
+import android.provider.CalendarContract
 import android.provider.MediaStore
 import android.provider.Settings
 import com.example.sol.memory.PersianNormalizer
 import com.example.sol.voice.AudioVolumeStatus
 import com.example.sol.voice.SolAudioManager
+import java.util.Locale
 
 data class BatteryStatus(
     val levelPercent: Int,
     val isCharging: Boolean,
     val temperatureCelsius: Float,
     val chargingSourceLabel: String,
+    val chargeTimeRemainingMinutes: Long? = null,
+)
+
+data class StorageStatus(
+    val freeBytes: Long,
+    val totalBytes: Long,
+) {
+    val freeGb: Double get() = freeBytes / (1024.0 * 1024.0 * 1024.0)
+    val totalGb: Double get() = totalBytes / (1024.0 * 1024.0 * 1024.0)
+}
+
+data class RamStatus(
+    val availableBytes: Long,
+    val totalBytes: Long,
+    val isLowMemory: Boolean,
+) {
+    val availableMb: Long get() = availableBytes / (1024L * 1024L)
+    val totalMb: Long get() = totalBytes / (1024L * 1024L)
+}
+
+data class FlashlightResult(
+    val success: Boolean,
+    val enabled: Boolean,
+    val messageFa: String,
 )
 
 data class InstalledAppShortcut(
@@ -35,13 +67,31 @@ class SettingsController(private val context: Context) {
         return launchSettingsIntent(intent)
     }
 
+    fun openMobileDataSettings(): Boolean {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY)
+        } else {
+            Intent(Settings.ACTION_DATA_ROAMING_SETTINGS)
+        }
+        return launchSettingsIntent(intent)
+    }
+
     fun openLocationSettings(): Boolean = launchSettingsIntent(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
 
     fun openBluetoothSettings(): Boolean = launchSettingsIntent(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
 
     fun openSoundSettings(): Boolean = launchSettingsIntent(Intent(Settings.ACTION_SOUND_SETTINGS))
 
+    fun openAirplaneModeSettings(): Boolean = launchSettingsIntent(Intent(Settings.ACTION_AIRPLANE_MODE_SETTINGS))
+
     fun openAppSettings(): Boolean = launchSettingsIntent(Intent(Settings.ACTION_SETTINGS))
+
+    fun openAppDetailsSettings(): Boolean {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", context.packageName, null)
+        }
+        return launchSettingsIntent(intent)
+    }
 
     fun openBatterySettings(): Boolean = launchSettingsIntent(Intent(Intent.ACTION_POWER_USAGE_SUMMARY))
 
@@ -200,6 +250,9 @@ class DeviceController(
     val settingsController = SettingsController(context)
     val appLauncher = AppLauncher(context)
 
+    @Volatile
+    private var lastTorchState: Boolean = false
+
     fun getBatteryStatus(): BatteryStatus {
         val intent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
@@ -216,13 +269,135 @@ class DeviceController(
             BatteryManager.BATTERY_PLUGGED_WIRELESS -> "بی‌سیم"
             else -> if (isCharging) "در حال شارژ" else "باتری"
         }
+        val chargeTimeRemainingMin = if (isCharging && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            runCatching {
+                val bm = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
+                val remMs = bm?.computeChargeTimeRemaining() ?: -1L
+                if (remMs > 0L) (remMs + 59_999L) / 60_000L else null
+            }.getOrNull()
+        } else {
+            null
+        }
         return BatteryStatus(
             levelPercent = percent,
             isCharging = isCharging,
             temperatureCelsius = tempTenths / 10f,
             chargingSourceLabel = source,
+            chargeTimeRemainingMinutes = chargeTimeRemainingMin,
         )
     }
+
+    fun getStorageStatus(): StorageStatus {
+        return runCatching {
+            val stat = StatFs(Environment.getDataDirectory().path)
+            StorageStatus(
+                freeBytes = stat.availableBytes,
+                totalBytes = stat.totalBytes,
+            )
+        }.getOrElse {
+            StorageStatus(freeBytes = 0L, totalBytes = 0L)
+        }
+    }
+
+    fun getRamStatus(): RamStatus {
+        return runCatching {
+            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            val info = ActivityManager.MemoryInfo()
+            am?.getMemoryInfo(info)
+            RamStatus(
+                availableBytes = info.availMem,
+                totalBytes = info.totalMem,
+                isLowMemory = info.lowMemory,
+            )
+        }.getOrElse {
+            RamStatus(availableBytes = 0L, totalBytes = 0L, isLowMemory = false)
+        }
+    }
+
+    /**
+     * Toggles the device rear camera flash torch via [CameraManager.setTorchMode] (API 23+).
+     * Standard Android does NOT require the CAMERA permission for setTorchMode; handles OEM/hardware
+     * unavailability or restrictions honestly without crashing or asking for CAMERA permission.
+     */
+    fun setFlashlight(enable: Boolean?): FlashlightResult {
+        val cm = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+            ?: return FlashlightResult(
+                success = false,
+                enabled = lastTorchState,
+                messageFa = "سرویس کنترل چراغ‌قوه روی این دستگاه در دسترس نیست.",
+            )
+
+        val targetState = enable ?: !lastTorchState
+        return try {
+            val cameraIds = cm.cameraIdList
+            var flashCameraId: String? = null
+            for (id in cameraIds) {
+                val chars = cm.getCameraCharacteristics(id)
+                val hasFlash = chars.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+                if (!hasFlash) continue
+                val facing = chars.get(CameraCharacteristics.LENS_FACING)
+                if (facing == CameraCharacteristics.LENS_FACING_BACK) {
+                    flashCameraId = id
+                    break
+                }
+                if (flashCameraId == null) {
+                    flashCameraId = id
+                }
+            }
+            if (flashCameraId == null) {
+                FlashlightResult(
+                    success = false,
+                    enabled = false,
+                    messageFa = "فلاش دوربین قابل کنترل روی این دستگاه پیدا نشد.",
+                )
+            } else {
+                cm.setTorchMode(flashCameraId, targetState)
+                lastTorchState = targetState
+                val stateWord = if (targetState) "روشن" else "خاموش"
+                FlashlightResult(
+                    success = true,
+                    enabled = targetState,
+                    messageFa = "چراغ‌قوه $stateWord شد.",
+                )
+            }
+        } catch (e: SecurityException) {
+            FlashlightResult(
+                success = false,
+                enabled = lastTorchState,
+                messageFa = "سیستم این گوشی اجازه کنترل مستقیم چراغ‌قوه بدون مجوز دوربین را مسدود کرده است.",
+            )
+        } catch (e: Exception) {
+            FlashlightResult(
+                success = false,
+                enabled = lastTorchState,
+                messageFa = "تغییر وضعیت چراغ‌قوه در این لحظه ممکن نشد (ممکن است دوربین در حال استفاده باشد).",
+            )
+        }
+    }
+
+    fun openCalendarInsertEvent(
+        title: String,
+        beginMillis: Long,
+        endMillis: Long = beginMillis + 3_600_000L,
+        description: String = "",
+    ): Boolean {
+        val intent = Intent(Intent.ACTION_INSERT).apply {
+            data = CalendarContract.Events.CONTENT_URI
+            putExtra(CalendarContract.Events.TITLE, title)
+            putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, beginMillis)
+            putExtra(CalendarContract.EXTRA_EVENT_END_TIME, endMillis)
+            if (description.isNotBlank()) {
+                putExtra(CalendarContract.Events.DESCRIPTION, description)
+            }
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return runCatching {
+            context.startActivity(intent)
+            true
+        }.getOrDefault(false)
+    }
+
+    fun dispatchMediaKey(keyCode: Int): Boolean = audioManager.dispatchMediaKey(keyCode)
 
     fun getVolumeStatus(): AudioVolumeStatus = audioManager.getVolumeStatus()
 
@@ -233,7 +408,32 @@ class DeviceController(
     fun buildDeviceSummaryFa(): String {
         val bat = getBatteryStatus()
         val vol = getVolumeStatus()
-        val chargeText = if (bat.isCharging) "در حال شارژ (${bat.chargingSourceLabel})" else "بدون اتصال شارژر"
-        return "باتری ${bat.levelPercent}٪ ($chargeText، دما ${bat.temperatureCelsius}°C) • صدای رسانه ${vol.mediaCurrent}/${vol.mediaMax} • حالت زنگ: ${vol.ringerModeLabel}"
+        val ram = getRamStatus()
+        val storage = getStorageStatus()
+
+        val chargeTimePart = bat.chargeTimeRemainingMinutes?.let { mins ->
+            " (زمان تخمینی تا شارژ کامل: $mins دقیقه)"
+        }.orEmpty()
+        val chargeText = if (bat.isCharging) {
+            "در حال شارژ با ${bat.chargingSourceLabel}$chargeTimePart"
+        } else {
+            "بدون اتصال شارژر"
+        }
+        val ramText = if (ram.totalMb > 0L) {
+            val lowNote = if (ram.isLowMemory) " [فشار حافظه]" else ""
+            " • رم آزاد: ${ram.availableMb} از ${ram.totalMb} مگابایت$lowNote"
+        } else {
+            ""
+        }
+        val storageText = if (storage.totalBytes > 0L) {
+            val freeGb = String.format(Locale.US, "%.1f", storage.freeGb)
+            val totalGb = String.format(Locale.US, "%.1f", storage.totalGb)
+            " • فضای خالی حافظه: $freeGb از $totalGb گیگابایت"
+        } else {
+            ""
+        }
+        return "باتری ${bat.levelPercent}٪ ($chargeText، دما ${bat.temperatureCelsius}°C)" +
+            "$ramText$storageText • صدای رسانه ${vol.mediaCurrent}/${vol.mediaMax} • حالت زنگ: ${vol.ringerModeLabel}"
     }
 }
+

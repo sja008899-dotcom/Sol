@@ -17,6 +17,7 @@ import com.example.sol.memory.KnowledgeRepository
 import com.example.sol.memory.LocationRepository
 import com.example.sol.memory.MemoryDatabase
 import com.example.sol.memory.MemoryRepository
+import com.example.sol.memory.NoteTodoRepository
 import com.example.sol.memory.PersonRepository
 import com.example.sol.memory.PreferencesRepository
 import com.example.sol.memory.SolPreferences
@@ -53,9 +54,11 @@ data class BackupStats(
     val chunksCount: Int,
     val rolesCount: Int,
     val fileSizeBytes: Long = 0L,
+    val notesTodosCount: Int = 0,
 )
 
 private data class StagedMemory(val kind: String, val keyText: String, val valueText: String)
+private data class StagedNoteTodo(val kind: String, val content: String, val isDone: Boolean)
 private data class StagedPerson(val name: String, val phone: String, val relation: String, val callScriptNote: String)
 private data class StagedLocation(val alias: String, val fullName: String, val addressNote: String)
 private data class StagedBookChunk(val chunkIndex: Int, val contentText: String, val normalizedTokens: String)
@@ -102,6 +105,7 @@ private data class StagedBackupPayload(
     val locations: List<StagedLocation>,
     val books: List<StagedBook>,
     val roles: List<StagedRole>,
+    val notesTodos: List<StagedNoteTodo>,
     val preferences: StagedPreferences?,
 )
 
@@ -114,6 +118,7 @@ class EncryptedBackupManager(
     private val knowledgeRepository: KnowledgeRepository,
     private val preferencesRepository: PreferencesRepository,
     private val availableBytesProvider: (File) -> Long = SolStorageGuard::readAvailableBytes,
+    private val noteTodoRepository: NoteTodoRepository? = null,
 ) {
     suspend fun exportEncryptedBackup(uri: Uri, password: String): Result<BackupStats> =
         withContext(Dispatchers.IO) {
@@ -168,6 +173,7 @@ class EncryptedBackupManager(
         val locations = locationRepository.getAllOnce()
         val books = knowledgeRepository.getAllBooksOnce()
         val roles = knowledgeRepository.getAllRolesOnce()
+        val notesTodos = noteTodoRepository?.getAllOnce().orEmpty()
         val prefs = preferencesRepository.getSnapshot()
 
         val random = SecureRandom()
@@ -293,6 +299,16 @@ class EncryptedBackupManager(
                         }
                         jw.endArray()
 
+                        jw.name("notesTodos").beginArray()
+                        for (nt in notesTodos) {
+                            jw.beginObject()
+                            jw.name("kind").value(nt.kind)
+                            jw.name("content").value(nt.content)
+                            jw.name("isDone").value(nt.isDone)
+                            jw.endObject()
+                        }
+                        jw.endArray()
+
                         jw.endObject()
                     }
                 }
@@ -308,6 +324,7 @@ class EncryptedBackupManager(
             chunksCount = totalChunks,
             rolesCount = roles.size,
             fileSizeBytes = countingOut.bytesWritten,
+            notesTodosCount = notesTodos.size,
         )
     }
 
@@ -463,6 +480,7 @@ class EncryptedBackupManager(
         val locations = mutableListOf<StagedLocation>()
         val books = mutableListOf<StagedBook>()
         val roles = mutableListOf<StagedRole>()
+        val notesTodos = mutableListOf<StagedNoteTodo>()
         var preferences: StagedPreferences? = null
 
         jr.beginObject()
@@ -473,6 +491,7 @@ class EncryptedBackupManager(
                 "locations" -> readLocations(jr, locations)
                 "books" -> readBooks(jr, books)
                 "roles" -> readRoles(jr, roles)
+                "notesTodos" -> readNotesTodos(jr, notesTodos)
                 "preferences" -> preferences = readPreferences(jr)
                 else -> jr.skipValue()
             }
@@ -485,6 +504,7 @@ class EncryptedBackupManager(
             locations = locations,
             books = books,
             roles = roles,
+            notesTodos = notesTodos,
             preferences = preferences,
         )
     }
@@ -506,6 +526,7 @@ class EncryptedBackupManager(
                 dao.clearAllBookChunks()
                 dao.clearAllBooks()
                 dao.clearAllRoles()
+                dao.clearAllNotesAndTodos()
             }
 
             for (m in staged.memories) {
@@ -573,6 +594,15 @@ class EncryptedBackupManager(
                     isActive = r.isActive,
                 )
             }
+
+            if (noteTodoRepository != null) {
+                for (nt in staged.notesTodos) {
+                    val saved = noteTodoRepository.addItem(kind = nt.kind, content = nt.content)
+                    if (nt.isDone) {
+                        noteTodoRepository.markDone(saved.id, true)
+                    }
+                }
+            }
         }
 
         // Apply preferences only after Room transaction succeeds cleanly
@@ -617,6 +647,7 @@ class EncryptedBackupManager(
             chunksCount = restoredChunks,
             rolesCount = staged.roles.size,
             fileSizeBytes = fileSizeBytes,
+            notesTodosCount = staged.notesTodos.size,
         )
     }
 
@@ -762,6 +793,29 @@ class EncryptedBackupManager(
             jr.endObject()
             require(roleName.isNotBlank()) { "نام نقش در پشتیبان خالی است." }
             out.add(StagedRole(roleName, instructions, linkedBookTitle, isActive))
+        }
+        jr.endArray()
+    }
+
+    private fun readNotesTodos(jr: JsonReader, out: MutableList<StagedNoteTodo>) {
+        jr.beginArray()
+        while (jr.hasNext()) {
+            var kind = "NOTE"
+            var content = ""
+            var isDone = false
+            jr.beginObject()
+            while (jr.hasNext()) {
+                when (jr.nextName()) {
+                    "kind" -> kind = nextStringOrEmpty(jr).ifBlank { "NOTE" }
+                    "content" -> content = nextStringOrEmpty(jr)
+                    "isDone" -> isDone = nextBooleanOrDefault(jr, false)
+                    else -> jr.skipValue()
+                }
+            }
+            jr.endObject()
+            if (content.isNotBlank()) {
+                out.add(StagedNoteTodo(kind, content, isDone))
+            }
         }
         jr.endArray()
     }

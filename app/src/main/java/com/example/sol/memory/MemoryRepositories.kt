@@ -330,3 +330,31 @@ class UserUtteranceRepository(private val dao: MemoryDao) {
     suspend fun clearAll() = dao.clearAllUserUtteranceExamples()
 }
 
+class NoteTodoRepository(private val dao: MemoryDao) {
+    val allItems: Flow<List<NoteTodoEntity>> = dao.observeNotesAndTodos()
+
+    suspend fun getAllOnce(): List<NoteTodoEntity> = dao.getAllNotesAndTodosOnce()
+
+    suspend fun getByKindOnce(kind: String): List<NoteTodoEntity> = dao.getNotesAndTodosByKindOnce(kind)
+
+    suspend fun addItem(kind: String, content: String): NoteTodoEntity {
+        val clean = content.trim()
+        val now = System.currentTimeMillis()
+        val item = NoteTodoEntity(
+            kind = kind,
+            content = clean,
+            isDone = false,
+            createdAt = now,
+            updatedAt = now,
+        )
+        val id = dao.upsertNoteTodo(item)
+        return item.copy(id = id)
+    }
+
+    suspend fun markDone(id: Long, isDone: Boolean = true): Boolean =
+        dao.setNoteTodoDone(id, isDone, System.currentTimeMillis()) > 0
+
+    suspend fun deleteById(id: Long): Boolean = dao.deleteNoteTodoById(id) > 0
+
+    suspend fun clearAll() = dao.clearAllNotesAndTodos()
+}

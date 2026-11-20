@@ -213,6 +213,28 @@ interface MemoryDao {
     @Query("DELETE FROM user_utterance_examples")
     suspend fun clearAllUserUtteranceExamples()
 
+    // --- Notes, To-Dos & Shopping Lists ---
+    @Query("SELECT * FROM notes_todos ORDER BY isDone ASC, updatedAt DESC LIMIT :limit")
+    fun observeNotesAndTodos(limit: Int = 300): Flow<List<NoteTodoEntity>>
+
+    @Query("SELECT * FROM notes_todos ORDER BY isDone ASC, updatedAt DESC")
+    suspend fun getAllNotesAndTodosOnce(): List<NoteTodoEntity>
+
+    @Query("SELECT * FROM notes_todos WHERE kind = :kind ORDER BY isDone ASC, updatedAt DESC")
+    suspend fun getNotesAndTodosByKindOnce(kind: String): List<NoteTodoEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertNoteTodo(item: NoteTodoEntity): Long
+
+    @Query("UPDATE notes_todos SET isDone = :isDone, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun setNoteTodoDone(id: Long, isDone: Boolean, updatedAt: Long = System.currentTimeMillis()): Int
+
+    @Query("DELETE FROM notes_todos WHERE id = :id")
+    suspend fun deleteNoteTodoById(id: Long): Int
+
+    @Query("DELETE FROM notes_todos")
+    suspend fun clearAllNotesAndTodos()
+
     @Transaction
     suspend fun insertAlarmWithUniqueRequestCode(alarm: ScheduledAlarmEntity): ScheduledAlarmEntity {
         val insertedId = upsertAlarm(alarm.copy(id = 0, requestCode = 0))
@@ -233,6 +255,7 @@ interface MemoryDao {
         clearAllScheduledAlarms()
         clearBackgroundLogs()
         clearAllUserUtteranceExamples()
+        clearAllNotesAndTodos()
     }
 
     companion object {

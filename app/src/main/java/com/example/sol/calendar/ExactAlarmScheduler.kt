@@ -73,8 +73,9 @@ class ExactAlarmScheduler(
         titleFa: String,
         messageBody: String,
         targetContact: String = "",
+        minLeadMillis: Long = 5_000L,
     ): AlarmScheduleOutcome {
-        val safeTrigger = maxOf(triggerAtMillis, System.currentTimeMillis() + 5_000L)
+        val safeTrigger = maxOf(triggerAtMillis, System.currentTimeMillis() + minLeadMillis.coerceAtLeast(1_000L))
         val jalaliFormatted = JalaliCalendar.formatDateTimeFa(safeTrigger)
         val exactAllowed = refreshExactAlarmState()
 
