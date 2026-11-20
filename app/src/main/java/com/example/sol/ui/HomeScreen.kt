@@ -632,6 +632,7 @@ fun HomeScreen(
                 ChatBubbleCard(
                     item = msg,
                     onSpeakClick = { onSpeakMessage(msg.text) },
+                    onChoiceClick = onQuickCommand,
                 )
             }
         }

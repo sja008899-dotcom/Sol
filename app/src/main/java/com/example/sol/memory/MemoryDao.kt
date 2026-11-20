@@ -197,6 +197,22 @@ interface MemoryDao {
     @Query("DELETE FROM scheduled_alarms")
     suspend fun clearAllScheduledAlarms()
 
+    // --- User NLU Teaching Examples ---
+    @Query("SELECT * FROM user_utterance_examples ORDER BY createdAt DESC LIMIT :limit")
+    fun observeUserUtteranceExamples(limit: Int = 500): Flow<List<UserUtteranceExampleEntity>>
+
+    @Query("SELECT * FROM user_utterance_examples ORDER BY createdAt DESC")
+    suspend fun getAllUserUtteranceExamplesOnce(): List<UserUtteranceExampleEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertUserUtteranceExample(example: UserUtteranceExampleEntity): Long
+
+    @Query("DELETE FROM user_utterance_examples WHERE id = :id")
+    suspend fun deleteUserUtteranceExampleById(id: Long): Int
+
+    @Query("DELETE FROM user_utterance_examples")
+    suspend fun clearAllUserUtteranceExamples()
+
     @Transaction
     suspend fun insertAlarmWithUniqueRequestCode(alarm: ScheduledAlarmEntity): ScheduledAlarmEntity {
         val insertedId = upsertAlarm(alarm.copy(id = 0, requestCode = 0))
@@ -216,6 +232,7 @@ interface MemoryDao {
         clearAllRoles()
         clearAllScheduledAlarms()
         clearBackgroundLogs()
+        clearAllUserUtteranceExamples()
     }
 
     companion object {

@@ -110,6 +110,7 @@ internal class ForgetMemoryMatcher : IntentMatcher {
 
         val target = ctx.cleaned
             .replace(STRIP_ACTION_REGEX, "")
+            .trim()
             .replace(STRIP_TAIL_REGEX, "")
             .trim()
         val slots = if (target.isNotBlank()) mapOf("target" to SlotValue.Text(target)) else emptyMap()

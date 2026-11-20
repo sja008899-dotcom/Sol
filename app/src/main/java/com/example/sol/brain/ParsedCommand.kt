@@ -76,6 +76,7 @@ data class ParsedCommand(
     val slots: Map<String, SlotValue> = emptyMap(),
     val confidence: Float = 1.0f,
     val matchedRuleId: String? = null,
+    val hasExplicitTimeSlot: Boolean = true,
 )
 
 data class IntentCandidate(

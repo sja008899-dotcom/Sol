@@ -15,10 +15,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -665,6 +668,7 @@ fun BackupPasswordDialog(
 ) {
     var password by remember { mutableStateOf("") }
     var replaceExisting by remember { mutableStateOf(false) }
+    var restoreConfirmed by remember(mode) { mutableStateOf(mode == BackupDialogMode.EXPORT) }
 
     val minLength = if (mode == BackupDialogMode.EXPORT) 8 else 1
     val strengthLabel = when {
@@ -737,10 +741,26 @@ fun BackupPasswordDialog(
                 if (mode == BackupDialogMode.IMPORT) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { replaceExisting = !replaceExisting },
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .clickable { replaceExisting = !replaceExisting },
                     ) {
                         Checkbox(checked = replaceExisting, onCheckedChange = { replaceExisting = it })
                         Text("جایگزینی کامل به جای ادغام با حافظه فعلی", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .clickable { restoreConfirmed = !restoreConfirmed }
+                            .testTag("confirm_backup_restore_checkbox"),
+                    ) {
+                        Checkbox(checked = restoreConfirmed, onCheckedChange = { restoreConfirmed = it })
+                        Text(
+                            "تأیید می‌کنم فایل پشتیبان در حافظه Sol بازیابی شود",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                        )
                     }
                 }
             }
@@ -748,7 +768,7 @@ fun BackupPasswordDialog(
         confirmButton = {
             Button(
                 onClick = { onConfirm(password, replaceExisting) },
-                enabled = password.length >= minLength,
+                enabled = password.length >= minLength && restoreConfirmed,
                 modifier = Modifier.testTag("confirm_backup_password_button"),
             ) {
                 Text(if (mode == BackupDialogMode.EXPORT) "رمزنگاری و ذخیره" else "رمزگشایی و بازیابی")
@@ -820,10 +840,12 @@ fun ConfirmCurrentLocationDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatBubbleCard(
     item: ChatMessageItem,
     onSpeakClick: () -> Unit,
+    onChoiceClick: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isUser = item.isUser
@@ -865,7 +887,7 @@ fun ChatBubbleCard(
                     if (!isUser) {
                         IconButton(
                             onClick = onSpeakClick,
-                            modifier = Modifier.size(32.dp),
+                            modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.VolumeUp,
@@ -882,6 +904,52 @@ fun ChatBubbleCard(
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                 )
+                if (!isUser && item.choices.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        item.choices.forEach { choice ->
+                            val tag = "dialogue_choice_${choice.id}"
+                            when {
+                                choice.isDestructive -> {
+                                    OutlinedButton(
+                                        onClick = { onChoiceClick(choice.submitText) },
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = MaterialTheme.colorScheme.error,
+                                        ),
+                                        modifier = Modifier
+                                            .heightIn(min = 48.dp)
+                                            .testTag(tag),
+                                    ) {
+                                        Text(choice.labelFa)
+                                    }
+                                }
+                                choice.isPrimary -> {
+                                    Button(
+                                        onClick = { onChoiceClick(choice.submitText) },
+                                        modifier = Modifier
+                                            .heightIn(min = 48.dp)
+                                            .testTag(tag),
+                                    ) {
+                                        Text(choice.labelFa)
+                                    }
+                                }
+                                else -> {
+                                    OutlinedButton(
+                                        onClick = { onChoiceClick(choice.submitText) },
+                                        modifier = Modifier
+                                            .heightIn(min = 48.dp)
+                                            .testTag(tag),
+                                    ) {
+                                        Text(choice.labelFa)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

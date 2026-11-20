@@ -1,0 +1,285 @@
+{"text":"درود بر شما سول عزیز","intent":"GREETING"}
+{"text":"سلام رفیق چخبر","intent":"GREETING"}
+{"text":"صبح زیباتون بخیر دستیار","intent":"GREETING"}
+{"text":"عصر بخیر حالت چطوره","intent":"GREETING"}
+{"text":"شب بخیر رفیق خوبم","intent":"GREETING"}
+{"text":"خسته نباشی سول جان","intent":"GREETING"}
+{"text":"دمت گرم مرسی از لطفت","intent":"GREETING"}
+{"text":"خیلی لطف کردی سپاس","intent":"GREETING"}
+{"text":"سلام صبح قشنگت بخیر","intent":"GREETING"}
+{"text":"اوضاع چطوره سول","intent":"GREETING"}
+{"text":"احوالت چطوره امروز","intent":"GREETING"}
+{"text":"چاکرم سول خوبی","intent":"GREETING"}
+{"text":"ممنون که هستی رفیق","intent":"GREETING"}
+{"text":"روز خوش دستیار من","intent":"GREETING"}
+{"text":"سلام وقتت بخیر باشه","intent":"GREETING"}
+{"text":"خدا قوت سول جان","intent":"GREETING"}
+{"text":"کی هستی دقیقا","intent":"IDENTITY"}
+{"text":"شخصیت و نامت چیه","intent":"IDENTITY"}
+{"text":"یه معرفی از خودت بگو","intent":"IDENTITY"}
+{"text":"میشه بگی اسمت چیه و چیکار میکنی","intent":"IDENTITY"}
+{"text":"بهم بگو تو کی هستی","intent":"IDENTITY"}
+{"text":"اسم دستیار صوتی من چیه","intent":"IDENTITY"}
+{"text":"خودت رو یه کم معرفی کن","intent":"IDENTITY"}
+{"text":"نام کامل تو چیست","intent":"IDENTITY"}
+{"text":"اصلا تو چه برنامه ای هستی","intent":"IDENTITY"}
+{"text":"تو رباتی یا دستیار آفلاین","intent":"IDENTITY"}
+{"text":"سول یعنی چی و تو کی هستی","intent":"IDENTITY"}
+{"text":"مخترع و کارکرد تو چیه","intent":"IDENTITY"}
+{"text":"امروز چه تاریخیه","intent":"TIME_DATE"}
+{"text":"تاریخ شمسی الان چنده","intent":"TIME_DATE"}
+{"text":"امروز چندمین روز ماهه","intent":"TIME_DATE"}
+{"text":"فردا چند شنبه میشه","intent":"TIME_DATE"}
+{"text":"پس فردا چه روزی از هفته است","intent":"TIME_DATE"}
+{"text":"ساعت الان چنده سول","intent":"TIME_DATE"}
+{"text":"بگو امروز چندم ماهیم","intent":"TIME_DATE"}
+{"text":"تاریخ هجری شمسی امروز را بگو","intent":"TIME_DATE"}
+{"text":"چندم برج هست امروز","intent":"TIME_DATE"}
+{"text":"امروز پنجشنبه است یا جمعه","intent":"TIME_DATE"}
+{"text":"ساعت دقیق چنده الان","intent":"TIME_DATE"}
+{"text":"تقویم امروز رو بهم بگو","intent":"TIME_DATE"}
+{"text":"آخر هفته چه روزیه","intent":"TIME_DATE"}
+{"text":"الان چه ماهی از سال هستیم","intent":"TIME_DATE"}
+{"text":"چه فرمان هایی بلدی اجرا کنی","intent":"HELP"}
+{"text":"راهنمای دستورهای صوتی را نشون بده","intent":"HELP"}
+{"text":"چطوری میتونم باهات کار کنم","intent":"HELP"}
+{"text":"مثال فرمان برام بزن","intent":"HELP"}
+{"text":"لیست دستورهای نمونه رو بگو","intent":"HELP"}
+{"text":"کمکم کن نمیدونم چی بپرسم","intent":"HELP"}
+{"text":"شیوه استفاده از دستیار را توضیح بده","intent":"HELP"}
+{"text":"چیا میتونم بهت بگم","intent":"HELP"}
+{"text":"راهنمای کار با سول رو بگو","intent":"HELP"}
+{"text":"نمونه سوال و فرمان صوتی بده","intent":"HELP"}
+{"text":"بیست قابلیتت چی هستن","intent":"SHOW_CAPABILITIES"}
+{"text":"فهرست تمام قابلیت های سول رو باز کن","intent":"SHOW_CAPABILITIES"}
+{"text":"صفحه امکانات و قابلیت ها رو بیار","intent":"SHOW_CAPABILITIES"}
+{"text":"همه ۲۰ مهارتت رو نشونم بده","intent":"SHOW_CAPABILITIES"}
+{"text":"کارهای پس زمینه و قابلیت ها کجاست","intent":"SHOW_CAPABILITIES"}
+{"text":"کاتالوگ توانمندی های دستیار رو باز کن","intent":"SHOW_CAPABILITIES"}
+{"text":"کل ۲۰ قابلیتی که داری رو نمایش بده","intent":"SHOW_CAPABILITIES"}
+{"text":"منوی بیست قابلیت سول رو نشون بده","intent":"SHOW_CAPABILITIES"}
+{"text":"هر وقت میگم کلینیک منظورم درمانگاه رازی است","intent":"LEARN_ALIAS"}
+{"text":"وقتی گفتم منزل یعنی خیابان سعدی پلاک ده","intent":"LEARN_ALIAS"}
+{"text":"هر زمان گفتم سالن دو منظورم سالن پرورش غربی است","intent":"LEARN_ALIAS"}
+{"text":"از این به بعد باشگاه یعنی مجموعه ورزشی انقلاب","intent":"LEARN_ALIAS"}
+{"text":"هر وقت لفظ انبار رو آوردم منظورم سوله شماره سه هست","intent":"LEARN_ALIAS"}
+{"text":"کلمه کوتاه کارگاه رو به کارگاه فنی بهار وصل کن","intent":"LEARN_ALIAS"}
+{"text":"وقتی میگم دانشگاه منظورم دانشکده فنی است","intent":"LEARN_ALIAS"}
+{"text":"مترادف بانک رو بذار بانک ملت شعبه مرکزی","intent":"LEARN_ALIAS"}
+{"text":"هر وقت گفتم مغازه یعنی فروشگاه برادران احمدی","intent":"LEARN_ALIAS"}
+{"text":"یاد بگیر که باغ یعنی باغ پسته رفسنجان","intent":"LEARN_ALIAS"}
+{"text":"اینو یادت باشه که من به بادام زمینی حساسیت دارم","intent":"LEARN_FACT"}
+{"text":"اسم کوچک من کاوه هست","intent":"LEARN_FACT"}
+{"text":"تو حافظه بنویس رمز در پارکینگ ۴۵۸۰ است","intent":"LEARN_FACT"}
+{"text":"به خاطر بسپار ساعت کاریم از هشت صبح شروع میشه","intent":"LEARN_FACT"}
+{"text":"یادت بمونه قهوه تلخ دوست دارم","intent":"LEARN_FACT"}
+{"text":"ذخیره کن پلاک ماشین من ۲۲ ایران ۴۴ است","intent":"LEARN_FACT"}
+{"text":"این نکته رو حفظ کن قسط وام روز پنجم ماهه","intent":"LEARN_FACT"}
+{"text":"نام منو تو تنظیمات به سارا تغییر بده","intent":"LEARN_FACT"}
+{"text":"ثبت کن گروه خونی من آ مثبت است","intent":"LEARN_FACT"}
+{"text":"این یادداشت شخصی رو نگه دار دارو بعد ناهار","intent":"LEARN_FACT"}
+{"text":"نکته رمز گاوصندوق را از حافظه پاک کن","intent":"FORGET_MEMORY"}
+{"text":"مترادف مغازه را فراموش کن","intent":"FORGET_MEMORY"}
+{"text":"یادداشت جلسه دیروز را حذف کن","intent":"FORGET_MEMORY"}
+{"text":"این مورد آخر رو یادت بره از حافظه","intent":"FORGET_MEMORY"}
+{"text":"قانون کافه رو دیگه نگه ندار پاکش کن","intent":"FORGET_MEMORY"}
+{"text":"اطلاعات قبلی پلاک ماشین رو از حافظه حذف کن","intent":"FORGET_MEMORY"}
+{"text":"اون نکته درباره خرید سیمان رو فراموش کن","intent":"FORGET_MEMORY"}
+{"text":"عبارت پارکینگ رو از یادگیری ها پاک کن","intent":"FORGET_MEMORY"}
+{"text":"کلا یادداشت باشگاه رو بریز دور فراموشش کن","intent":"FORGET_MEMORY"}
+{"text":"از یادت ببر شماره قبلی انبار رو","intent":"FORGET_MEMORY"}
+{"text":"تو حافظت الان چیا ذخیره داری","intent":"LIST_MEMORY"}
+{"text":"هر چی بهت یاد دادم رو برام بخون","intent":"LIST_MEMORY"}
+{"text":"لیست یادگیری ها و مکان ها را نشون بده","intent":"LIST_MEMORY"}
+{"text":"حافظه شخصی سول چه چیزهایی داره","intent":"LIST_MEMORY"}
+{"text":"نکات و مترادف های ذخیره شده چیه","intent":"LIST_MEMORY"}
+{"text":"چیا تو ذهن خودت نگه داشتی","intent":"LIST_MEMORY"}
+{"text":"مرور کامل حافظه محلی رو برام بیار","intent":"LIST_MEMORY"}
+{"text":"بگو تا حالا چه اطلاعاتی ثبت کردیم","intent":"LIST_MEMORY"}
+{"text":"فهرست قوانین و اشخاص حافظه رو نمایش بده","intent":"LIST_MEMORY"}
+{"text":"موجودی حافظه شخصیت رو بگو","intent":"LIST_MEMORY"}
+{"text":"مخاطب جدید ذخیره کن سعید مرادی 09124445566 همکار","intent":"SAVE_PERSON"}
+{"text":"شخص بهنام کریمی با شماره 09357778899 را ثبت کن","intent":"SAVE_PERSON"}
+{"text":"توی حافظه اشخاص اضافه کن خانم اکبری 09131112233 مدیر","intent":"SAVE_PERSON"}
+{"text":"شماره موبایل مادرم 09128889900 را به نام مریم ذخیره کن","intent":"SAVE_PERSON"}
+{"text":"شخص جدید بساز مهرداد 09152223344 دوست","intent":"SAVE_PERSON"}
+{"text":"اسم دکتر حسینی رو با شماره 02188776655 یادت نگه دار","intent":"SAVE_PERSON"}
+{"text":"در بخش اشخاص بنویس فرهاد با شماره 09195556677 همسرم","intent":"SAVE_PERSON"}
+{"text":"شماره 09173334455 مال مهندس باقری هست ذخیره کن","intent":"SAVE_PERSON"}
+{"text":"اطلاعات تماس کاظم 09186667788 را در حافظه ثبت کن","intent":"SAVE_PERSON"}
+{"text":"ذخیره مخاطب حمید رضا 09101234567 برادر","intent":"SAVE_PERSON"}
+{"text":"مکان مطب را به عنوان کلینیک مهر ذخیره کن","intent":"SAVE_LOCATION"}
+{"text":"جای خانه مادربزرگ را در مکان ها ثبت کن شهرک غرب","intent":"SAVE_LOCATION"}
+{"text":"یه مکان جدید اضافه کن به اسم کارخانه آدرس جاده ساوه","intent":"SAVE_LOCATION"}
+{"text":"لوکیشن شعبه دو را توی حافظه مکان ها بنویس","intent":"SAVE_LOCATION"}
+{"text":"ذخیره کن مکان باغ یعنی کیلومتر ده جاده کرج","intent":"SAVE_LOCATION"}
+{"text":"آدرس دفتر مرکزی رو به فهرست مکان ها اضافه کن","intent":"SAVE_LOCATION"}
+{"text":"مکان ویلا رو با نشانی شمال ثبت کن","intent":"SAVE_LOCATION"}
+{"text":"توی مکان های ذخیره‌شده ایستگاه مترو رو اضافه کن","intent":"SAVE_LOCATION"}
+{"text":"اسم کوتاه سوله رو بذار به عنوان انبار پیمانکاری","intent":"SAVE_LOCATION"}
+{"text":"نقطه دانشگاه رو توی مکان های همیشگی ثبت کن","intent":"SAVE_LOCATION"}
+{"text":"الان رسیدم کلینیک مهر هستم","intent":"SET_CURRENT_LOCATION"}
+{"text":"در حال حاضر توی فرودگاه امام هستم","intent":"SET_CURRENT_LOCATION"}
+{"text":"موقعیت فعلیم رو بذار روی دفتر مرکزی","intent":"SET_CURRENT_LOCATION"}
+{"text":"تایید کن که من الان خونه هستم","intent":"SET_CURRENT_LOCATION"}
+{"text":"اکنون در سالن کنفرانس حضور دارم","intent":"SET_CURRENT_LOCATION"}
+{"text":"الان توی ترافیک اتوبان همت هستم ثبت کن","intent":"SET_CURRENT_LOCATION"}
+{"text":"من الان رسیدم کارخانه موقعیت فعلیم اینجاست","intent":"SET_CURRENT_LOCATION"}
+{"text":"تنظیم کن الان در دانشگاه هستم","intent":"SET_CURRENT_LOCATION"}
+{"text":"الان منزل هستم یادت باشه","intent":"SET_CURRENT_LOCATION"}
+{"text":"وضعیت مکانی الانم رو بذار روی مغازه","intent":"SET_CURRENT_LOCATION"}
+{"text":"من الان کجا هستم","intent":"GET_CURRENT_LOCATION"}
+{"text":"موقعیت فعلی تاییدشده چیه الان","intent":"GET_CURRENT_LOCATION"}
+{"text":"کدوم لوکیشن برام ثبت شده","intent":"GET_CURRENT_LOCATION"}
+{"text":"بگو موقعیت فعلیم روی چی تنظیمه","intent":"GET_CURRENT_LOCATION"}
+{"text":"آخرین مکانی که تایید کردم کجا بود","intent":"GET_CURRENT_LOCATION"}
+{"text":"موقعیت الانم توی حافظت چیه","intent":"GET_CURRENT_LOCATION"}
+{"text":"مکان‌های ذخیره و موقعیت فعلی رو نشونم بده","intent":"GET_CURRENT_LOCATION"}
+{"text":"آیا الان میدونی کجا هستم","intent":"GET_CURRENT_LOCATION"}
+{"text":"تماس بگیر با مریم لطفا","intent":"CALL"}
+{"text":"یه تک زنگ به سعید بزن","intent":"CALL"}
+{"text":"شماره مامان رو بگیر صحبت کنم","intent":"CALL"}
+{"text":"با بهنام تماس صوتی برقرار کن","intent":"CALL"}
+{"text":"گوشی رو بزن زنگ بزنه به فرهاد","intent":"CALL"}
+{"text":"میخوام با مهندس باقری تلفنی حرف بزنم","intent":"CALL"}
+{"text":"شماره‌گیر رو با شماره 09127654321 باز کن","intent":"CALL"}
+{"text":"به داداش زنگ بزن و بگو منتظرم","intent":"CALL"}
+{"text":"لطفا همین الان با دکتر حسینی تماس بگیر","intent":"CALL"}
+{"text":"تلفن بزن به سارا کارش دارم","intent":"CALL"}
+{"text":"شماره کاظم را بگیر برای تماس","intent":"CALL"}
+{"text":"با همکارم تماس بگیر درباره فایل","intent":"CALL"}
+{"text":"به مریم اس ام اس بده الان میام","intent":"SEND_SMS"}
+{"text":"یه پیامک برای سعید بفرست جلسه لغو شد","intent":"SEND_SMS"}
+{"text":"توی پیام به مامان بنویس رسیدم خونه","intent":"SEND_SMS"}
+{"text":"پیام بده به فرهاد که خرید رو انجام دادم","intent":"SEND_SMS"}
+{"text":"برای بهنام پیامک متنی آماده کن امروز دیرتر میرسم","intent":"SEND_SMS"}
+{"text":"اس‌ام‌اس بفرست به کاظم سر کوچه منتظرم","intent":"SEND_SMS"}
+{"text":"یک پیام کوتاه به دکتر بنویس وقت مشاوره میخوام","intent":"SEND_SMS"}
+{"text":"با متن سلام به حمید پیامک بده","intent":"SEND_SMS"}
+{"text":"به همسرم پیام بده نان بخرم یا نه","intent":"SEND_SMS"}
+{"text":"پیامک آماده کن برای سارا بابت تبریک","intent":"SEND_SMS"}
+{"text":"به مدیر خبر بده کار تمام شد","intent":"SEND_SMS"}
+{"text":"برای مهندس باقری پیام بنویس فاکتور آماده شد","intent":"SEND_SMS"}
+{"text":"موقعیت الانم رو به سعید اطلاع بده و بعد گزارششو به من بده","intent":"MULTI_STEP_NOTIFY"}
+{"text":"فرمان چند مرحله ای وضعیت کارگاه را به مدیر بفرست و نتیجه را بگو","intent":"MULTI_STEP_NOTIFY"}
+{"text":"شرایط فعلی شرکت رو به همکارم اطلاع رسانی کن و به من خبر بده","intent":"MULTI_STEP_NOTIFY"}
+{"text":"با مراحل کامل پیام رسیدن به مقصد را برای مریم بفرست و گزارش بده","intent":"MULTI_STEP_NOTIFY"}
+{"text":"اول وضعیت رو ببین بعد به فرهاد خبر بده و گزارش کار رو نمایش بده","intent":"MULTI_STEP_NOTIFY"}
+{"text":"اجرای تسک چند مرحله ای اطلاع دادن به بهنام و ثبت گزارش","intent":"MULTI_STEP_NOTIFY"}
+{"text":"موقعیت تاییدشده رو به مامان اطلاع بده و آخرش تاییدیه رو بهم بگو","intent":"MULTI_STEP_NOTIFY"}
+{"text":"پروسه چند گامی ارسال گزارش به دکتر را شروع کن","intent":"MULTI_STEP_NOTIFY"}
+{"text":"برنامه ماشین حساب گوشی را باز کن","intent":"OPEN_APP"}
+{"text":"اپلیکیشن تقویم رو اجرا کن","intent":"OPEN_APP"}
+{"text":"دوربین موبایل رو بیار بالا عکس بگیرم","intent":"OPEN_APP"}
+{"text":"نرم افزار تلگرام رو باز کن","intent":"OPEN_APP"}
+{"text":"گالری عکس ها رو باز کن لطفا","intent":"OPEN_APP"}
+{"text":"برنامه پیامک ها رو اجرا کن","intent":"OPEN_APP"}
+{"text":"اپلیکیشن نقشه نشان رو باز کن","intent":"OPEN_APP"}
+{"text":"برنامه اسنپ رو راه بنداز","intent":"OPEN_APP"}
+{"text":"موزیک پلیر گوشی رو باز کن","intent":"OPEN_APP"}
+{"text":"مرورگر کروم رو باز کن","intent":"OPEN_APP"}
+{"text":"تنظیمات وای فای گوشی رو باز کن","intent":"OPEN_SETTINGS"}
+{"text":"منوی تنظیمات بلوتوث رو بیار بالا","intent":"OPEN_SETTINGS"}
+{"text":"برو توی تنظیمات مکان یاب و جی پی اس","intent":"OPEN_SETTINGS"}
+{"text":"بخش تنظیمات صدا و زنگ گوشی رو باز کن","intent":"OPEN_SETTINGS"}
+{"text":"تنظیمات مصرف باتری رو نشونم بده","intent":"OPEN_SETTINGS"}
+{"text":"صفحه وایفای رو بیار روشنش کنم","intent":"OPEN_SETTINGS"}
+{"text":"تنظیمات موقعیت مکانی دستگاه را باز کن","intent":"OPEN_SETTINGS"}
+{"text":"برو توی صفحه بلوتوث گوشی","intent":"OPEN_SETTINGS"}
+{"text":"شارژ باتری گوشی الان چند درصده","intent":"DEVICE_STATUS"}
+{"text":"وضعیت دستگاه و میزان صدا و دما چطوره","intent":"DEVICE_STATUS"}
+{"text":"ببین گوشی در حال شارژ هست یا نه و چند درصد داره","intent":"DEVICE_STATUS"}
+{"text":"گزارش سخت افزاری باتری و بلندی صدا را بده","intent":"DEVICE_STATUS"}
+{"text":"دمای باتری و وضعیت زنگ موبایل چنده","intent":"DEVICE_STATUS"}
+{"text":"میزان شارژ باقی مانده موبایل رو چک کن","intent":"DEVICE_STATUS"}
+{"text":"وضعیت کلی سیستم و ولوم رسانه چطوره","intent":"DEVICE_STATUS"}
+{"text":"گوشی چقدر شارژ داره الان","intent":"DEVICE_STATUS"}
+{"text":"صدای رسانه گوشی رو ببر بالا زیاد بشه","intent":"ADJUST_VOLUME"}
+{"text":"ولوم پخش رو کم کن خیلی بلنده","intent":"ADJUST_VOLUME"}
+{"text":"صدا رو بیشتر کن نمیشنوم","intent":"ADJUST_VOLUME"}
+{"text":"یکم صدای دستگاه را بیار پایین تر","intent":"ADJUST_VOLUME"}
+{"text":"بلندی صدا رو کاهش بده لطفا","intent":"ADJUST_VOLUME"}
+{"text":"صدای خروجی رو افزایش بده","intent":"ADJUST_VOLUME"}
+{"text":"ولوم رو آروم تر کن شب شده","intent":"ADJUST_VOLUME"}
+{"text":"صدا رو خیلی زیاد کن","intent":"ADJUST_VOLUME"}
+{"text":"روتین شروع کار صبحگاهی رو اجرا کن","intent":"RUN_ROUTINE"}
+{"text":"حالت کار و دفتر را راه اندازی کن","intent":"RUN_ROUTINE"}
+{"text":"روتین شب و پایان روز را فعال کن","intent":"RUN_ROUTINE"}
+{"text":"برنامه روتین شبانه رو شروع کن","intent":"RUN_ROUTINE"}
+{"text":"سناریوی کاری امروز رو بزن اجرا بشه","intent":"RUN_ROUTINE"}
+{"text":"چک لیست کار روزانه رو اجرا کن","intent":"RUN_ROUTINE"}
+{"text":"حالت شبانه روتین گوشی رو بزن","intent":"RUN_ROUTINE"}
+{"text":"شروع کار رو برای من اجرا کن","intent":"RUN_ROUTINE"}
+{"text":"نیم ساعت دیگه یادم بنداز گاز رو خاموش کنم","intent":"SCHEDULE_REMINDER"}
+{"text":"۱۰ دقیقه دیگه یادآوری کن زنگ بزنم","intent":"SCHEDULE_REMINDER"}
+{"text":"فردا ساعت ۸ صبح آلارم بذار بیدار شم","intent":"SCHEDULE_REMINDER"}
+{"text":"پس فردا ساعت ۱۰ یادم بنداز قسط بدم","intent":"SCHEDULE_REMINDER"}
+{"text":"آخر هفته ساعت یازده یادآوری کن ماشین رو ببرم کارواش","intent":"SCHEDULE_REMINDER"}
+{"text":"شنبه آینده ساعت نه صبح یادآوری کن ارسال فاکتور","intent":"SCHEDULE_REMINDER"}
+{"text":"سه روز دیگه یادم بنداز آزمایش خون بدم","intent":"SCHEDULE_REMINDER"}
+{"text":"جمعه ساعت پنج عصر آلارم بگذار استراحت کنم","intent":"SCHEDULE_REMINDER"}
+{"text":"ساعت ۲۱ امشب یادآوری کن مسواک بزنم","intent":"SCHEDULE_REMINDER"}
+{"text":"۲۰ دقیقه بعد بهم یادآوری کن چای دم کشید","intent":"SCHEDULE_REMINDER"}
+{"text":"یه ربع دیگه آلارم بده برم بیرون","intent":"SCHEDULE_REMINDER"}
+{"text":"برای یکشنبه ساعت دو بعدازظهر یادآور ثبت کن","intent":"SCHEDULE_REMINDER"}
+{"text":"از حافظه محلی توی پس زمینه بکاپ بگیر","intent":"BACKGROUND_CONTROL"}
+{"text":"کار پس زمینه ایندکس مجدد کتاب ها رو الان اجرا کن","intent":"BACKGROUND_CONTROL"}
+{"text":"نگهبان باتری در پس زمینه رو روشن و اجرا کن","intent":"BACKGROUND_CONTROL"}
+{"text":"خلاصه روزانه پس زمینه را الان اجرا کن","intent":"BACKGROUND_CONTROL"}
+{"text":"پاکسازی خودکار سوابق قدیمی در پس زمینه رو انجام بده","intent":"BACKGROUND_CONTROL"}
+{"text":"تسک چک مکانی در پس زمینه رو اجرا کن","intent":"BACKGROUND_CONTROL"}
+{"text":"پشتیبان گیری خودکار پس زمینه رو الان بزن","intent":"BACKGROUND_CONTROL"}
+{"text":"این لینک مقاله https://example.com رو از اینترنت بگیر و یاد بگیر","intent":"WEB_BOOK_LEARN_ROLE"}
+{"text":"از اینترنت کتاب هنر شفاف اندیشیدن را جستجو و دانلود کن","intent":"WEB_BOOK_LEARN_ROLE"}
+{"text":"برو در وب موضوع مدیریت بحران رو پیدا کن و به کتابخونه اضافه کن","intent":"WEB_BOOK_LEARN_ROLE"}
+{"text":"فایل کتاب پی دی اف یا از اینترنت صفحه جدید رو بخون و یاد بگیر","intent":"WEB_BOOK_LEARN_ROLE"}
+{"text":"توی ویکی پدیا دنبال تاریخ ایران بگرد و بیارش تو حافظت","intent":"WEB_BOOK_LEARN_ROLE"}
+{"text":"از اینترنت یه کتاب خوب درباره روانشناسی دانلود کن","intent":"WEB_BOOK_LEARN_ROLE"}
+{"text":"آدرس اینترنتی ویکی را دریافت و نمایه‌سازی کن","intent":"WEB_BOOK_LEARN_ROLE"}
+{"text":"با اتصال اینترنت کتاب جدید را پیدا و ذخیره کن","intent":"WEB_BOOK_LEARN_ROLE"}
+{"text":"نقش جدید برای خودت بساز مشاور تغذیه با دستور رژیم سالم","intent":"TEACH_ROLE_VOICE"}
+{"text":"میخوام بهت نقش مربی ورزشی یاد بدم هر روز برنامه تمرین بده","intent":"TEACH_ROLE_VOICE"}
+{"text":"شخصیت یا نقش تازه تعریف کن حسابدار شخصی با دقت بالا","intent":"TEACH_ROLE_VOICE"}
+{"text":"توضیحات صوتی من برای نقش جدید اینه که مثل معلم زبان صحبت کنی","intent":"TEACH_ROLE_VOICE"}
+{"text":"یه نقش دستیار حقوقی برات ثبت میکنم با لحن رسمی","intent":"TEACH_ROLE_VOICE"}
+{"text":"نقش سول رو تغییر بده به مشاور مدیریت زمان","intent":"TEACH_ROLE_VOICE"}
+{"text":"آموزش نقش تازه به اسم راهنمای مطالعه روزانه","intent":"TEACH_ROLE_VOICE"}
+{"text":"با صدای من نقش دستیار فنی پرورش رو ذخیره کن","intent":"TEACH_ROLE_VOICE"}
+{"text":"بر اساس نقشت و کتاب ها درباره تمرکز راهنماییم کن","intent":"CONSULT_ROLE_BOOK"}
+{"text":"طبق کتاب های ذخیره شده راهکار مدیریت استرس چیه","intent":"CONSULT_ROLE_BOOK"}
+{"text":"تو نقش مربی بهم بگو چطور عادت بد رو ترک کنم","intent":"CONSULT_ROLE_BOOK"}
+{"text":"از توی کتاب هایی که داری درباره تهویه سالن چی نوشته","intent":"CONSULT_ROLE_BOOK"}
+{"text":"با تکیه بر دانش کتابخانه خودت درباره برنامه ریزی پیشنهاد بده","intent":"CONSULT_ROLE_BOOK"}
+{"text":"جستجو کن در کتاب ها نکته مهم فصل اول چی بود","intent":"CONSULT_ROLE_BOOK"}
+{"text":"مشاوره بده طبق نقش فعلیت راجع به کاهش هزینه ها","intent":"CONSULT_ROLE_BOOK"}
+{"text":"ببین تو جزوه و پی دی اف ذخیره شده راجع به این موضوع چی گفته","intent":"CONSULT_ROLE_BOOK"}
+{"text":"امروز خیلی حوصله ام سر رفته بیا یه کم گپ بزنیم","intent":"OUT_OF_SCOPE"}
+{"text":"دلم خیلی گرفته و خسته ام یکم باهام حرف بزن","intent":"OUT_OF_SCOPE"}
+{"text":"شماره سارا احمدی چنده توی دفترچه","intent":"OUT_OF_SCOPE"}
+{"text":"شماره تلفن مهندس رضایی رو میدونی چنده","intent":"OUT_OF_SCOPE"}
+{"text":"به نظرت بهترین فصل برای سفر به شمال کی هست","intent":"OUT_OF_SCOPE"}
+{"text":"یک داستان کوتاه فلسفی برام تعریف کن","intent":"OUT_OF_SCOPE"}
+{"text":"چرا آسمان در طول روز آبی دیده میشه","intent":"OUT_OF_SCOPE"}
+{"text":"طرز تهیه قورمه سبزی جا افتاده چطوریه","intent":"OUT_OF_SCOPE"}
+{"text":"یک جوک باحال و مودبانه بگو بخندیم","intent":"OUT_OF_SCOPE"}
+{"text":"حس میکنم انگیزه کار کردن ندارم چی کار کنم","intent":"OUT_OF_SCOPE"}
+{"text":"معنی شعر حافظ دوش دیدم که ملایک چیست","intent":"OUT_OF_SCOPE"}
+{"text":"برای کاهش وزن چه ورزشی مناسب تره","intent":"OUT_OF_SCOPE"}
+{"text":"فرق بین هوش مصنوعی و یادگیری ماشین چیه","intent":"OUT_OF_SCOPE"}
+{"text":"چه فیلم هایی تو ژانر علمی تخیلی ارزش دیدن داره","intent":"OUT_OF_SCOPE"}
+{"text":"میشه برام راجع به سیاره مشتری توضیح بدی","intent":"OUT_OF_SCOPE"}
+{"text":"یه متن عاشقانه زیبا برام بنویس","intent":"OUT_OF_SCOPE"}
+{"text":"چطور میتونم زبان انگلیسی رو سریع تر یاد بگیرم","intent":"OUT_OF_SCOPE"}
+{"text":"اگر باران بباره هوا چقدر خنک میشه","intent":"OUT_OF_SCOPE"}
+{"text":"به نظر تو فوتبال دیروز قشنگ بود","intent":"OUT_OF_SCOPE"}
+{"text":"فلسفه رواقی گرایی دقیقا چی میگه","intent":"OUT_OF_SCOPE"}
+{"text":"شعر سهراب سپهری درباره آب رو بگو","intent":"OUT_OF_SCOPE"}
+{"text":"چرا بعضی آدم ها شب ها خوابشون نمیبره","intent":"OUT_OF_SCOPE"}
+{"text":"تاریخچه قهوه در ایران چطور بوده","intent":"OUT_OF_SCOPE"}
+{"text":"دوست دارم با یه هم صحبت دانا درد دل کنم","intent":"OUT_OF_SCOPE"}
+{"text":"منظور از کارنو صنعت چیه توی یادداشتام","intent":"OUT_OF_SCOPE"}
+{"text":"آدرس انبار قدیمی کجا بود یادت هست","intent":"OUT_OF_SCOPE"}
+{"text":"این جمله انگلیسی رو به فارسی ترجمه کن","intent":"OUT_OF_SCOPE"}
+{"text":"یک برنامه غذایی سالم برای صبحانه پیشنهاد بده","intent":"OUT_OF_SCOPE"}
+{"text":"مساحت دایره با شعاع پنج چقدر میشه","intent":"OUT_OF_SCOPE"}
+{"text":"حالت چطوره برام از خودت حرف بزن امشب تنهام","intent":"OUT_OF_SCOPE"}

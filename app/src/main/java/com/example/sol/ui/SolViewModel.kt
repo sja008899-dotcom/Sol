@@ -9,6 +9,7 @@ import com.example.sol.brain.PendingSolTask
 import com.example.sol.contacts.ResolvedContact
 import com.example.sol.device.BatteryStatus
 import com.example.sol.device.InstalledAppShortcut
+import com.example.sol.dialogue.DialogueUiChoice
 import com.example.sol.knowledge.LocalSlmEngine
 import com.example.sol.knowledge.SlmModelSpec
 import com.example.sol.knowledge.SlmRuntimeState
@@ -26,6 +27,7 @@ import com.example.sol.memory.PersonEntity
 import com.example.sol.memory.ScheduledAlarmEntity
 import com.example.sol.memory.SolPreferences
 import com.example.sol.memory.SolRoleEntity
+import com.example.sol.memory.UserUtteranceExampleEntity
 import com.example.sol.memory.VoicePersona
 import com.example.sol.security.RamUsageSnapshot
 import com.example.sol.security.SecurityAuditItem
@@ -55,6 +57,7 @@ data class ChatMessageItem(
     val isUser: Boolean,
     val text: String,
     val actionBadge: String = "",
+    val choices: List<DialogueUiChoice> = emptyList(),
     val timestampMs: Long = System.currentTimeMillis(),
 )
 
@@ -109,6 +112,9 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     val scheduledAlarms: StateFlow<List<ScheduledAlarmEntity>> = c.knowledgeRepository.scheduledAlarms
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val userUtteranceExamples: StateFlow<List<UserUtteranceExampleEntity>> = c.userUtteranceRepository.allExamples
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val enabledPeriodicJobs: StateFlow<Set<String>> = c.backgroundTaskCoordinator.enabledPeriodicJobs
@@ -327,15 +333,19 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         if (raw.isBlank()) return
         if (textOverride == null) _inputText.value = ""
 
+        _messages.value = _messages.value.map { msg ->
+            if (msg.choices.isEmpty()) msg else msg.copy(choices = emptyList())
+        }
         appendMessage(isUser = true, text = raw)
 
         viewModelScope.launch {
-            val result = c.commandBrain.process(raw)
+            val result = c.commandBrain.processDialogue(raw)
             if (result.replyText.isNotBlank()) {
                 appendMessage(
                     isUser = false,
                     text = result.replyText,
                     actionBadge = result.parsedCommand.action.name,
+                    choices = result.actionChoices,
                 )
                 val currentPrefs = preferences.value
                 c.historyRepository.recordIfAllowed(
@@ -852,6 +862,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     fun confirmAndExecutePending() {
         stopVoiceConfirmationListening()
         _confirmVoiceFeedback.value = ""
+        c.dialogueManager.clearPendingState()
         val pending = c.confirmationManager.pending.value ?: return
         viewModelScope.launch {
             c.taskManager.confirmAndExecute(pending) { report ->
@@ -864,6 +875,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelPendingConfirmation() {
         stopVoiceConfirmationListening()
         _confirmVoiceFeedback.value = ""
+        c.dialogueManager.clearPendingState()
         c.taskManager.cancelConfirmation { msg ->
             appendMessage(isUser = false, text = msg, actionBadge = "CANCELLED")
         }
@@ -872,6 +884,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissActiveTaskCard() = c.taskManager.dismissTaskCard()
 
     fun initiateContactAction(contact: ResolvedContact, channel: CommunicationChannel) {
+        c.dialogueManager.clearPendingState()
         val prefs = preferences.value
         c.taskManager.requestDirectCommunication(
             contact = contact,
@@ -899,6 +912,14 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteMemoryItem(id: Long) {
         viewModelScope.launch { c.memoryRepository.forgetById(id) }
+    }
+
+    fun deleteUserUtteranceExample(id: Long) {
+        viewModelScope.launch {
+            c.userUtteranceRepository.deleteExample(id)
+            c.statisticalClassifier.removeUserExample(id)
+            _statusBannerMessage.value = "مثال آموزشی از حافظه فراموش شد."
+        }
     }
 
     fun savePerson(name: String, phone: String, relation: String, callScriptNote: String, existingId: Long = 0) {
@@ -1008,6 +1029,8 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
             c.exactAlarmScheduler.cancelAlarm(alarm)
         }
         c.knowledgeRepository.deleteAllUserData()
+        c.dialogueManager.clearHistory()
+        c.statisticalClassifier.syncUserExamples(emptyList())
         c.preferencesRepository.resetAllPreferences()
         c.bookRagEngine.evictCache()
         runCatching {
@@ -1114,13 +1137,19 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         _statusBannerMessage.value = "حافظهٔ گفت‌وگوی فعلی مدل تازه شد (مدل در RAM باقی ماند)."
     }
 
-    private fun appendMessage(isUser: Boolean, text: String, actionBadge: String = ""): Long {
+    private fun appendMessage(
+        isUser: Boolean,
+        text: String,
+        actionBadge: String = "",
+        choices: List<DialogueUiChoice> = emptyList(),
+    ): Long {
         val msgId = System.nanoTime()
         val next = ChatMessageItem(
             id = msgId,
             isUser = isUser,
             text = text,
             actionBadge = actionBadge,
+            choices = choices,
         )
         _messages.value = _messages.value + next
         return msgId

@@ -301,3 +301,32 @@ class KnowledgeRepository(private val dao: MemoryDao) {
 
     suspend fun deleteAllUserData() = dao.deleteAllUserData()
 }
+
+class UserUtteranceRepository(private val dao: MemoryDao) {
+    val allExamples: Flow<List<UserUtteranceExampleEntity>> = dao.observeUserUtteranceExamples()
+
+    suspend fun getAllOnce(): List<UserUtteranceExampleEntity> = dao.getAllUserUtteranceExamplesOnce()
+
+    suspend fun saveExample(
+        intent: String,
+        text: String,
+        slotsJson: String = "{}",
+    ): UserUtteranceExampleEntity {
+        val cleanText = text.trim()
+        val norm = PersianNormalizer.normalize(cleanText)
+        val entity = UserUtteranceExampleEntity(
+            intent = intent,
+            text = cleanText,
+            normalizedText = norm,
+            slotsJson = slotsJson,
+            createdAt = System.currentTimeMillis(),
+        )
+        val id = dao.insertUserUtteranceExample(entity)
+        return entity.copy(id = id)
+    }
+
+    suspend fun deleteExample(id: Long): Boolean = dao.deleteUserUtteranceExampleById(id) > 0
+
+    suspend fun clearAll() = dao.clearAllUserUtteranceExamples()
+}
+

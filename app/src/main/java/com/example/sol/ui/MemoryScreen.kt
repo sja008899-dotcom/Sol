@@ -52,11 +52,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.sol.brain.HybridNluEngine
+import com.example.sol.brain.SolAction
 import com.example.sol.memory.BookKnowledgeEntity
 import com.example.sol.memory.LocationEntity
 import com.example.sol.memory.MemoryFactEntity
 import com.example.sol.memory.PersonEntity
 import com.example.sol.memory.SolRoleEntity
+import com.example.sol.memory.UserUtteranceExampleEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,11 +69,13 @@ fun MemoryScreen(
     locations: List<LocationEntity>,
     books: List<BookKnowledgeEntity>,
     roles: List<SolRoleEntity>,
+    userExamples: List<UserUtteranceExampleEntity> = emptyList(),
     confirmedCurrentLocation: String,
     onAddOrUpdateAlias: (String, String) -> Unit,
     onAddFact: (String) -> Unit,
     onUpdateMemory: (MemoryFactEntity, String) -> Unit,
     onDeleteMemory: (Long) -> Unit,
+    onDeleteUserExample: (Long) -> Unit = {},
     onSavePerson: (name: String, phone: String, relation: String, note: String, existingId: Long) -> Unit,
     onDeletePerson: (Long) -> Unit,
     onSaveLocation: (alias: String, fullName: String, note: String, existingId: Long) -> Unit,
@@ -136,7 +141,7 @@ fun MemoryScreen(
 
             when (selectedTab) {
                 0 -> {
-                    if (memories.isEmpty()) {
+                    if (memories.isEmpty() && userExamples.isEmpty()) {
                         EmptyMemoryState(
                             icon = Icons.Default.Psychology,
                             title = "هنوز قانونی یا نکته‌ای ذخیره نشده",
@@ -147,6 +152,53 @@ fun MemoryScreen(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
+                            if (userExamples.isNotEmpty()) {
+                                item {
+                                    Text(
+                                        text = "عبارت‌های آموخته‌شدهٔ فرمان‌ها (کلیک «فراموش کن» برای حذف):",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                    )
+                                }
+                                items(userExamples, key = { "uex_${it.id}" }) { ex ->
+                                    val actionLabel = runCatching {
+                                        HybridNluEngine.actionLabelFa(SolAction.valueOf(ex.intent))
+                                    }.getOrDefault(ex.intent)
+                                    Card(
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                                        ),
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(14.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "آموزش نیت: $actionLabel",
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    color = MaterialTheme.colorScheme.secondary,
+                                                )
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = "«${ex.text}»",
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                )
+                                            }
+                                            OutlinedButton(
+                                                onClick = { onDeleteUserExample(ex.id) },
+                                                modifier = Modifier.testTag("forget_user_example_${ex.id}"),
+                                            ) {
+                                                Text("فراموش کن")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             items(memories, key = { it.id }) { item ->
                                 val isAlias = item.kind == "alias"
                                 Card(

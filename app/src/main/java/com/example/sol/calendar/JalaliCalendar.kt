@@ -164,13 +164,18 @@ object JalaliCalendar {
             cal.get(Calendar.MINUTE),
         )
 
+        if (norm.contains("پس فردا") || norm.contains("پس‌فردا")) {
+            val dayAfter = fromMillis(nowMillis + 2 * 86_400_000L)
+            return "پس‌فردا ${dayAfter.formatFullFa()} (${dayAfter.formatShortFa()}) است."
+        }
         if (norm.contains("فردا")) {
             val tomorrow = fromMillis(nowMillis + 86_400_000L)
             return "فردا ${tomorrow.formatFullFa()} (${tomorrow.formatShortFa()}) است."
         }
-        if (norm.contains("پس فردا") || norm.contains("پس‌فردا")) {
-            val dayAfter = fromMillis(nowMillis + 2 * 86_400_000L)
-            return "پس‌فردا ${dayAfter.formatFullFa()} (${dayAfter.formatShortFa()}) است."
+        if (norm.contains("اخر هفته") || norm.contains("آخر هفته")) {
+            val weekendMillis = computeWeekendMillis(nowMillis)
+            val weekend = fromMillis(weekendMillis)
+            return "آخر هفته ${weekend.formatFullFa()} (${weekend.formatShortFa()}) است."
         }
 
         val daysLeft = daysInJalaliMonth(today.year, today.month) - today.day
@@ -183,25 +188,60 @@ object JalaliCalendar {
      * Parses complex Persian Jalali scheduling phrases:
      * - «چهارشنبه ساعت ۹ صبح یادآوری کن جلسه دارم»
      * - «دو روز دیگه به علی پیام یادآوری بفرست»
-     * - «فردا ساعت ۱۴ و ۳۰ دقیقه یادآوری کن دارو بخورم»
-     * - «۱۵ آذر ساعت ۱۰ صبح یادآوری کن پرداخت قبض»
+     * - «۱۰ دقیقه دیگه / نیم ساعت دیگه یادآوری کن ...»
+     * - «آخر هفته / شنبه آینده ساعت ۱۰ یادآوری کن ...»
      */
     fun parsePersianDateTimeCommand(
         raw: String,
         nowMillis: Long = System.currentTimeMillis(),
+    ): ParsedJalaliSchedule? = parseDateTimeInternal(raw, nowMillis, requireReminderCue = true)
+
+    /**
+     * Parses date/time expressions even without explicit "یادآوری" keywords (for slot-filling follow-ups).
+     */
+    fun parseDateTimeSlot(
+        raw: String,
+        nowMillis: Long = System.currentTimeMillis(),
+    ): ParsedJalaliSchedule? = parseDateTimeInternal(raw, nowMillis, requireReminderCue = false)
+
+    private fun computeWeekendMillis(nowMillis: Long): Long {
+        val cal = Calendar.getInstance().apply { timeInMillis = nowMillis }
+        val dow = cal.get(Calendar.DAY_OF_WEEK)
+        val addDays = when (dow) {
+            Calendar.THURSDAY -> 1 // Tomorrow is Friday
+            Calendar.FRIDAY -> 6   // Next Thursday
+            else -> (Calendar.THURSDAY - dow + 7) % 7
+        }
+        cal.add(Calendar.DAY_OF_YEAR, addDays)
+        return cal.timeInMillis
+    }
+
+    private fun parseDateTimeInternal(
+        raw: String,
+        nowMillis: Long,
+        requireReminderCue: Boolean,
     ): ParsedJalaliSchedule? {
         val cleaned = PersianNormalizer.cleanText(raw)
-        val norm = normalizePersianNumberWords(PersianNormalizer.normalize(cleaned))
+        val preNormalized = PersianNormalizer.normalize(cleaned)
+            .replace("نیم ساعت", "30 دقیقه")
+            .replace("یه ربع", "15 دقیقه")
+            .replace("یک ربع", "15 دقیقه")
+            .replace("ربع ساعت", "15 دقیقه")
+            .replace("یه ساعت", "1 ساعت")
+            .replace("یک ساعت", "1 ساعت")
+        val norm = normalizePersianNumberWords(preNormalized)
 
         val isReminderOrDelayedMessage =
             norm.contains("یادآور") || norm.contains("یادم بنداز") || norm.contains("آلارم") ||
                 ((norm.contains("پیام") || norm.contains("خبر") || norm.contains("اطلاع")) &&
                     (norm.contains("روز دیگه") || norm.contains("روز دیگر") || norm.contains("فردا") ||
-                        norm.contains("پس فردا") || norm.contains("ساعت ") || findWeekday(norm) != null || findJalaliMonthDate(norm) != null))
+                        norm.contains("پس فردا") || norm.contains("آخر هفته") || norm.contains("اخر هفته") ||
+                        norm.contains("هفته آینده") || norm.contains("هفته آینده") || norm.contains("هفته دیگه") ||
+                        norm.contains("ساعت ") || findWeekday(norm) != null || findJalaliMonthDate(norm) != null))
 
-        if (!isReminderOrDelayedMessage) return null
+        if (requireReminderCue && !isReminderOrDelayedMessage) return null
 
-        // Check simple relative minute/hour/second: "۵ دقیقه دیگر ..."
+        // Check relative minute/hour/second: "۱۰ دقیقه دیگه", "نیم ساعت دیگه", "۱ ساعت بعد"
         val relMinHour = Regex("(\\d+)\\s*(دقیقه|ثانیه|ساعت)\\s*(?:دیگر|دیگه|بعد)").find(norm)
         if (relMinHour != null && findWeekday(norm) == null && !norm.contains("فردا") && !norm.contains("روز")) {
             val amount = relMinHour.groupValues[1].toLongOrNull() ?: 1L
@@ -220,8 +260,13 @@ object JalaliCalendar {
         val targetCal = Calendar.getInstance().apply { timeInMillis = nowMillis }
         var dateSpecified = false
 
-        // 1. Relative day expressions: "دو روز دیگه" / "فردا" / "پس فردا"
+        // 1. Relative day & week expressions
         val daysOffsetMatch = Regex("(\\d+)\\s*روز\\s*(?:دیگر|دیگه|بعد)").find(norm)
+        val hasNextWeekPhrase = norm.contains("هفته اینده") || norm.contains("هفته آینده") ||
+            norm.contains("هفته دیگه") || norm.contains("هفته دیگر") || norm.contains("هفته بعد")
+        val hasWeekendPhrase = norm.contains("اخر هفته") || norm.contains("آخر هفته")
+        val targetDow = findWeekday(norm)
+
         when {
             daysOffsetMatch != null -> {
                 val days = daysOffsetMatch.groupValues[1].toIntOrNull()?.coerceIn(1, 365) ?: 1
@@ -234,6 +279,11 @@ object JalaliCalendar {
             }
             norm.contains("فردا") -> {
                 targetCal.add(Calendar.DAY_OF_YEAR, 1)
+                dateSpecified = true
+            }
+            hasWeekendPhrase -> {
+                val weekendMillis = computeWeekendMillis(nowMillis)
+                targetCal.timeInMillis = weekendMillis
                 dateSpecified = true
             }
             else -> {
@@ -252,18 +302,23 @@ object JalaliCalendar {
                     targetCal.set(Calendar.MONTH, gm - 1)
                     targetCal.set(Calendar.DAY_OF_MONTH, gd)
                     dateSpecified = true
-                } else {
-                    // 3. Weekday: "چهارشنبه"
-                    val targetDow = findWeekday(norm)
-                    if (targetDow != null) {
-                        val todayDow = targetCal.get(Calendar.DAY_OF_WEEK)
-                        var diff = (targetDow - todayDow + 7) % 7
-                        if (diff == 0 && !norm.contains("امروز")) {
-                            diff = 7
-                        }
-                        targetCal.add(Calendar.DAY_OF_YEAR, diff)
-                        dateSpecified = true
+                } else if (targetDow != null) {
+                    val todayDow = targetCal.get(Calendar.DAY_OF_WEEK)
+                    val diff = if (hasNextWeekPhrase) {
+                        // Next Jalali week (Saturday-based) target day
+                        val daysSinceSat = (todayDow - Calendar.SATURDAY + 7) % 7
+                        val targetFromSat = (targetDow - Calendar.SATURDAY + 7) % 7
+                        (7 - daysSinceSat) + targetFromSat
+                    } else {
+                        var d = (targetDow - todayDow + 7) % 7
+                        if (d == 0 && !norm.contains("امروز")) d = 7
+                        d
                     }
+                    targetCal.add(Calendar.DAY_OF_YEAR, diff)
+                    dateSpecified = true
+                } else if (hasNextWeekPhrase) {
+                    targetCal.add(Calendar.DAY_OF_YEAR, 7)
+                    dateSpecified = true
                 }
             }
         }

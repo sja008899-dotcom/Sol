@@ -55,7 +55,47 @@ class SettingsController(private val context: Context) {
 }
 
 class AppLauncher(private val context: Context) {
-    fun getLaunchableApps(): List<InstalledAppShortcut> {
+
+    @Volatile
+    private var cachedApps: List<InstalledAppShortcut>? = null
+
+    @Volatile
+    private var cacheTimestampMs: Long = 0L
+
+    companion object {
+        private const val CACHE_TTL_MS = 60_000L
+
+        private val APP_SYNONYMS: Map<String, List<String>> = mapOf(
+            "ماشین حساب" to listOf("calculator", "calc"),
+            "تقویم" to listOf("calendar"),
+            "پیام" to listOf("messages", "messaging", "sms"),
+            "گالری" to listOf("gallery", "photos"),
+            "موسیقی" to listOf("music", "player"),
+            "موزیک" to listOf("music", "player"),
+            "واتساپ" to listOf("whatsapp"),
+            "تلگرام" to listOf("telegram"),
+            "اینستاگرام" to listOf("instagram"),
+            "نشان" to listOf("neshan"),
+            "بلد" to listOf("balad"),
+            "اسنپ" to listOf("snapp"),
+            "دیوار" to listOf("divar"),
+            "کروم" to listOf("chrome"),
+            "مرورگر" to listOf("browser", "chrome", "firefox"),
+            "یادداشت" to listOf("notes", "keep"),
+        )
+    }
+
+    fun invalidateAppsCache() {
+        cachedApps = null
+        cacheTimestampMs = 0L
+    }
+
+    fun getLaunchableApps(forceRefresh: Boolean = false): List<InstalledAppShortcut> {
+        val now = System.currentTimeMillis()
+        val existing = cachedApps
+        if (!forceRefresh && existing != null && (now - cacheTimestampMs) < CACHE_TTL_MS) {
+            return existing
+        }
         val pm = context.packageManager
         val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
@@ -66,7 +106,7 @@ class AppLauncher(private val context: Context) {
             @Suppress("DEPRECATION")
             pm.queryIntentActivities(mainIntent, 0)
         }
-        return resolved
+        val fresh = resolved
             .mapNotNull { info ->
                 val pkg = info.activityInfo?.packageName ?: return@mapNotNull null
                 if (pkg == context.packageName) return@mapNotNull null
@@ -76,6 +116,49 @@ class AppLauncher(private val context: Context) {
             }
             .distinctBy { it.packageName }
             .sortedBy { it.label }
+        cachedApps = fresh
+        cacheTimestampMs = now
+        return fresh
+    }
+
+    fun findBestAppMatch(query: String, apps: List<InstalledAppShortcut> = getLaunchableApps()): InstalledAppShortcut? {
+        val norm = PersianNormalizer.normalize(query)
+        if (norm.isBlank()) return null
+
+        val expandedKeywords = buildList {
+            add(norm)
+            for ((faKey, synonyms) in APP_SYNONYMS) {
+                val normKey = PersianNormalizer.normalize(faKey)
+                if (norm.contains(normKey)) {
+                    addAll(synonyms)
+                }
+            }
+        }.distinct()
+
+        // 1. Exact label match
+        apps.firstOrNull { app ->
+            val appNorm = PersianNormalizer.normalize(app.label)
+            expandedKeywords.any { it == appNorm }
+        }?.let { return it }
+
+        // 2. Containment match
+        apps.firstOrNull { app ->
+            val appNorm = PersianNormalizer.normalize(app.label)
+            val pkgNorm = app.packageName.lowercase()
+            expandedKeywords.any { kw ->
+                appNorm.contains(kw) || kw.contains(appNorm) || (kw.length >= 4 && pkgNorm.contains(kw))
+            }
+        }?.let { return it }
+
+        // 3. Fuzzy Levenshtein <= 1 for tokens/labels with length >= 4
+        return apps.firstOrNull { app ->
+            val appNorm = PersianNormalizer.normalize(app.label)
+            val appTokens = appNorm.split(' ').filter { it.length >= 4 }
+            expandedKeywords.filter { it.length >= 4 }.any { kw ->
+                (appNorm.length >= 4 && com.example.sol.contacts.ContactResolver.levenshteinDistance(kw, appNorm) <= 1) ||
+                    appTokens.any { tok -> com.example.sol.contacts.ContactResolver.levenshteinDistance(kw, tok) <= 1 }
+            }
+        }
     }
 
     fun launchAppByQuery(query: String): String? {
@@ -95,27 +178,13 @@ class AppLauncher(private val context: Context) {
                 val intent = Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 if (runCatching { context.startActivity(intent) }.isSuccess) return "تنظیمات گوشی"
             }
-            norm.contains("تلفن") || norm.contains("شماره‌گیر") || norm.contains("شماره گیر") -> {
+            norm.contains("تلفن") || norm.contains("شماره گیر") -> {
                 val intent = Intent(Intent.ACTION_DIAL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 if (runCatching { context.startActivity(intent) }.isSuccess) return "شماره‌گیر تلفن"
             }
         }
 
-        val keywords = buildList {
-            add(norm)
-            if (norm.contains("ماشین حساب")) add("calculator")
-            if (norm.contains("تقویم")) add("calendar")
-            if (norm.contains("پیام")) add("messages")
-            if (norm.contains("گالری")) add("gallery")
-            if (norm.contains("موسیقی") || norm.contains("موزیک")) add("music")
-        }
-
-        val apps = getLaunchableApps()
-        val match = apps.firstOrNull { app ->
-            val appNorm = PersianNormalizer.normalize(app.label)
-            keywords.any { kw -> appNorm.contains(kw) || kw.contains(appNorm) }
-        } ?: return null
-
+        val match = findBestAppMatch(query) ?: return null
         val launchIntent = context.packageManager.getLaunchIntentForPackage(match.packageName)?.apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         } ?: return null

@@ -351,6 +351,7 @@ internal class ScheduleReminderMatcher : IntentMatcher {
                     slots = r.slots,
                     confidence = r.score,
                     matchedRuleId = id,
+                    hasExplicitTimeSlot = false,
                 )
             }
         }

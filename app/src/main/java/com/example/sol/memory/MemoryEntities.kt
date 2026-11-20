@@ -121,3 +121,20 @@ data class ScheduledAlarmEntity(
     val isExact: Boolean = true,
     val isTriggered: Boolean = false,
 )
+
+@Entity(
+    tableName = "user_utterance_examples",
+    indices = [
+        Index(value = ["intent"]),
+        Index(value = ["normalizedText"]),
+    ]
+)
+data class UserUtteranceExampleEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val intent: String,
+    val text: String,
+    val normalizedText: String,
+    val slotsJson: String = "{}",
+    val createdAt: Long = System.currentTimeMillis(),
+)
+

@@ -95,6 +95,7 @@ fun SolAppRoot(
     val enabledPeriodicJobs by viewModel.enabledPeriodicJobs.collectAsStateWithLifecycle()
     val bookChunkCount by viewModel.bookChunkCount.collectAsStateWithLifecycle()
     val scheduledAlarms by viewModel.scheduledAlarms.collectAsStateWithLifecycle()
+    val userUtteranceExamples by viewModel.userUtteranceExamples.collectAsStateWithLifecycle()
 
     val listeningState by viewModel.listeningState.collectAsStateWithLifecycle()
     val partialSpeechText by viewModel.partialSpeechText.collectAsStateWithLifecycle()
@@ -474,11 +475,13 @@ fun SolAppRoot(
                                         locations = locations,
                                         books = books,
                                         roles = roles,
+                                        userExamples = userUtteranceExamples,
                                         confirmedCurrentLocation = preferences.confirmedCurrentLocation,
                                         onAddOrUpdateAlias = viewModel::addOrUpdateAlias,
                                         onAddFact = viewModel::addFact,
                                         onUpdateMemory = viewModel::updateMemoryItem,
                                         onDeleteMemory = viewModel::deleteMemoryItem,
+                                        onDeleteUserExample = viewModel::deleteUserUtteranceExample,
                                         onSavePerson = viewModel::savePerson,
                                         onDeletePerson = viewModel::deletePerson,
                                         onSaveLocation = viewModel::saveLocation,

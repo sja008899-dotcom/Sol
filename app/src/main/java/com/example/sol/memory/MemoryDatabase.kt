@@ -19,8 +19,9 @@ import com.example.BuildConfig
         BackgroundJobLogEntity::class,
         BookChunkEntity::class,
         ScheduledAlarmEntity::class,
+        UserUtteranceExampleEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class MemoryDatabase : RoomDatabase() {
@@ -169,7 +170,26 @@ abstract class MemoryDatabase : RoomDatabase() {
             }
         }
 
-        internal val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `user_utterance_examples` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `intent` TEXT NOT NULL,
+                        `text` TEXT NOT NULL,
+                        `normalizedText` TEXT NOT NULL,
+                        `slotsJson` TEXT NOT NULL,
+                        `createdAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_utterance_examples_intent` ON `user_utterance_examples` (`intent`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_user_utterance_examples_normalizedText` ON `user_utterance_examples` (`normalizedText`)")
+            }
+        }
+
+        internal val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 
         internal fun buildDatabase(
             context: Context,

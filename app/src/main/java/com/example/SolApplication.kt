@@ -79,24 +79,77 @@ class SolAppContainer(private val application: Application) {
     }
 
     val learningEngine by lazy { LearningEngine(memoryRepository, personRepository, locationRepository) }
+    val userUtteranceRepository by lazy { com.example.sol.memory.UserUtteranceRepository(dao) }
     val colloquialLexicon by lazy { com.example.sol.text.ColloquialLexicon.fromContext(application) }
-    val intentParser by lazy { IntentParser(EntityExtractor(), colloquialLexicon) }
-    val commandBrain by lazy {
-        CommandBrain(
+    val entityExtractor by lazy { EntityExtractor() }
+    val intentParser by lazy { IntentParser(entityExtractor, colloquialLexicon) }
+    val nluConfig by lazy { com.example.sol.brain.NluConfig() }
+    val statisticalClassifier by lazy {
+        com.example.sol.brain.StatisticalIntentClassifier(
             context = application,
-            parser = intentParser,
-            learningEngine = learningEngine,
-            memoryRepository = memoryRepository,
-            locationRepository = locationRepository,
-            knowledgeRepository = knowledgeRepository,
-            preferencesRepository = preferencesRepository,
-            deviceController = deviceController,
-            backgroundCoordinator = backgroundTaskCoordinator,
-            bookRagEngine = bookRagEngine,
-            localSlmEngine = localSlmEngine,
-            exactAlarmScheduler = exactAlarmScheduler,
+            config = nluConfig,
+            lexicon = colloquialLexicon,
         )
     }
+    val hybridNluEngine by lazy {
+        com.example.sol.brain.HybridNluEngine(
+            intentParser = intentParser,
+            statisticalClassifier = statisticalClassifier,
+            extractor = entityExtractor,
+            lexicon = colloquialLexicon,
+            config = nluConfig,
+        )
+    }
+    val skillRegistry by lazy {
+        val knowledgeSkill = com.example.sol.brain.skills.KnowledgeAndRoleSkill(
+            context = application,
+            memoryRepository = memoryRepository,
+            knowledgeRepository = knowledgeRepository,
+            preferencesRepository = preferencesRepository,
+            bookRagEngine = bookRagEngine,
+            localSlmEngine = localSlmEngine,
+        )
+        com.example.sol.brain.skills.SkillRegistry(
+            listOf(
+                com.example.sol.brain.skills.ConversationSkill(knowledgeRepository, preferencesRepository),
+                com.example.sol.brain.skills.MemoryAndLocationSkill(
+                    context = application,
+                    learningEngine = learningEngine,
+                    memoryRepository = memoryRepository,
+                    locationRepository = locationRepository,
+                    knowledgeRepository = knowledgeRepository,
+                    preferencesRepository = preferencesRepository,
+                ),
+                com.example.sol.brain.skills.CalendarAndBackgroundSkill(backgroundTaskCoordinator, exactAlarmScheduler),
+                knowledgeSkill,
+                com.example.sol.brain.skills.DeviceAndCommunicationSkill(
+                    learningEngine = learningEngine,
+                    deviceController = deviceController,
+                    preferencesRepository = preferencesRepository,
+                ),
+                com.example.sol.brain.skills.UnknownFallbackSkill(
+                    learningEngine = learningEngine,
+                    memoryRepository = memoryRepository,
+                    locationRepository = locationRepository,
+                    preferencesRepository = preferencesRepository,
+                    bookRagEngine = bookRagEngine,
+                    localSlmEngine = localSlmEngine,
+                    knowledgeSkill = knowledgeSkill,
+                ),
+            )
+        )
+    }
+    val dialogueManager by lazy {
+        com.example.sol.dialogue.DialogueManager(
+            hybridNlu = hybridNluEngine,
+            statisticalClassifier = statisticalClassifier,
+            userUtteranceRepository = userUtteranceRepository,
+            contactManager = contactManager,
+            skillRegistry = skillRegistry,
+            extractor = entityExtractor,
+        )
+    }
+    val commandBrain by lazy { CommandBrain(dialogueManager) }
 
     val confirmationManager by lazy { ConfirmationManager() }
     val taskManager by lazy {

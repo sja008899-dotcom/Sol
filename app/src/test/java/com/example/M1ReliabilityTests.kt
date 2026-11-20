@@ -42,9 +42,9 @@ import java.io.File
 class M1ReliabilityTests {
 
     @Test
-    fun `room migration from v2 to v4 preserves user data and creates required indices`() = runBlocking {
+    fun `room migration from v2 to v5 preserves user data and creates required indices`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val dbName = "migration_test_v2_to_v4.db"
+        val dbName = "migration_test_v2_to_v5.db"
         val dbFile = context.getDatabasePath(dbName)
         dbFile.parentFile?.mkdirs()
         if (dbFile.exists()) dbFile.delete()
@@ -187,7 +187,7 @@ class M1ReliabilityTests {
             assertEquals(1, history.size)
             assertEquals("سلام!", history.first().solText)
 
-            // Verify new indices in SQLite master
+            // Verify new indices across v3..v5 in SQLite master
             val sqliteDb = migratedDb.openHelper.writableDatabase
             val indexNames = mutableSetOf<String>()
             sqliteDb.query("SELECT name FROM sqlite_master WHERE type='index'").use { cursor ->
@@ -197,6 +197,9 @@ class M1ReliabilityTests {
             }
             assertTrue(indexNames.contains("index_history_createdAt"))
             assertTrue(indexNames.contains("index_scheduled_alarms_isTriggered_triggerAtMillis"))
+            assertTrue(indexNames.contains("index_user_utterance_examples_intent"))
+            assertTrue(indexNames.contains("index_user_utterance_examples_normalizedText"))
+            assertEquals(0, dao.getAllUserUtteranceExamplesOnce().size)
         } finally {
             migratedDb.close()
             dbFile.delete()
