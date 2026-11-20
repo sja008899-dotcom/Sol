@@ -1,0 +1,1340 @@
+{"text":"سلام","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"سلام سول","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"سلام خوبی؟","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"درود بر تو","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"صبح بخیر Sol","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"شب بخیر دستیار","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"چطوری امروز؟","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"مرسی خیلی لطف کردی","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"ممنون از کمکت","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"خسته نباشی سول","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"حال شما خوب است؟","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"عصر بخیر","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"سلام چطور مطوری؟","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"متشکرم رفیق","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"حالت چطوره سول؟","intent":"GREETING","slots":{},"split":"dev"}
+{"text":"سلام عزيزم خوبی","intent":"GREETING","slots":{},"split":"test"}
+{"text":"درود سول","intent":"GREETING","slots":{},"split":"test"}
+{"text":"صبح بخیر خوبی؟","intent":"GREETING","slots":{},"split":"test"}
+{"text":"شب بخیر بخوابی","intent":"GREETING","slots":{},"split":"test"}
+{"text":"ممنون سول","intent":"GREETING","slots":{},"split":"test"}
+{"text":"سپاسگزارم دوست من","intent":"GREETING","slots":{},"split":"test"}
+{"text":"سلام خسته نباشی","intent":"GREETING","slots":{},"split":"test"}
+{"text":"سلام بر تو سول","intent":"GREETING","slots":{},"split":"test"}
+{"text":"خوبی سول؟","intent":"GREETING","slots":{},"split":"test"}
+{"text":"چطوری رفیق؟","intent":"GREETING","slots":{},"split":"test"}
+{"text":"مرسی سول جان","intent":"GREETING","slots":{},"split":"test"}
+{"text":"سلام حال تو چطوره","intent":"GREETING","slots":{},"split":"test"}
+{"text":"عصر بخیر سول","intent":"GREETING","slots":{},"split":"test"}
+{"text":"درود و سلام","intent":"GREETING","slots":{},"split":"test"}
+{"text":"خیلی ممنون","intent":"GREETING","slots":{},"split":"test"}
+{"text":"متشكرم كارت عالي بود","intent":"GREETING","slots":{},"split":"test"}
+{"text":"سلام صبح بخیر","intent":"GREETING","slots":{},"split":"test"}
+{"text":"چطوری تو؟","intent":"GREETING","slots":{},"split":"test"}
+{"text":"خوشحالم باهات حرف میزنم سلام","intent":"GREETING","slots":{},"split":"test"}
+{"text":"مرسی دستت درد نکنه","intent":"GREETING","slots":{},"split":"test"}
+{"text":"خسته نباشی رفیق","intent":"GREETING","slots":{},"split":"test"}
+{"text":"سلام صبح شما بخیر","intent":"GREETING","slots":{},"split":"test"}
+{"text":"حال شما خوب هست؟","intent":"GREETING","slots":{},"split":"test"}
+{"text":"درود خوبی؟","intent":"GREETING","slots":{},"split":"test"}
+{"text":"شب بخیر سول","intent":"GREETING","slots":{},"split":"test"}
+{"text":"اسم تو چیه؟","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"اسمت چیه؟","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"تو کی هستی؟","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"نام تو چیست؟","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"خودت را معرفی کن","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"شما کی هستید؟","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"چی هستی تو؟","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"خودتو معرفی کن لطفاً","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"سلام Sol، اسم تو چیه؟","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"بگو اسم تو چیه","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"می‌تونم بپرسم کی هستی؟","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"اسمت چیست دستیار؟","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"تو چیستی؟","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"معرفی کن خودت رو","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"نام تو چیه سول؟","intent":"IDENTITY","slots":{},"split":"dev"}
+{"text":"لطفاً خودت را معرفی کن","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"اسم تو چیست؟","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"کی هستی دقیقا؟","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"اسمت چیه رفیق؟","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"میشه بگی کی هستی؟","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"نام تو را بگو","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"شما كي هستيد؟","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"خودتو به من معرفی کن","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"چی هستی سول؟","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"بهم بگو اسمت چیه","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"میخواستم بدونم کی هستی","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"نام تو چیه؟","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"اسم تو سول هست؟ خودت رو معرفی کن","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"تو کی هستی و اسمت چیه","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"اسمت رو بگو","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"خودت را معرفي كن","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"بی زحمت بگو کی هستی","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"بگو ببینم تو کی هستی","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"چیستی تو اصلا","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"اسمت چیه الان؟","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"میتونی خودتو معرفی کنی؟","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"اسم تو چی بود؟","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"نام تو چیست سول","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"بهم معرفی کن خودت رو","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"سلام، تو کی هستی؟","intent":"IDENTITY","slots":{},"split":"test"}
+{"text":"ساعت چنده؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"ساعت چند است؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"امروز چندم برج است؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"تاریخ امروز چنده؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"امروز چه روزی است؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"امروز چندشنبه‌ست؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"امروز چندمه؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"ساعت الان چنده؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"الان چه ساعتیه؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"تاریخ شمسی امروز چیه؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"ساعت چند شد؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"امروز چندم ماه است؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"امسال سال کبیسه است؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"ساعت رو بگو","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"تاریخ امروز را بگو","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"امروز چندم هست؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"لطفاً ساعت چنده الان","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"میشه بگی ساعت چنده","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"تاریخ امروز چیه؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"امروز چندشنبه است؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"الان ساعت چند است؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"تاریخ روز چنده؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"ساعت چنه؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"امروز چه روزيه؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"تقویم شمسی امروز رو بگو","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"چندم ماه هستیم الان؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"ماه شمسی الان چیه؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"ساعت چنده رفیق","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"تاریخ شمسی رو بهم بگو","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"امروز چندم برج هستیم؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"امروز چیه تاریخ؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"آیا ۱۴۰۴ سال کبیسه است؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"بگو امروز چندمه","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"ساعت","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"امروز چندم ماهه؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"امروز چه روزیه سول","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"بي زحمت ساعت را بگو","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"الان چندم برج است","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"تاریخ امروز به شمسی چیه","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"ساعت چند است الان؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"کمک","intent":"HELP","slots":{},"split":"dev"}
+{"text":"راهنمایی می‌خوام","intent":"HELP","slots":{},"split":"dev"}
+{"text":"چیکار می‌تونی بکنی؟","intent":"HELP","slots":{},"split":"dev"}
+{"text":"چه کارهایی بلدی؟","intent":"HELP","slots":{},"split":"dev"}
+{"text":"کاربردت چیه؟","intent":"HELP","slots":{},"split":"dev"}
+{"text":"چی بلدی سول؟","intent":"HELP","slots":{},"split":"dev"}
+{"text":"چطوری کار می‌کنی؟","intent":"HELP","slots":{},"split":"dev"}
+{"text":"راهنما رو نشون بده","intent":"HELP","slots":{},"split":"dev"}
+{"text":"کمکم کن سول","intent":"HELP","slots":{},"split":"dev"}
+{"text":"نمونه فرمان‌ها چیا هستن؟","intent":"HELP","slots":{},"split":"dev"}
+{"text":"چکار می‌تونی انجام بدی؟","intent":"HELP","slots":{},"split":"dev"}
+{"text":"یک راهنما بده","intent":"HELP","slots":{},"split":"dev"}
+{"text":"به من کمک کن","intent":"HELP","slots":{},"split":"dev"}
+{"text":"چطور با تو کار کنم؟","intent":"HELP","slots":{},"split":"dev"}
+{"text":"کاربردت چیست؟","intent":"HELP","slots":{},"split":"dev"}
+{"text":"راهنمای استفاده رو بگو","intent":"HELP","slots":{},"split":"test"}
+{"text":"میتونی کمکم کنی؟","intent":"HELP","slots":{},"split":"test"}
+{"text":"چه کارهایی از دستت برمیاد؟","intent":"HELP","slots":{},"split":"test"}
+{"text":"سول چی بلدی؟","intent":"HELP","slots":{},"split":"test"}
+{"text":"راهنما لطفاً","intent":"HELP","slots":{},"split":"test"}
+{"text":"کمک لازم دارم","intent":"HELP","slots":{},"split":"test"}
+{"text":"بهم بگو چیکار میتونی بکنی","intent":"HELP","slots":{},"split":"test"}
+{"text":"نیاز به راهنمایی دارم","intent":"HELP","slots":{},"split":"test"}
+{"text":"چطور کار می‌کنی سول؟","intent":"HELP","slots":{},"split":"test"}
+{"text":"نمونه فرمان بده","intent":"HELP","slots":{},"split":"test"}
+{"text":"میخوام بدونم چی بلدی","intent":"HELP","slots":{},"split":"test"}
+{"text":"راهنمایی کن","intent":"HELP","slots":{},"split":"test"}
+{"text":"چه کارهایی انجام میدی؟","intent":"HELP","slots":{},"split":"test"}
+{"text":"کمکم کن لطفاً","intent":"HELP","slots":{},"split":"test"}
+{"text":"کاربردت چیه دقیقاً؟","intent":"HELP","slots":{},"split":"test"}
+{"text":"لطفاً راهنما رو بگو","intent":"HELP","slots":{},"split":"test"}
+{"text":"چجوری کمک می‌کنی؟","intent":"HELP","slots":{},"split":"test"}
+{"text":"بگو چه کارهایی بلدی","intent":"HELP","slots":{},"split":"test"}
+{"text":"یه کم راهنماییم بده","intent":"HELP","slots":{},"split":"test"}
+{"text":"چکار می تونی بکنی؟","intent":"HELP","slots":{},"split":"test"}
+{"text":"سول راهنما چیه","intent":"HELP","slots":{},"split":"test"}
+{"text":"فقط یه کمک کوچیک میخوام","intent":"HELP","slots":{},"split":"test"}
+{"text":"بهم راهنمایی بده","intent":"HELP","slots":{},"split":"test"}
+{"text":"چطوري كار ميكني","intent":"HELP","slots":{},"split":"test"}
+{"text":"کمک می خوام","intent":"HELP","slots":{},"split":"test"}
+{"text":"هر وقت می‌گم دفتر منظورم شرکت کارنو صنعت ماکیان است","intent":"LEARN_ALIAS","slots":{"aliasKey":"دفتر","aliasValue":"شرکت کارنو صنعت ماکیان"},"split":"dev"}
+{"text":"هر وقت میگم خونه، منظورم منزل پدری است","intent":"LEARN_ALIAS","slots":{"aliasKey":"خونه","aliasValue":"منزل پدری"},"split":"dev"}
+{"text":"از این به بعد هر وقت گفتم سالن یعنی سالن شماره دو","intent":"LEARN_ALIAS","slots":{"aliasKey":"سالن","aliasValue":"سالن شماره دو"},"split":"dev"}
+{"text":"هر وقت میگم کارگاه منظورم سوله صنعتی شرق است","intent":"LEARN_ALIAS","slots":{"aliasKey":"کارگاه","aliasValue":"سوله صنعتی شرق"},"split":"dev"}
+{"text":"هر وقت می‌گم مدیر یعنی آقای محمدی","intent":"LEARN_ALIAS","slots":{"aliasKey":"مدیر","aliasValue":"آقای محمدی"},"split":"dev"}
+{"text":"هر وقت میگم باشگاه منظورم مجموعه ورزشی انقلاب هست","intent":"LEARN_ALIAS","slots":{"aliasKey":"باشگاه","aliasValue":"مجموعه ورزشی انقلاب"},"split":"dev"}
+{"text":"هر وقت گفتم کلینیک منظورم درمانگاه فارابی است","intent":"LEARN_ALIAS","slots":{"aliasKey":"کلینیک","aliasValue":"درمانگاه فارابی"},"split":"dev"}
+{"text":"منظورم از شرکت همان کارنو صنعت است","intent":"LEARN_ALIAS","slots":{"aliasKey":"شرکت","aliasValue":"کارنو صنعت"},"split":"dev"}
+{"text":"هر وقت میگم انبار، یعنی انبار مرکزی جاده قدیم","intent":"LEARN_ALIAS","slots":{"aliasKey":"انبار","aliasValue":"انبار مرکزی جاده قدیم"},"split":"dev"}
+{"text":"از این به بعد هر وقت میگم استاد منظورم دکتر رضایی است","intent":"LEARN_ALIAS","slots":{"aliasKey":"استاد","aliasValue":"دکتر رضایی"},"split":"dev"}
+{"text":"هر وقت میگم مزرعه منظورم باغ شهریار است","intent":"LEARN_ALIAS","slots":{"aliasKey":"مزرعه","aliasValue":"باغ شهریار"},"split":"dev"}
+{"text":"هر وقت گفتم بانک منظورم شعبه مرکزی ملت هست","intent":"LEARN_ALIAS","slots":{"aliasKey":"بانک","aliasValue":"شعبه مرکزی ملت"},"split":"dev"}
+{"text":"منظورم از داداش همان امیرحسین است","intent":"LEARN_ALIAS","slots":{"aliasKey":"داداش","aliasValue":"امیرحسین"},"split":"dev"}
+{"text":"هر وقت میگم پروژه منظورم فاز سوم کارنو است","intent":"LEARN_ALIAS","slots":{"aliasKey":"پروژه","aliasValue":"فاز سوم کارنو"},"split":"dev"}
+{"text":"هر وقت می‌گم مغازه، منظورم فروشگاه سعادت است","intent":"LEARN_ALIAS","slots":{"aliasKey":"مغازه","aliasValue":"فروشگاه سعادت"},"split":"dev"}
+{"text":"هر وقت میگم «سایت» منظورم دفتر مرکزی است","intent":"LEARN_ALIAS","slots":{"aliasKey":"سایت","aliasValue":"دفتر مرکزی"},"split":"test"}
+{"text":"هر وقت میگم خانه منظورم آپارتمان ولیعصر است","intent":"LEARN_ALIAS","slots":{"aliasKey":"خانه","aliasValue":"آپارتمان ولیعصر"},"split":"test"}
+{"text":"از این به بعد هر وقت میگم سالن یک یعنی مرغداری شمال","intent":"LEARN_ALIAS","slots":{"aliasKey":"سالن یک","aliasValue":"مرغداری شمال"},"split":"test"}
+{"text":"هر وقت گفتم حسابدار یعنی خانم کریمی","intent":"LEARN_ALIAS","slots":{"aliasKey":"حسابدار","aliasValue":"خانم کریمی"},"split":"test"}
+{"text":"هر وقت میگم محل کار منظورم کارخانه شیرآلات هست","intent":"LEARN_ALIAS","slots":{"aliasKey":"محل کار","aliasValue":"کارخانه شیرآلات"},"split":"test"}
+{"text":"منظورم از آزمایشگاه همان مرکز پاتولوژی پارس است","intent":"LEARN_ALIAS","slots":{"aliasKey":"آزمایشگاه","aliasValue":"مرکز پاتولوژی پارس"},"split":"test"}
+{"text":"هر وقت می‌گم رفیق یعنی سجاد","intent":"LEARN_ALIAS","slots":{"aliasKey":"رفیق","aliasValue":"سجاد"},"split":"test"}
+{"text":"هر وقت گفتم پارک منظورم بوستان ملت است","intent":"LEARN_ALIAS","slots":{"aliasKey":"پارک","aliasValue":"بوستان ملت"},"split":"test"}
+{"text":"از این به بعد هر وقت گفتم کتابخانه منظورم قرائت‌خانه مرکزی است","intent":"LEARN_ALIAS","slots":{"aliasKey":"کتابخانه","aliasValue":"قرائت‌خانه مرکزی"},"split":"test"}
+{"text":"هر وقت میگم دکتر منظورم کلینیک مهر است","intent":"LEARN_ALIAS","slots":{"aliasKey":"دکتر","aliasValue":"کلینیک مهر"},"split":"test"}
+{"text":"هر وقت میگم تیم یعنی گروه فنی","intent":"LEARN_ALIAS","slots":{"aliasKey":"تیم","aliasValue":"گروه فنی"},"split":"test"}
+{"text":"منظورم از فروشگاه همان سوپرمارکت بهار است","intent":"LEARN_ALIAS","slots":{"aliasKey":"فروشگاه","aliasValue":"سوپرمارکت بهار"},"split":"test"}
+{"text":"هر وقت گفتم سرکار منظورم شرکت پتروشیمی است","intent":"LEARN_ALIAS","slots":{"aliasKey":"سرکار","aliasValue":"شرکت پتروشیمی"},"split":"test"}
+{"text":"هر وقت میگم مسجد یعنی حسینیه محله","intent":"LEARN_ALIAS","slots":{"aliasKey":"مسجد","aliasValue":"حسینیه محله"},"split":"test"}
+{"text":"از این به بعد هر وقت میگم دفتر دو منظورم شعبه ونک است","intent":"LEARN_ALIAS","slots":{"aliasKey":"دفتر دو","aliasValue":"شعبه ونک"},"split":"test"}
+{"text":"هر وقت میگم باغ منظورم ویلای لواسان هست","intent":"LEARN_ALIAS","slots":{"aliasKey":"باغ","aliasValue":"ویلای لواسان"},"split":"test"}
+{"text":"هر وقت گفتم مربی یعنی آقای ناصری","intent":"LEARN_ALIAS","slots":{"aliasKey":"مربی","aliasValue":"آقای ناصری"},"split":"test"}
+{"text":"منظورم از همکار همان مهدی کاظمی است","intent":"LEARN_ALIAS","slots":{"aliasKey":"همکار","aliasValue":"مهدی کاظمی"},"split":"test"}
+{"text":"هر وقت میگم کارخونه منظورم خط تولید دوم است","intent":"LEARN_ALIAS","slots":{"aliasKey":"کارخونه","aliasValue":"خط تولید دوم"},"split":"test"}
+{"text":"هر وقت میگم سالن کنفرانس یعنی اتاق ۲۰۲","intent":"LEARN_ALIAS","slots":{"aliasKey":"سالن کنفرانس","aliasValue":"اتاق ۲۰۲"},"split":"test"}
+{"text":"هر وقت گفتم پمپ بنزین منظورم جایگاه آزادی هست","intent":"LEARN_ALIAS","slots":{"aliasKey":"پمپ بنزین","aliasValue":"جایگاه آزادی"},"split":"test"}
+{"text":"هر وقت میگم نمایشگاه منظورم مصلی است","intent":"LEARN_ALIAS","slots":{"aliasKey":"نمایشگاه","aliasValue":"مصلی"},"split":"test"}
+{"text":"منظورم از استادکار همان آقای حسینی است","intent":"LEARN_ALIAS","slots":{"aliasKey":"استادکار","aliasValue":"آقای حسینی"},"split":"test"}
+{"text":"هر وقت میگم کافه یعنی کافه هنر","intent":"LEARN_ALIAS","slots":{"aliasKey":"کافه","aliasValue":"کافه هنر"},"split":"test"}
+{"text":"از این به بعد هر وقت میگم آموزشگاه منظورم زبانکده بهار است","intent":"LEARN_ALIAS","slots":{"aliasKey":"آموزشگاه","aliasValue":"زبانکده بهار"},"split":"test"}
+{"text":"اسم من رضا هست","intent":"LEARN_FACT","slots":{"aliasKey":"owner_name","aliasValue":"رضا"},"split":"dev"}
+{"text":"نام من علی کاظمی است","intent":"LEARN_FACT","slots":{"aliasKey":"owner_name","aliasValue":"علی کاظمی"},"split":"dev"}
+{"text":"یاد بگیر جلسه هفتگی شنبه ساعت ۱۰ صبح است","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"به خاطر بسپار که رمز گاوصندوق ۴۴۱۲ نیست بلکه ۱۱۲۲ است","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"ذخیره کن پلاک ماشینم ۶۸ ب ۴۲۱ است","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"یادداشت کن امروز ۳ میلیون تومان خرید داشتم","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"یادت باشه من قهوه تلخ دوست دارم","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"یادت بمونه دمای استاندارد سالن ۳۰ درجه است","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"بنویس فردا نوبت دندانپزشکی دارم","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"اینو یاد بگیر که ساعت کاریم از ۸ تا ۴ است","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"این را به خاطر بسپار مدیر بخش آقای سهرابی است","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"ذخیره کن کد پستی منزل ۱۴۱۵۵ است","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"اسم من سارا هست","intent":"LEARN_FACT","slots":{"aliasKey":"owner_name","aliasValue":"سارا"},"split":"dev"}
+{"text":"یادداشت کن لیست خرید شیر و نان و تخم مرغ است","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"یادت باشه داروهای فشار خون را صبح‌ها می‌خورم","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"لطفاً اسم من محمد است","intent":"LEARN_FACT","slots":{"aliasKey":"owner_name","aliasValue":"محمد"},"split":"test"}
+{"text":"یاد بگیر تاریخ بیمه ماشین ۱۵ اردیبهشت است","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادت باشه من به بادام زمینی حساسیت دارم","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"ذخیره کن گروه خونی من O مثبت است","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"بنویس پروژه آلفا تحویل آخر ماه دارد","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"به خاطر بسپار شماره اشتراک آب ۹۸۴۵ است","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادداشت کن هزینه تعمیر موتور ۵ میلیون شد","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادت بمونه کلید یدک داخل کشوی میز است","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"اسم من مریم هست","intent":"LEARN_FACT","slots":{"aliasKey":"owner_name","aliasValue":"مریم"},"split":"test"}
+{"text":"یاد بگیر سررسید قسط بانک پنجم هر ماه است","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"ذخیره کن رمز مودم دفتر کارنو۲۰۲۵ است","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"بنویس فردا با مهندس نادری قرار ملاقات دارم","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادت باشه کلاس شنا روزهای زوج برگزار میشه","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"به خاطر بسپار وزن خوراک امروز ۳۲۰ کیلوگرم بود","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"اینو ذخیره کن شماره شاسی در داشبورد است","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادداشت کن آبگرمکن سالن سرویس شد","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادت بمونه اسم سگ من تدی است","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یاد بگیر من صبح‌ها ساعت ۶ بیدار می‌شوم","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"نام من اميرحسين هست","intent":"LEARN_FACT","slots":{"aliasKey":"owner_name","aliasValue":"اميرحسين"},"split":"test"}
+{"text":"بنویس کتاب عادت های اتمی را خیلی دوست دارم","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"به خاطر بسپار واکسن طیور سه‌شنبه تزریق می‌شود","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"ذخیره کن سایز کفش من ۴۳ است","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادت باشه قرار دوشنبه ساعت ۱۱ لغو شد","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادداشت کن مصرف برق امروز ۵۰ کیلووات بود","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یاد بگیر من چای سبز بیشتر دوست دارم","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"دفتر را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"از حافظه پاک کن رمز مودم را","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"پلاک ماشین را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"یادداشت دیروز را از حافظه حذف کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"یادت بره شماره قبلی رو","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"همه نکات جلسه رو فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"از حافظه پاک کن شماره اشتراک را","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"آدرس قدیمی را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"کلمه کلیدی انبار را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"این یادداشت را از حافظه پاک کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"لیست خرید را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"حافظه مربوط به پروژه قبلی را حذف کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"بیمه ماشین را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"رمز وایفای رو از حافظه پاک کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"قرص فشار خون رو فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
+{"text":"نکته دمای سالن را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"کلید یدک را از حافظه پاک کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"ساعت کاری را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"قرار دندانپزشکی رو فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"یادت بره چی درباره باشگاه گفتم","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"یادداشت خرید نان را حذف کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"دفتر قدیمی را از حافظه فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"کد پستی رو از حافظه پاک کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"گروه خونی را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"مترادف کارگاه را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"این نکته را از حافظه حذف کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"مبلغ ۳ میلیون را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"شماره قبلی علی را از حافظه پاک کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"یادداشت دیروزم رو فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"جلسه شنبه را از حافظه پاک کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"سایز کفش را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"نام مهندس نادری را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"واکسن طیور را از حافظه حذف کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"آدرس پارک را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"یادت بره کافه هنر رو","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"یادداشت برق مصرفی را پاک کن از حافظه","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"حساسیت غذایی را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"این عبارت رو فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"توضیح کلینیک را از حافظه پاک کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"سوله شرق را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"test"}
+{"text":"حافظه رو بگو","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"چی یادت هست؟","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"چیا ذخیره کردی؟","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"لیست حافظه رو نشون بده","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"توی حافظه چی داری؟","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"گزارش حافظه رو بده","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"مرور حافظه","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"چه چیزهایی یادت مونده؟","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"فهرست حافظه را بخوان","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"حافظه‌ات چیا داره؟","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"چیا بلدی از من؟","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"حافظه را نشان بده","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"در حافظه چه چیزهایی ذخیره شده؟","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"چی یادته از من؟","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"حافظه شخصی رو بگو","intent":"LIST_MEMORY","slots":{},"split":"dev"}
+{"text":"لیست حافظه چیه؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"چیزهایی که ذخیره کردی را بگو","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"لطفاً گزارش حافظه را بخوان","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"چی تو حافظه‌ات داری سول؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"یادداشت‌های حافظه رو بگو","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"چیا یادت هست درباره من؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"مرور حافظه رو انجام بده","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"حافظه ت چی داره؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"فهرست یادداشت‌های حافظه را بگو","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"چی ذخیره کردی برام؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"توی حافظه‌ات چیا هست؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"حافظه منو بخون","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"چه چیزهایی ذخیره داری؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"حافظه رو مرور کن","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"بگو چی یادت هست","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"لیست اطلاعات حافظه چیه؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"از حافظه چی می‌دونی؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"محتوای حافظه را بگو","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"چیا تو حافظه ذخیره شده؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"نشون بده توی حافظه چی داری","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"گزارش کامل حافظه چیه","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"چی یادت مونده؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"فهرست حافظه رو بگو","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"چیا یادته؟","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"حافظه رو برام بخوان","intent":"LIST_MEMORY","slots":{},"split":"test"}
+{"text":"شماره علی ۰۹۱۲۳۴۵۶۷۸۹ است","intent":"SAVE_PERSON","slots":{"contact":"علی","phone":"09123456789"},"split":"dev"}
+{"text":"رضا همکار منه ۰۹۱۲۱۱۱۲۲۳۳","intent":"SAVE_PERSON","slots":{"contact":"رضا","phone":"09121112233"},"split":"dev"}
+{"text":"مهدی دوست منه شماره‌اش ۰۹۳۵۷۷۷۸۸۹۹ است","intent":"SAVE_PERSON","slots":{"contact":"مهدی","phone":"09357778899"},"split":"dev"}
+{"text":"شماره آقای احمدی ۰۹۱۵۹۹۹۱۰۱۰ هست","intent":"SAVE_PERSON","slots":{"phone":"09159991010"},"split":"dev"}
+{"text":"سجاد مدیر بخش ۰۹۱۲۸۸۸۴۴۵۵","intent":"SAVE_PERSON","slots":{"contact":"سجاد","phone":"09128884455"},"split":"dev"}
+{"text":"شماره خانم کریمی ۰۹۳۶۲۲۲۳۳۴۴","intent":"SAVE_PERSON","slots":{"phone":"09362223344"},"split":"dev"}
+{"text":"برادرم امیر ۰۹۱۹۴۴۴۵۵۶۶ است","intent":"SAVE_PERSON","slots":{"phone":"09194445566"},"split":"dev"}
+{"text":"حسین ۰۹۱۲۷۶۵۴۳۲۱ همکار منه","intent":"SAVE_PERSON","slots":{"contact":"حسین","phone":"09127654321"},"split":"dev"}
+{"text":"شماره دکتر راد ۰۹۱۲۳۳۳۴۴۵۵","intent":"SAVE_PERSON","slots":{"phone":"09123334455"},"split":"dev"}
+{"text":"مریم خواهر منه ۰۹۳۰۵۵۵۶۶۷۷","intent":"SAVE_PERSON","slots":{"phone":"09305556677"},"split":"dev"}
+{"text":"مهندس نادری ۰۹۱۲۶۵۴۹۸۷۰","intent":"SAVE_PERSON","slots":{"contact":"مهندس نادری","phone":"09126549870"},"split":"dev"}
+{"text":"کاظم ۰۹۱۷۱۲۳۴۵۶۷","intent":"SAVE_PERSON","slots":{"contact":"کاظم","phone":"09171234567"},"split":"dev"}
+{"text":"شماره سعید دوست منه ۰۹۳۸۹۸۷۶۵۴۳","intent":"SAVE_PERSON","slots":{"phone":"09389876543"},"split":"dev"}
+{"text":"فرهاد ۰۹۱۲۱۰۱۰۱۰۱","intent":"SAVE_PERSON","slots":{"contact":"فرهاد","phone":"09121010101"},"split":"dev"}
+{"text":"شماره داوود همکار ۰۹۱۶۲۳۴۵۶۷۸ است","intent":"SAVE_PERSON","slots":{"phone":"09162345678"},"split":"dev"}
+{"text":"شماره یاسر ۰۹۱۲۹۹۹۸۸۷۷ است","intent":"SAVE_PERSON","slots":{"contact":"یاسر","phone":"09129998877"},"split":"test"}
+{"text":"بهروز دوست منه ۰۹۳۳۱۱۱۲۲۳۳","intent":"SAVE_PERSON","slots":{"contact":"بهروز","phone":"09331112233"},"split":"test"}
+{"text":"شماره کامران ۰۹۱۲۴۵۶۷۸۹۰ هست","intent":"SAVE_PERSON","slots":{"contact":"کامران","phone":"09124567890"},"split":"test"}
+{"text":"نیما همکار منه ۰۹۱۹۱۲۳۴۵۶۷","intent":"SAVE_PERSON","slots":{"contact":"نیما","phone":"09191234567"},"split":"test"}
+{"text":"شماره خانم شریفی ۰۹۳۵۱۱۱۲۲۴۴ است","intent":"SAVE_PERSON","slots":{"phone":"09351112244"},"split":"test"}
+{"text":"جواد ۰۹۱۴۵۵۵۶۶۷۷","intent":"SAVE_PERSON","slots":{"contact":"جواد","phone":"09145556677"},"split":"test"}
+{"text":"شماره استاد پناهی ۰۹۱۲۶۶۶۷۷۸۸ است","intent":"SAVE_PERSON","slots":{"phone":"09126667788"},"split":"test"}
+{"text":"زهرا خواهر منه ۰۹۳۷۸۸۸۹۹۰۰","intent":"SAVE_PERSON","slots":{"phone":"09378889900"},"split":"test"}
+{"text":"شماره مسعود ۰۹۱۲۷۷۷۶۶۵۵ است","intent":"SAVE_PERSON","slots":{"contact":"مسعود","phone":"09127776655"},"split":"test"}
+{"text":"پیمان مدیر ۰۹۱۳۴۴۴۵۵۶۶","intent":"SAVE_PERSON","slots":{"phone":"09134445566"},"split":"test"}
+{"text":"شماره سهراب ۰۹۱۲۳۲۱۶۵۴۹","intent":"SAVE_PERSON","slots":{"contact":"سهراب","phone":"09123216549"},"split":"test"}
+{"text":"هادی همکار ۰۹۳۹۸۷۶۵۴۳۲ است","intent":"SAVE_PERSON","slots":{"phone":"09398765432"},"split":"test"}
+{"text":"شماره آرش ۰۹۱۲۱۱۱۲۲۴۴ هست","intent":"SAVE_PERSON","slots":{"contact":"آرش","phone":"09121112244"},"split":"test"}
+{"text":"مجید دوست منه ۰۹۰۱۱۲۳۴۵۶۷","intent":"SAVE_PERSON","slots":{"contact":"مجید","phone":"09011234567"},"split":"test"}
+{"text":"شماره حامد ۰۹۱۲۸۷۶۵۴۳۲ است","intent":"SAVE_PERSON","slots":{"contact":"حامد","phone":"09128765432"},"split":"test"}
+{"text":"پارسا ۰۹۳۶۱۲۳۹۸۷۶","intent":"SAVE_PERSON","slots":{"contact":"پارسا","phone":"09361239876"},"split":"test"}
+{"text":"شماره نازنین همکار منه ۰۹۱۲۵۴۳۲۱۰۹","intent":"SAVE_PERSON","slots":{"phone":"09125432109"},"split":"test"}
+{"text":"نوید ۰۹۱۸۷۶۵۴۳۲۱","intent":"SAVE_PERSON","slots":{"contact":"نوید","phone":"09187654321"},"split":"test"}
+{"text":"شماره رحیم ۰۹۱۲۳۴۵۹۸۷۶ است","intent":"SAVE_PERSON","slots":{"contact":"رحیم","phone":"09123459876"},"split":"test"}
+{"text":"سامان دوست منه ۰۹۳۵۶۷۸۱۲۳۴","intent":"SAVE_PERSON","slots":{"contact":"سامان","phone":"09356781234"},"split":"test"}
+{"text":"شماره مهندس قاسمی ۰۹۱۲۲۲۲۳۳۴۴","intent":"SAVE_PERSON","slots":{"phone":"09122223344"},"split":"test"}
+{"text":"میلاد ۰۹۱۹۹۸۷۶۵۴۳ همکار منه","intent":"SAVE_PERSON","slots":{"contact":"میلاد","phone":"09199876543"},"split":"test"}
+{"text":"شماره بابک ۰۹۱۲۶۷۸۹۰۱۲ است","intent":"SAVE_PERSON","slots":{"contact":"بابک","phone":"09126789012"},"split":"test"}
+{"text":"پویا ۰۹۳۳۹۹۹۱۱۱۲","intent":"SAVE_PERSON","slots":{"contact":"پویا","phone":"09339991112"},"split":"test"}
+{"text":"شماره اکبر آقای همکار ۰۹۱۲۴۳۲۱۵۶۷","intent":"SAVE_PERSON","slots":{"phone":"09124321567"},"split":"test"}
+{"text":"آدرس شرکت خیابان ولیعصر پلاک ۱۲ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"شرکت","aliasValue":"خیابان ولیعصر پلاک 12"},"split":"dev"}
+{"text":"محل دفتر کارنو صنعت شهرک صنعتی است","intent":"SAVE_LOCATION","slots":{"aliasKey":"دفتر"},"split":"dev"}
+{"text":"آدرس خانه میدان ونک خیابان ملاصدرا است","intent":"SAVE_LOCATION","slots":{"aliasKey":"خانه"},"split":"dev"}
+{"text":"مکان منزل سعادت آباد کوچه سوم است","intent":"SAVE_LOCATION","slots":{"aliasKey":"منزل"},"split":"dev"}
+{"text":"آدرس انبار جاده مخصوص کیلومتر ۱۵ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"انبار"},"split":"dev"}
+{"text":"محل کارگاه بلوار فردوس شرق پلاک ۸ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"کارگاه"},"split":"dev"}
+{"text":"آدرس باشگاه خیابان شریعتی پلاک ۴۵ هست","intent":"SAVE_LOCATION","slots":{"aliasKey":"باشگاه"},"split":"dev"}
+{"text":"نشانی شرکت میدان آرژانتین کوچه اول است","intent":"SAVE_LOCATION","slots":{"aliasKey":"شرکت"},"split":"dev"}
+{"text":"آدرس کلینیک خیابان آزادی نبش کوچه چهارم است","intent":"SAVE_LOCATION","slots":{"aliasKey":"کلینیک"},"split":"dev"}
+{"text":"مکان مزرعه کیلومتر ده جاده کرج است","intent":"SAVE_LOCATION","slots":{"aliasKey":"مزرعه"},"split":"dev"}
+{"text":"محل شرکت برج نگین طبقه پنجم است","intent":"SAVE_LOCATION","slots":{"aliasKey":"شرکت"},"split":"dev"}
+{"text":"آدرس دانشگاه خیابان انقلاب است","intent":"SAVE_LOCATION","slots":{"aliasKey":"دانشگاه"},"split":"dev"}
+{"text":"آدرس مغازه پاساژ علاءالدین طبقه دوم هست","intent":"SAVE_LOCATION","slots":{"aliasKey":"مغازه"},"split":"dev"}
+{"text":"نشانی منزل شهرک غرب فاز ۴ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"منزل"},"split":"dev"}
+{"text":"محل دفتر خیابان فاطمی پلاک ۲۱ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"دفتر"},"split":"dev"}
+{"text":"آدرس شرکت خیابان بهشتی پلاک ۵۴ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"شرکت"},"split":"test"}
+{"text":"آدرس خانه نیاوران خیابان یاسر است","intent":"SAVE_LOCATION","slots":{"aliasKey":"خانه"},"split":"test"}
+{"text":"محل کارنو بلوار میرداماد پلاک ۱۰ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"کارنو"},"split":"test"}
+{"text":"مکان دفتر مرکزی خیابان سهروردی شمالی است","intent":"SAVE_LOCATION","slots":{"aliasKey":"دفتر"},"split":"test"}
+{"text":"آدرس منزل تهرانپارس فلکه اول است","intent":"SAVE_LOCATION","slots":{"aliasKey":"منزل"},"split":"test"}
+{"text":"نشانی کارگاه جاده ساوه شهرک بهارستان است","intent":"SAVE_LOCATION","slots":{"aliasKey":"کارگاه"},"split":"test"}
+{"text":"محل باشگاه تجریش خیابان مقصودبیک است","intent":"SAVE_LOCATION","slots":{"aliasKey":"باشگاه"},"split":"test"}
+{"text":"آدرس کلینیک پونک بلوار همیلا است","intent":"SAVE_LOCATION","slots":{"aliasKey":"کلینیک"},"split":"test"}
+{"text":"مکان مزرعه ورامین جاده جوادآباد است","intent":"SAVE_LOCATION","slots":{"aliasKey":"مزرعه"},"split":"test"}
+{"text":"آدرس بیمارستان بلوار کشاورز پلاک ۳ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"بیمارستان"},"split":"test"}
+{"text":"نشانی داروخانه میدان انقلاب است","intent":"SAVE_LOCATION","slots":{"aliasKey":"داروخانه"},"split":"test"}
+{"text":"محل سالن جاده رشت کیلومتر ۵ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"سالن"},"split":"test"}
+{"text":"آدرس بانک خیابان مطهری پلاک ۱۸ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"بانک"},"split":"test"}
+{"text":"مکان کافه خیابان کریمخان پلاک ۳۰ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"کافه"},"split":"test"}
+{"text":"آدرس نمایشگاه بزرگراه چمران است","intent":"SAVE_LOCATION","slots":{"aliasKey":"نمایشگاه"},"split":"test"}
+{"text":"محل پارک خیابان ولیعصر است","intent":"SAVE_LOCATION","slots":{"aliasKey":"پارک"},"split":"test"}
+{"text":"آدرس آزمایشگاه خیابان شریعتی پلاک ۸۸ هست","intent":"SAVE_LOCATION","slots":{"aliasKey":"آزمایشگاه"},"split":"test"}
+{"text":"نشانی انبار جاده قدیم کرج است","intent":"SAVE_LOCATION","slots":{"aliasKey":"انبار"},"split":"test"}
+{"text":"مکان فروشگاه خیابان فرشته پلاک ۴ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"فروشگاه"},"split":"test"}
+{"text":"آدرس رستوران دریاچه چیتگر بلوار کوهک است","intent":"SAVE_LOCATION","slots":{"aliasKey":"رستوران"},"split":"test"}
+{"text":"محل دفتر میدان جهاد پلاک ۷۷ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"دفتر"},"split":"test"}
+{"text":"آدرس منزل صادقیه بلوار فردوس است","intent":"SAVE_LOCATION","slots":{"aliasKey":"منزل"},"split":"test"}
+{"text":"مکان استخر خیابان اندرزگو پلاک ۱۹ است","intent":"SAVE_LOCATION","slots":{"aliasKey":"استخر"},"split":"test"}
+{"text":"آدرس آموزشگاه میدان ولیعصر است","intent":"SAVE_LOCATION","slots":{"aliasKey":"آموزشگاه"},"split":"test"}
+{"text":"نشانی شرکت بزرگراه نواب پلاک ۲ هست","intent":"SAVE_LOCATION","slots":{"aliasKey":"شرکت"},"split":"test"}
+{"text":"الان شرکت هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"شرکت"},"split":"dev"}
+{"text":"من الان در خانه هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"خانه"},"split":"dev"}
+{"text":"الان توی دفترم هستم","intent":"SET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"رسیدم شرکت","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"شرکت"},"split":"dev"}
+{"text":"من الان به کارگاه رسیدم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"کارگاه"},"split":"dev"}
+{"text":"اومدم خانه","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"خانه"},"split":"dev"}
+{"text":"موقعیت فعلی من سالن دوم است","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"سالن دوم"},"split":"dev"}
+{"text":"الان در دانشگاه هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"دانشگاه"},"split":"dev"}
+{"text":"رسیدم به دفتر","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"دفتر"},"split":"dev"}
+{"text":"من الان توی راه هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"راه"},"split":"dev"}
+{"text":"الان کلینیک هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"کلینیک"},"split":"dev"}
+{"text":"موقعیت من الان باغ شهریار است","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"باغ شهریار"},"split":"dev"}
+{"text":"آمدم مزرعه","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"مزرعه"},"split":"dev"}
+{"text":"الان در فرودگاه هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"فرودگاه"},"split":"dev"}
+{"text":"من الان انبار هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"انبار"},"split":"dev"}
+{"text":"الان تو شرکت هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"شرکت"},"split":"test"}
+{"text":"رسیدم منزل","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"منزل"},"split":"test"}
+{"text":"من الان در دفتر هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"دفتر"},"split":"test"}
+{"text":"اومدم باشگاه","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"باشگاه"},"split":"test"}
+{"text":"موقعیت فعلی من کارخانه است","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"کارخانه"},"split":"test"}
+{"text":"الان بیمارستان هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"بیمارستان"},"split":"test"}
+{"text":"رسیدم به کارگاه","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"کارگاه"},"split":"test"}
+{"text":"من الان توی مغازه هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"مغازه"},"split":"test"}
+{"text":"الان پارک هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"پارک"},"split":"test"}
+{"text":"آمدم شرکت","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"شرکت"},"split":"test"}
+{"text":"من الان خانه هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"خانه"},"split":"test"}
+{"text":"رسیدم فرودگاه","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"فرودگاه"},"split":"test"}
+{"text":"موقعیت فعلی من نمایشگاه است","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"نمایشگاه"},"split":"test"}
+{"text":"الان توی آزمایشگاه هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"آزمایشگاه"},"split":"test"}
+{"text":"رسیدم به خانه","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"خانه"},"split":"test"}
+{"text":"اومدم دفتر","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"دفتر"},"split":"test"}
+{"text":"من الان سالن هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"سالن"},"split":"test"}
+{"text":"الان در کافه هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"کافه"},"split":"test"}
+{"text":"رسیدم بانک","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"بانک"},"split":"test"}
+{"text":"من الان به منزل رسیدم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"منزل"},"split":"test"}
+{"text":"الان تو جاده هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"جاده"},"split":"test"}
+{"text":"موقعیت من الان کلینیک مهر است","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"کلینیک مهر"},"split":"test"}
+{"text":"الان مسجد هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"مسجد"},"split":"test"}
+{"text":"رسیدم به سوله","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"سوله"},"split":"test"}
+{"text":"من الان توی کتابخانه هستم","intent":"SET_CURRENT_LOCATION","slots":{"locationReference":"کتابخانه"},"split":"test"}
+{"text":"الان کجام؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"موقعیت فعلی من کجاست؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"کجا هستم الان؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"موقعیتم چیه؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"الان کجا هستم؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"موقعیت فعلی چیه؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"موقعیتم کجاست؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"من کجا هستم؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"موقعیت من کجاست؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"موقعیت فعلی را بگو","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"بگو الان کجام","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"موقعیتم چیست؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"الان موقعیت فعلی کجاست؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"من الان کجام سول؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"موقعیتم رو بهم بگو","intent":"GET_CURRENT_LOCATION","slots":{},"split":"dev"}
+{"text":"الان کجا هستم سول؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیت فعلی من چیه؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیتم کجا ثبت شده؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"کجا هستم؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"سول الان کجام؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیت فعلی رو نشون بده","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیت من الان کجاست؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"لطفاً بگو کجا هستم","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"الان توی چه موقعیتی هستم؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیتم را بخوان","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"من الان کجا هستم؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیت فعلی چیست؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"بهم بگو موقعیتم کجاست","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"کجام الان؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیتم چجوری ثبت شده؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیت فعلی من رو بگو","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"کجا هستم الان دقیقاً؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"الان کجام دقیقاً؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیت فعلی کدام جا است؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"می‌تونی بگی الان کجام؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیتم الان چیه؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"الان موقعیتم کجاست؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"بگو کجا هستم","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیت فعلی من چیست؟","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"موقعیتم رو چک کن","intent":"GET_CURRENT_LOCATION","slots":{},"split":"test"}
+{"text":"به علی زنگ بزن و بگو بیاد شرکت","intent":"CALL","slots":{"contact":"علی","message":"بیاد شرکت","locationReference":"WORK"},"split":"dev"}
+{"text":"با علی تماس بگیر و بگو بیاد شرکت","intent":"CALL","slots":{"contact":"علی","message":"بیاد شرکت"},"split":"dev"}
+{"text":"به رضا زنگ بزن","intent":"CALL","slots":{"contact":"رضا"},"split":"dev"}
+{"text":"با مادر تماس بگیر","intent":"CALL","slots":{"contact":"مادر"},"split":"dev"}
+{"text":"شماره ۰۹۱۲۳۴۵۶۷۸۹ را بگیر","intent":"CALL","slots":{"phone":"09123456789"},"split":"dev"}
+{"text":"تماس با آقای احمدی","intent":"CALL","slots":{"contact":"احمدی"},"split":"dev"}
+{"text":"به مهدی زنگ بزن بگو دیر نرسه","intent":"CALL","slots":{"contact":"مهدی"},"split":"dev"}
+{"text":"با سجاد یه تماس بگیر","intent":"CALL","slots":{"contact":"سجاد"},"split":"dev"}
+{"text":"لطفاً به مریم زنگ بزن","intent":"CALL","slots":{"contact":"مریم"},"split":"dev"}
+{"text":"شماره کاظم رو بگیر","intent":"CALL","slots":{"contact":"کاظم"},"split":"dev"}
+{"text":"به مهندس نادری زنگ بزن و بگو منتظریم","intent":"CALL","slots":{"contact":"مهندس نادری"},"split":"dev"}
+{"text":"تماس با دکتر راد","intent":"CALL","slots":{"contact":"دکتر راد"},"split":"dev"}
+{"text":"به خانم کریمی زنگ بزن","intent":"CALL","slots":{"contact":"کریمی"},"split":"dev"}
+{"text":"با پدر تماس بگیر","intent":"CALL","slots":{"contact":"پدر"},"split":"dev"}
+{"text":"یه زنگ به حسین بزن","intent":"CALL","slots":{"contact":"حسین"},"split":"dev"}
+{"text":"به علی زنگ بزن","intent":"CALL","slots":{"contact":"علی"},"split":"test"}
+{"text":"با رضا تماس بگیر","intent":"CALL","slots":{"contact":"رضا"},"split":"test"}
+{"text":"شماره یاسر را بگیر","intent":"CALL","slots":{"contact":"یاسر"},"split":"test"}
+{"text":"به برادرم زنگ بزن بگو برسه خونه","intent":"CALL","slots":{"contact":"برادرم"},"split":"test"}
+{"text":"تماس با سعید","intent":"CALL","slots":{"contact":"سعید"},"split":"test"}
+{"text":"با فرهاد یه تماس بگیر و بگو آماده بشه","intent":"CALL","slots":{"contact":"فرهاد"},"split":"test"}
+{"text":"به کامران زنگ بزن","intent":"CALL","slots":{"contact":"کامران"},"split":"test"}
+{"text":"شماره ۰۹۳۵۷۷۷۸۸۹۹ رو بگیر","intent":"CALL","slots":{"phone":"09357778899"},"split":"test"}
+{"text":"با خانم شریفی تماس بگیر","intent":"CALL","slots":{"contact":"شریفی"},"split":"test"}
+{"text":"به جواد زنگ بزن بگو کلید رو بیاره","intent":"CALL","slots":{"contact":"جواد"},"split":"test"}
+{"text":"تماس بگیر با مدیر","intent":"CALL","slots":{"contact":"مدیر"},"split":"test"}
+{"text":"به نیما زنگ بزن","intent":"CALL","slots":{"contact":"نیما"},"split":"test"}
+{"text":"با سارا تماس بگیر","intent":"CALL","slots":{"contact":"سارا"},"split":"test"}
+{"text":"لطفاً شماره داوود را بگیر","intent":"CALL","slots":{"contact":"داوود"},"split":"test"}
+{"text":"به مسعود زنگ بزن بگو کار انجام شد","intent":"CALL","slots":{"contact":"مسعود"},"split":"test"}
+{"text":"تماس با پیمان","intent":"CALL","slots":{"contact":"پیمان"},"split":"test"}
+{"text":"با سهراب تماس بگیر","intent":"CALL","slots":{"contact":"سهراب"},"split":"test"}
+{"text":"به هادی زنگ بزن","intent":"CALL","slots":{"contact":"هادی"},"split":"test"}
+{"text":"با آرش یه تماس بگیر","intent":"CALL","slots":{"contact":"آرش"},"split":"test"}
+{"text":"تلفن بزن به مجید","intent":"CALL","slots":{},"split":"test"}
+{"text":"به حامد زنگ بزن بگو ساعت ۴ دفتر باشه","intent":"CALL","slots":{"contact":"حامد"},"split":"test"}
+{"text":"با پارسا تماس بگیر","intent":"CALL","slots":{"contact":"پارسا"},"split":"test"}
+{"text":"به نوید زنگ بزن","intent":"CALL","slots":{"contact":"نوید"},"split":"test"}
+{"text":"شماره بابک رو بگیر لطفاً","intent":"CALL","slots":{"contact":"بابک"},"split":"test"}
+{"text":"به سامان زنگ بزن و بگو رسیدم شرکت","intent":"CALL","slots":{"contact":"سامان","locationReference":"WORK"},"split":"test"}
+{"text":"به علی پیام بده ساعت ۵ جلسه داریم","intent":"SEND_SMS","slots":{"contact":"علی"},"split":"dev"}
+{"text":"به رضا پیامک بفرست دارم میام","intent":"SEND_SMS","slots":{"contact":"رضا"},"split":"dev"}
+{"text":"به سجاد اس ام اس بده کلید همراهت باشه","intent":"SEND_SMS","slots":{"contact":"سجاد"},"split":"dev"}
+{"text":"به مادر اطلاع بده من سالم رسیدم","intent":"SEND_SMS","slots":{"contact":"مادر"},"split":"dev"}
+{"text":"به مهدی خبر بده جلسه لغو شد","intent":"SEND_SMS","slots":{"contact":"مهدی"},"split":"dev"}
+{"text":"برای حسین پیام بفرست فاکتور آماده است","intent":"SEND_SMS","slots":{"contact":"حسین"},"split":"dev"}
+{"text":"پیام بده به آقای احمدی که مدارک ارسال شد","intent":"SEND_SMS","slots":{"contact":"احمدی"},"split":"dev"}
+{"text":"به خانم کریمی پیامک بده تا نیم ساعت دیگه میرسم","intent":"SEND_SMS","slots":{"contact":"کریمی"},"split":"dev"}
+{"text":"برای مریم پیام بده زودتر بیا خانه","intent":"SEND_SMS","slots":{"contact":"مریم","locationReference":"HOME"},"split":"dev"}
+{"text":"به کاظم اس ام اس بزن بارگیری انجام شد","intent":"SEND_SMS","slots":{"contact":"کاظم"},"split":"dev"}
+{"text":"به دکتر راد پیام بفرست فردا میام کلینیک","intent":"SEND_SMS","slots":{"contact":"دکتر راد"},"split":"dev"}
+{"text":"برای پدر پیامک بفرست الان دفتر هستم","intent":"SEND_SMS","slots":{"contact":"پدر","locationReference":"OFFICE"},"split":"dev"}
+{"text":"به فرهاد پی ام بده فایل رو دیدم","intent":"SEND_SMS","slots":{"contact":"فرهاد"},"split":"dev"}
+{"text":"به سعید پیام بده دم در منتظرم","intent":"SEND_SMS","slots":{"contact":"سعید"},"split":"dev"}
+{"text":"به داوود پیامک بفرست موتور تعمیر شد","intent":"SEND_SMS","slots":{"contact":"داوود"},"split":"dev"}
+{"text":"به یاسر پیام بده فردا صبح هماهنگ کنیم","intent":"SEND_SMS","slots":{"contact":"یاسر"},"split":"test"}
+{"text":"برای بهروز پیامک بفرست رسیدم شرکت","intent":"SEND_SMS","slots":{"contact":"بهروز","locationReference":"WORK"},"split":"test"}
+{"text":"به کامران اس ام اس بده فاکتور را تایید کنه","intent":"SEND_SMS","slots":{"contact":"کامران"},"split":"test"}
+{"text":"به نیما خبر بده من رسیدم","intent":"SEND_SMS","slots":{"contact":"نیما"},"split":"test"}
+{"text":"به خانم شریفی اطلاع بده فایل ایمیل شد","intent":"SEND_SMS","slots":{"contact":"شریفی"},"split":"test"}
+{"text":"پیامک بده به جواد که ماشین آماده است","intent":"SEND_SMS","slots":{"contact":"جواد"},"split":"test"}
+{"text":"به سارا پیام بده شیر و نان بخره","intent":"SEND_SMS","slots":{"contact":"سارا"},"split":"test"}
+{"text":"برای مسعود پیام بفرست ساعت ۳ زنگ بزنه","intent":"SEND_SMS","slots":{"contact":"مسعود"},"split":"test"}
+{"text":"به پیمان پیام بده پروژه تایید شد","intent":"SEND_SMS","slots":{"contact":"پیمان"},"split":"test"}
+{"text":"به سهراب اس ام اس بفرست ناهار منتظر نمونه","intent":"SEND_SMS","slots":{"contact":"سهراب"},"split":"test"}
+{"text":"برای هادی پیام بده آدرس را بفرسته","intent":"SEND_SMS","slots":{"contact":"هادی"},"split":"test"}
+{"text":"به آرش پیامک بفرست امروز نمیرسم بیام","intent":"SEND_SMS","slots":{"contact":"آرش"},"split":"test"}
+{"text":"به مجید خبر بده بسته تحویل داده شد","intent":"SEND_SMS","slots":{"contact":"مجید"},"split":"test"}
+{"text":"به حامد پیام بده کلید روی میز است","intent":"SEND_SMS","slots":{"contact":"حامد"},"split":"test"}
+{"text":"برای پارسا پیامک بفرست جلسه آنلاینه","intent":"SEND_SMS","slots":{"contact":"پارسا"},"split":"test"}
+{"text":"به نوید پیام بده لیست آماده شد","intent":"SEND_SMS","slots":{"contact":"نوید"},"split":"test"}
+{"text":"به رحیم اطلاع بده ماشین راه افتاد","intent":"SEND_SMS","slots":{"contact":"رحیم"},"split":"test"}
+{"text":"به سامان پیام بده ساعت ۶ خانه هستم","intent":"SEND_SMS","slots":{"contact":"سامان","locationReference":"HOME"},"split":"test"}
+{"text":"برای میلاد پیامک بده رمز عوض شد","intent":"SEND_SMS","slots":{"contact":"میلاد"},"split":"test"}
+{"text":"به بابک پیام بفرست کار تموم شد","intent":"SEND_SMS","slots":{"contact":"بابک"},"split":"test"}
+{"text":"به پویا اس ام اس بفرست فردا می بینمت","intent":"SEND_SMS","slots":{"contact":"پویا"},"split":"test"}
+{"text":"برای اکبر پیام بده بار رسید انبار","intent":"SEND_SMS","slots":{"contact":"اکبر"},"split":"test"}
+{"text":"به امیر پیامک بده من در راهم","intent":"SEND_SMS","slots":{"contact":"امیر"},"split":"test"}
+{"text":"به نازنین پیام بده گزارش رو چک کنه","intent":"SEND_SMS","slots":{"contact":"نازنین"},"split":"test"}
+{"text":"به علی پیام ارسال کن کار انجام شد","intent":"SEND_SMS","slots":{"contact":"علی"},"split":"test"}
+{"text":"وضعیت شرکت را به علی اطلاع بده و بعد نتیجه را به من گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"علی"},"split":"dev"}
+{"text":"وضعیت پروژه را به رضا خبر بده و سپس گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"رضا"},"split":"dev"}
+{"text":"وضعیت سالن را به مهندس نادری اطلاع بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"مهندس نادری"},"split":"dev"}
+{"text":"به سجاد درباره وضعیت دفتر خبر بده و بعد نتیجه را گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"سجاد"},"split":"dev"}
+{"text":"وضعیت تولید را به مدیر اطلاع بده و سپس نتیجه را به من گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"مدیر"},"split":"dev"}
+{"text":"به آقای احمدی وضعیت انبار را اطلاع بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"احمدی"},"split":"dev"}
+{"text":"وضعیت حضور من در شرکت را به علی خبر بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"علی"},"split":"dev"}
+{"text":"به خانم کریمی وضعیت حساب را اطلاع بده و بعد به من گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"کریمی"},"split":"dev"}
+{"text":"وضعیت دستگاه‌ها را به کاظم اطلاع بده و سپس گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"کاظم"},"split":"dev"}
+{"text":"به مهدی درباره وضعیت مزرعه خبر بده و بعد نتیجه را گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"مهدی"},"split":"dev"}
+{"text":"وضعیت کارگاه را به حسین اطلاع بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"حسین"},"split":"dev"}
+{"text":"به فرهاد وضعیت جلسه را خبر بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"فرهاد"},"split":"dev"}
+{"text":"وضعیت ارسال بار را به سعید اطلاع بده و سپس گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"سعید"},"split":"dev"}
+{"text":"به داوود وضعیت تعمیرات را خبر بده و بعد به من گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"داوود"},"split":"dev"}
+{"text":"وضعیت خانه را به مادر اطلاع بده و بعد نتیجه را گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"مادر"},"split":"dev"}
+{"text":"وضعیت سفارش را به یاسر اطلاع بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"یاسر"},"split":"test"}
+{"text":"به بهروز وضعیت کلینیک را خبر بده و سپس به من گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"بهروز"},"split":"test"}
+{"text":"وضعیت قرارداد را به کامران اطلاع بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"کامران"},"split":"test"}
+{"text":"به نیما درباره وضعیت خط دوم خبر بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"نیما"},"split":"test"}
+{"text":"وضعیت مالی را به خانم شریفی اطلاع بده و بعد نتیجه را گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"شریفی"},"split":"test"}
+{"text":"به جواد وضعیت خودرو را خبر بده و سپس گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"جواد"},"split":"test"}
+{"text":"وضعیت حضورم در دفتر را به سارا اطلاع بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"سارا"},"split":"test"}
+{"text":"به مسعود وضعیت سرور را اطلاع بده و بعد نتیجه را گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"مسعود"},"split":"test"}
+{"text":"وضعیت فروش را به پیمان خبر بده و سپس به من گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"پیمان"},"split":"test"}
+{"text":"به سهراب وضعیت انبار را اطلاع بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"سهراب"},"split":"test"}
+{"text":"وضعیت سالن یک را به هادی خبر بده و بعد نتیجه را گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"هادی"},"split":"test"}
+{"text":"به آرش وضعیت بارگیری را اطلاع بده و سپس گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"آرش"},"split":"test"}
+{"text":"وضعیت شرکت را به مجید خبر بده و بعد به من گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"مجید"},"split":"test"}
+{"text":"به حامد وضعیت پروژه را اطلاع بده و بعد نتیجه را گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"حامد"},"split":"test"}
+{"text":"وضعیت آزمایشگاه را به پارسا خبر بده و سپس گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"پارسا"},"split":"test"}
+{"text":"به نوید وضعیت جلسه را اطلاع بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"نوید"},"split":"test"}
+{"text":"وضعیت تعمیر را به رحیم خبر بده و بعد به من گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"رحیم"},"split":"test"}
+{"text":"به سامان وضعیت خانه را اطلاع بده و سپس نتیجه را گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"سامان"},"split":"test"}
+{"text":"وضعیت سیستم را به میلاد اطلاع بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"میلاد"},"split":"test"}
+{"text":"به بابک وضعیت مغازه را خبر بده و بعد نتیجه را گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"بابک"},"split":"test"}
+{"text":"وضعیت باشگاه را به پویا اطلاع بده و سپس گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"پویا"},"split":"test"}
+{"text":"به اکبر وضعیت دمای سالن را خبر بده و بعد به من گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"اکبر"},"split":"test"}
+{"text":"وضعیت پرداخت را به امیر اطلاع بده و بعد گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"امیر"},"split":"test"}
+{"text":"به نازنین وضعیت گزارش را خبر بده و بعد نتیجه را گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"نازنین"},"split":"test"}
+{"text":"وضعیت کارخانه را به علی اطلاع بده و بعد نتیجه را گزارش کن","intent":"MULTI_STEP_NOTIFY","slots":{"contact":"علی"},"split":"test"}
+{"text":"واتساپ رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"واتساپ"},"split":"dev"}
+{"text":"برنامه تلگرام را باز کن","intent":"OPEN_APP","slots":{"targetApp":"تلگرام"},"split":"dev"}
+{"text":"دوربین رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"دوربین"},"split":"dev"}
+{"text":"اپ اینستاگرام را باز کن","intent":"OPEN_APP","slots":{"targetApp":"اینستاگرام"},"split":"dev"}
+{"text":"ساعت رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"ساعت"},"split":"dev"}
+{"text":"برنامه تقویم رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"تقویم"},"split":"dev"}
+{"text":"ماشین حساب را باز کن","intent":"OPEN_APP","slots":{"targetApp":"ماشین حساب"},"split":"dev"}
+{"text":"باز کن گالری","intent":"OPEN_APP","slots":{"targetApp":"گالری"},"split":"dev"}
+{"text":"یوتیوب رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"یوتیوب"},"split":"dev"}
+{"text":"برنامه ایتا را باز کن","intent":"OPEN_APP","slots":{"targetApp":"ایتا"},"split":"dev"}
+{"text":"بله رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"بله"},"split":"dev"}
+{"text":"روبیکا را باز کن","intent":"OPEN_APP","slots":{"targetApp":"روبیکا"},"split":"dev"}
+{"text":"نشان رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"نشان"},"split":"dev"}
+{"text":"برنامه اسنپ را باز کن","intent":"OPEN_APP","slots":{"targetApp":"اسنپ"},"split":"dev"}
+{"text":"جیمیل رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"جیمیل"},"split":"dev"}
+{"text":"باز کن واتساپ","intent":"OPEN_APP","slots":{"targetApp":"واتساپ"},"split":"test"}
+{"text":"موزیک رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"موزیک"},"split":"test"}
+{"text":"اپلیکیشن بلد را باز کن","intent":"OPEN_APP","slots":{"targetApp":"بلد"},"split":"test"}
+{"text":"یادداشت‌ها رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"یادداشت‌ها"},"split":"test"}
+{"text":"مخاطبین را باز کن","intent":"OPEN_APP","slots":{"targetApp":"مخاطبین"},"split":"test"}
+{"text":"برنامه دیجی کالا رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"دیجی کالا"},"split":"test"}
+{"text":"کروم را باز کن","intent":"OPEN_APP","slots":{"targetApp":"کروم"},"split":"test"}
+{"text":"باز کن تلگرام","intent":"OPEN_APP","slots":{"targetApp":"تلگرام"},"split":"test"}
+{"text":"اپ آپارات رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"آپارات"},"split":"test"}
+{"text":"شماره گیر را باز کن","intent":"OPEN_APP","slots":{"targetApp":"شماره گیر"},"split":"test"}
+{"text":"پیام ها رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"پیام ها"},"split":"test"}
+{"text":"برنامه نقشه را باز کن","intent":"OPEN_APP","slots":{"targetApp":"نقشه"},"split":"test"}
+{"text":"تلویزیون رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"تلویزیون"},"split":"test"}
+{"text":"فایل منیجر را باز کن","intent":"OPEN_APP","slots":{"targetApp":"فایل منیجر"},"split":"test"}
+{"text":"باز کن دوربین","intent":"OPEN_APP","slots":{"targetApp":"دوربین"},"split":"test"}
+{"text":"برنامه همراه بانک را باز کن","intent":"OPEN_APP","slots":{"targetApp":"همراه بانک"},"split":"test"}
+{"text":"سروش رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"سروش"},"split":"test"}
+{"text":"رادیو را باز کن","intent":"OPEN_APP","slots":{"targetApp":"رادیو"},"split":"test"}
+{"text":"ضبط صدا رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"ضبط صدا"},"split":"test"}
+{"text":"اپ تپسی را باز کن","intent":"OPEN_APP","slots":{"targetApp":"تپسی"},"split":"test"}
+{"text":"گوگل مپ رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"گوگل مپ"},"split":"test"}
+{"text":"برنامه دیوار را باز کن","intent":"OPEN_APP","slots":{"targetApp":"دیوار"},"split":"test"}
+{"text":"باز کن ماشین حساب","intent":"OPEN_APP","slots":{"targetApp":"ماشین حساب"},"split":"test"}
+{"text":"شمارشگر رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"شمارشگر"},"split":"test"}
+{"text":"برنامه شرپا رو باز کن","intent":"OPEN_APP","slots":{"targetApp":"شرپا"},"split":"test"}
+{"text":"تنظیمات وای فای را باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"dev"}
+{"text":"وایفای رو روشن کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"dev"}
+{"text":"تنظیمات بلوتوث رو باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"BLUETOOTH"},"split":"dev"}
+{"text":"بلوتوث رو روشن کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"BLUETOOTH"},"split":"dev"}
+{"text":"تنظیمات مکان یاب را باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"LOCATION"},"split":"dev"}
+{"text":"لوکیشن رو باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"LOCATION"},"split":"dev"}
+{"text":"تنظیمات صدا را باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"SOUND"},"split":"dev"}
+{"text":"تنظیمات باتری را باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"BATTERY"},"split":"dev"}
+{"text":"تنظیمات اینترنت رو باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"dev"}
+{"text":"wifi رو باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"dev"}
+{"text":"gps رو روشن کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"LOCATION"},"split":"dev"}
+{"text":"تنظیمات گوشی را باز کن","intent":"OPEN_SETTINGS","slots":{},"split":"dev"}
+{"text":"بلوتوث را خاموش کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"BLUETOOTH"},"split":"dev"}
+{"text":"وای فای را وصل کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"dev"}
+{"text":"تنظیمات لوکیشن رو بیار","intent":"OPEN_SETTINGS","slots":{"settingTarget":"LOCATION"},"split":"dev"}
+{"text":"تنظیمات وایفای رو بیار","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"test"}
+{"text":"وای فای رو خاموش کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"test"}
+{"text":"بلوتوث رو وصل کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"BLUETOOTH"},"split":"test"}
+{"text":"تنظیمات مکان را باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"LOCATION"},"split":"test"}
+{"text":"تنظیمات صدا رو بیار","intent":"OPEN_SETTINGS","slots":{"settingTarget":"SOUND"},"split":"test"}
+{"text":"تنظیمات باتری رو نشون بده","intent":"OPEN_SETTINGS","slots":{"settingTarget":"BATTERY"},"split":"test"}
+{"text":"لوکیشن گوشی را روشن کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"LOCATION"},"split":"test"}
+{"text":"تنظیمات بلوتوث را نشان بده","intent":"OPEN_SETTINGS","slots":{"settingTarget":"BLUETOOTH"},"split":"test"}
+{"text":"برو تو تنظیمات گوشی","intent":"OPEN_SETTINGS","slots":{},"split":"test"}
+{"text":"وایفای گوشی رو باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"test"}
+{"text":"تنظیمات wifi را باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"test"}
+{"text":"مکان یاب گوشی را روشن کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"LOCATION"},"split":"test"}
+{"text":"تنظیمات اینترنت را نشان بده","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"test"}
+{"text":"بلوتوث رو باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"BLUETOOTH"},"split":"test"}
+{"text":"gps گوشی را باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"LOCATION"},"split":"test"}
+{"text":"تنظیمات باتری گوشی را باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"BATTERY"},"split":"test"}
+{"text":"تنظیمات صدا گوشی رو باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"SOUND"},"split":"test"}
+{"text":"پنل تنظیمات وای فای را باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"test"}
+{"text":"لوکیشن را خاموش کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"LOCATION"},"split":"test"}
+{"text":"وای فای را باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"test"}
+{"text":"تنظیمات را باز کن","intent":"OPEN_SETTINGS","slots":{},"split":"test"}
+{"text":"بلوتوث دستگاه را روشن کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"BLUETOOTH"},"split":"test"}
+{"text":"تنظیمات مکان را نشان بده","intent":"OPEN_SETTINGS","slots":{"settingTarget":"LOCATION"},"split":"test"}
+{"text":"برو تنظیمات وایفای","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"test"}
+{"text":"تنظیمات صدا و زنگ را باز کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"SOUND"},"split":"test"}
+{"text":"وضعیت باتری چطوره؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"شارژ گوشی چقدره؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"وضعیت گوشی چطوره؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"وضعیت دستگاه چیه؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"درصد باتری چنده؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"گوشی چند درصد شارژ داره؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"میزان شارژ گوشی چقدره؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"باتری چقدر مونده؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"گزارش وضعیت گوشی را بده","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"شارژ دستگاه چنده؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"وضعیت باتری رو بگو","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"چقدر باتری دارم؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"گوشیم چقدر شارژ داره؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"وضعیت کلی دستگاه چطوره؟","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"درصد شارژ را بگو","intent":"DEVICE_STATUS","slots":{},"split":"dev"}
+{"text":"شارژ باتری چند درصده؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"وضعیت گوشی را بگو","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"باتری گوشی چطوره؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"چند درصد شارژ دارم؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"میزان باتری الان چنده؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"وضعیت دستگاه را چک کن","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"گزارش باتری بده","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"شارژ چقدر باقی مونده؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"درصد باتری گوشی چیه؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"بگو باتری چند درصده","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"وضعیت گوشی و شارژش چطوره؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"شارژت چقدره؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"وضعیت شارژ دستگاه چیه؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"باتری الان چند درصد است؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"چقدر شارژ مونده روی گوشی؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"گزارش وضعیت دستگاه رو بگو","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"شارژ گوشی چنده الان؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"میزان شارژ باتری چقدر است؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"وضعیت باتری الان چیه؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"چک کن ببین باتری چقدره","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"درصد شارژ گوشی رو بخوان","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"وضعیت گوشی الان خوبه؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"باتری چقدر شارژ داره؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"وضعیت دستگاه چیست؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"گوشی الان چند درصد باتری داره؟","intent":"DEVICE_STATUS","slots":{},"split":"test"}
+{"text":"صداتو زیاد کن","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"صدا را کم کن","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"ولوم رو ببر بالا","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"صدای گوشی رو آروم کن","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"صدا رو بلند کن","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"ولوم را کاهش بده","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"صدا رو افزایش بده","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"صدات ضعیفه زیادش کن","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"صدای تو رو پایین بیار","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"ولوم رو زیاد کن","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"صداتو کم کن","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"صدا رو بیشتر کن","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"ولوم گوشی رو کم کن","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"صدا را بلندتر کن","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"صدای سول را آرام تر کن","intent":"ADJUST_VOLUME","slots":{},"split":"dev"}
+{"text":"صدا رو زیاد کن لطفاً","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"ولوم را کم کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدات خیلی پایینه ببرش بالا","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدا را آروم کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"ولوم رو افزایش بده","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صداتو ببر بالا","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدای گوشی رو کاهش بده","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"ولوم رو بلند کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدا را کمتر کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صداتو آروم کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"ولومو زیاد کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدا رو پایین بیار","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدای تو خیلی بلنده کم کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"ولوم رو آروم کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدا را بالاتر ببر","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صداتو بیشتر کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"ولوم را پایین بیار","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدا خیلی ضعیفه","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدای گوشی رو بلندتر کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"ولوم دستگاه را کم کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صداتو بلند کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدا را بیار پایین","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"ولوم را بیشتر کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدای سول رو زیاد کن","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"صدا رو کاهش بده","intent":"ADJUST_VOLUME","slots":{},"split":"test"}
+{"text":"روتین کار را اجرا کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"dev"}
+{"text":"حالت شب رو فعال کن","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"dev"}
+{"text":"حالت کار را روشن کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"dev"}
+{"text":"روتین شب را شروع کن","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"dev"}
+{"text":"حالت تمرکز رو فعال کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"dev"}
+{"text":"روتین روزانه را اجرا کن","intent":"RUN_ROUTINE","slots":{},"split":"dev"}
+{"text":"حالت شب را بگذار","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"dev"}
+{"text":"حالت کار رو فعال کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"dev"}
+{"text":"روتین منو اجرا کن","intent":"RUN_ROUTINE","slots":{},"split":"dev"}
+{"text":"بریم روی حالت شب","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"dev"}
+{"text":"حالت کار را شروع کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"dev"}
+{"text":"روتین کاری رو روشن کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"dev"}
+{"text":"حالت شبانه روتین را بزن","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"dev"}
+{"text":"روتین شبانه رو فعال کن","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"dev"}
+{"text":"حالت تمرکز کار رو روشن کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"dev"}
+{"text":"حالت کار را فعال کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"روتین شب رو فعال کن","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"test"}
+{"text":"روتین دفتر را اجرا کن","intent":"RUN_ROUTINE","slots":{},"split":"test"}
+{"text":"حالت شب را روشن کن","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"test"}
+{"text":"روتین کار رو شروع کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"حالت تمرکز را فعال کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"حالت کار رو بگذار","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"روتین خواب شب رو اجرا کن","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"test"}
+{"text":"روتین روز رو فعال کن","intent":"RUN_ROUTINE","slots":{},"split":"test"}
+{"text":"حالت شب رو شروع کن","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"test"}
+{"text":"روتین کار را بگذار","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"حالت کار را بزن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"روتین شب را فعال کن لطفاً","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"test"}
+{"text":"حالت شبانه رو روشن کن","intent":"RUN_ROUTINE","slots":{},"split":"test"}
+{"text":"روتین تمرین را اجرا کن","intent":"RUN_ROUTINE","slots":{},"split":"test"}
+{"text":"حالت کار رو روشن کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"روتین شبانه رو شروع کن","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"test"}
+{"text":"حالت کار را تنظیم کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"روتین کار رو بزن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"حالت شب را فعال کن","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"test"}
+{"text":"روتین تمرکز را اجرا کن","intent":"RUN_ROUTINE","slots":{},"split":"test"}
+{"text":"روتین مدیریت کار را فعال کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"حالت شب رو بذار","intent":"RUN_ROUTINE","slots":{"routineName":"NIGHT"},"split":"test"}
+{"text":"روتین کاری رو اجرا کن","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"حالت کار را شروع کن لطفاً","intent":"RUN_ROUTINE","slots":{"routineName":"WORK"},"split":"test"}
+{"text":"۵ دقیقه دیگر یادآوری کن جلسه را بررسی کنم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"5"},"split":"dev"}
+{"text":"یادم بنداز دارو بخورم","intent":"SCHEDULE_REMINDER","slots":{"message":"دارو بخورم"},"split":"dev"}
+{"text":"۱ دقیقه دیگر یادآوری کن وضعیت پروژه را بررسی کنم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"1"},"split":"dev"}
+{"text":"چهارشنبه ساعت ۹ صبح یادآوری کن جلسه مهم دارم","intent":"SCHEDULE_REMINDER","slots":{},"split":"dev"}
+{"text":"دو روز دیگه به علی پیام یادآوری بفرست","intent":"SCHEDULE_REMINDER","slots":{"contact":"علی"},"split":"dev"}
+{"text":"یک ساعت و نیم دیگه یادآوری کن قرصم رو بخورم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"90"},"split":"dev"}
+{"text":"بیست و پنج دقیقه دیگه یادم بنداز به مادر زنگ بزنم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"25"},"split":"dev"}
+{"text":"فردا ساعت ۱۰ صبح یادآوری کن قبض رو بپردازم","intent":"SCHEDULE_REMINDER","slots":{},"split":"dev"}
+{"text":"نیم ساعت دیگه یادآوری کن چای دم کنم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"30"},"split":"dev"}
+{"text":"۱۰ دقیقه بعد به من بگو گاز را خاموش کنم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"10"},"split":"dev"}
+{"text":"یادم بنداز فردا بیمه را تمدید کنم","intent":"SCHEDULE_REMINDER","slots":{},"split":"dev"}
+{"text":"سه ربع ساعت دیگر یادآوری کن تمرین شروع میشه","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"45"},"split":"dev"}
+{"text":"آلارم بذار برای ساعت ۶ صبح","intent":"SCHEDULE_REMINDER","slots":{},"split":"dev"}
+{"text":"۲۰ دقیقه دیگر یادآوری کن فاکتور بفرستم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"20"},"split":"dev"}
+{"text":"یادآوری کن شب در را قفل کنم","intent":"SCHEDULE_REMINDER","slots":{},"split":"dev"}
+{"text":"۱۵ دقیقه دیگر یادآوری کن با حسابدار تماس بگیرم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"15"},"split":"test"}
+{"text":"یادم بنداز نان بخرم","intent":"SCHEDULE_REMINDER","slots":{"message":"نان بخرم"},"split":"test"}
+{"text":"۲ ساعت دیگر یادآوری کن ماشین را تحویل بگیرم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"120"},"split":"test"}
+{"text":"شنبه ساعت ۸ صبح یادآوری کن گزارش هفتگی بدهم","intent":"SCHEDULE_REMINDER","slots":{},"split":"test"}
+{"text":"یادم بنداز که شارژر رو بردارم","intent":"SCHEDULE_REMINDER","slots":{"message":"شارژر رو بردارم"},"split":"test"}
+{"text":"۳۰ دقیقه دیگه یادآوری کن ایمیل بزنم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"30"},"split":"test"}
+{"text":"یک ساعت دیگه یادم بنداز سالن رو چک کنم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"60"},"split":"test"}
+{"text":"پنج دقیقه بعد یادآوری کن آب را ببندم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"5"},"split":"test"}
+{"text":"فردا ساعت ۴ عصر یادآوری کن جلسه داریم","intent":"SCHEDULE_REMINDER","slots":{},"split":"test"}
+{"text":"آلارم بذار ۵ دقیقه دیگه بیدارم کنی","intent":"SCHEDULE_REMINDER","slots":{},"split":"test"}
+{"text":"۱۰ دقیقه دیگر یادآوری کن قرارداد را امضا کنم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"10"},"split":"test"}
+{"text":"یادم بنداز به رضا خبر بدهم","intent":"SCHEDULE_REMINDER","slots":{},"split":"test"}
+{"text":"پس‌فردا ساعت ۱۱ صبح یادآوری کن نوبت دکتر دارم","intent":"SCHEDULE_REMINDER","slots":{},"split":"test"}
+{"text":"۱۲ دقیقه دیگه یادآوری کن سوئیچ را بردارم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"12"},"split":"test"}
+{"text":"یادآوری کن که کتاب را همراه ببرم","intent":"SCHEDULE_REMINDER","slots":{},"split":"test"}
+{"text":"چهل دقیقه دیگر یادآوری کن خوراک طیور بدهم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"40"},"split":"test"}
+{"text":"سه روز دیگه یادآوری کن قسط وام را بدهم","intent":"SCHEDULE_REMINDER","slots":{},"split":"test"}
+{"text":"۴۵ دقیقه بعد یادآوری کن پمپ را خاموش کنم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"45"},"split":"test"}
+{"text":"یادم بنداز مدارک را اسکن کنم","intent":"SCHEDULE_REMINDER","slots":{"message":"مدارک را اسکن کنم"},"split":"test"}
+{"text":"۷ دقیقه دیگه یادآوری کن پیام بفرستم","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"7"},"split":"test"}
+{"text":"دوشنبه ساعت ۹ صبح یادآوری کن سر بزنم دفتر","intent":"SCHEDULE_REMINDER","slots":{},"split":"test"}
+{"text":"یادم بنداز آب به گلدان‌ها بدهم","intent":"SCHEDULE_REMINDER","slots":{},"split":"test"}
+{"text":"۱۸ دقیقه دیگر به من بگو تست تمام شد","intent":"SCHEDULE_REMINDER","slots":{"delayMinutes":"18"},"split":"test"}
+{"text":"یادآوری کن شب ساعت ۱۰ دارو بخورم","intent":"SCHEDULE_REMINDER","slots":{},"split":"test"}
+{"text":"آلارم بذار برای بیدار شدن فردا","intent":"SCHEDULE_REMINDER","slots":{},"split":"test"}
+{"text":"روتین صبحگاهی پس‌زمینه را فعال کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_daily_briefing"},"split":"dev"}
+{"text":"پایش باتری در پس‌زمینه را اجرا کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_battery_guard"},"split":"dev"}
+{"text":"از حافظه در پس‌زمینه پشتیبان بگیر","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_backup"},"split":"dev"}
+{"text":"حافظه را در پس‌زمینه مرتب کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_indexer"},"split":"dev"}
+{"text":"یادآور تأیید موقعیت را فعال کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_location_checkin"},"split":"dev"}
+{"text":"گزارش حافظه را با سرویس صوتی بخوان","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_tts_reader_service"},"split":"dev"}
+{"text":"سوابق قدیمی را در پس‌زمینه بهینه‌سازی کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_history_cleanup"},"split":"dev"}
+{"text":"از اطلاعات حافظه پشتیبان بگیر","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_backup"},"split":"dev"}
+{"text":"سرویس صوتی روخوانی را اجرا کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_tts_reader_service"},"split":"dev"}
+{"text":"نمایه‌سازی حافظه در پس زمینه را بزن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_indexer"},"split":"dev"}
+{"text":"در پس‌زمینه پایش باتری را روشن کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_battery_guard"},"split":"dev"}
+{"text":"پشتیبان گیری خودکار حافظه را اجرا کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_backup"},"split":"dev"}
+{"text":"پاکسازی سوابق در پس‌زمینه را انجام بده","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_history_cleanup"},"split":"dev"}
+{"text":"روتین صبحگاهی در پس زمینه را فعال کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_daily_briefing"},"split":"dev"}
+{"text":"یادآور تایید موقعیت در پس زمینه را بگذار","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_location_checkin"},"split":"dev"}
+{"text":"در پس زمینه از حافظه پشتیبان بگیر","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_backup"},"split":"test"}
+{"text":"سرویس صوتی رو برای خواندن گزارش روشن کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_tts_reader_service"},"split":"test"}
+{"text":"حافظه را در پس زمینه نمایه‌سازی کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_indexer"},"split":"test"}
+{"text":"پایش باتری پس‌زمینه رو فعال کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_battery_guard"},"split":"test"}
+{"text":"سوابق قدیمی در پس زمینه را پاکسازی کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_history_cleanup"},"split":"test"}
+{"text":"روتین صبحگاهی پس زمینه رو اجرا کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_daily_briefing"},"split":"test"}
+{"text":"یادآور تأیید موقعیت رو روشن کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_location_checkin"},"split":"test"}
+{"text":"بکاپ حافظه رو در پس‌زمینه بگیر","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_backup"},"split":"test"}
+{"text":"روخوانی گزارش حافظه با سرویس صوتی را شروع کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_tts_reader_service"},"split":"test"}
+{"text":"مرتب‌سازی حافظه پس‌زمینه را فعال کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_indexer"},"split":"test"}
+{"text":"بهینه‌سازی سوابق پس‌زمینه را اجرا کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_history_cleanup"},"split":"test"}
+{"text":"در پس‌زمینه وضعیت باتری را پایش کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_battery_guard"},"split":"test"}
+{"text":"تهیه پشتیبان از حافظه را انجام بده","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_backup"},"split":"test"}
+{"text":"گزارش صبحگاهی پس زمینه را فعال کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_daily_briefing"},"split":"test"}
+{"text":"یادآور تایید موقعیت را اجرا کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_location_checkin"},"split":"test"}
+{"text":"سرویس صوتی پس‌زمینه را فعال کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_tts_reader_service"},"split":"test"}
+{"text":"در پس زمینه سوابق را هرس و بهینه کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_history_cleanup"},"split":"test"}
+{"text":"از حافظه بکاپ بگیر لطفاً","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_backup"},"split":"test"}
+{"text":"نمایه سازی حافظه در پس‌زمینه را شروع کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_indexer"},"split":"test"}
+{"text":"پایش شارژ و باتری در پس‌زمینه را بزن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_battery_guard"},"split":"test"}
+{"text":"روتین صبحگاهی پس‌زمینه رو روشن کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_daily_briefing"},"split":"test"}
+{"text":"حافظه را در پس‌زمینه مرتب و نمایه کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_indexer"},"split":"test"}
+{"text":"در پس زمینه پشتیبان حافظه بساز","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_memory_backup"},"split":"test"}
+{"text":"سرویس صوتی روخوانی کتاب را اجرا کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_tts_reader_service"},"split":"test"}
+{"text":"سوابق را در پس‌زمینه بهینه کن","intent":"BACKGROUND_CONTROL","slots":{"backgroundJobId":"bg_history_cleanup"},"split":"test"}
+{"text":"به اینترنت برو کتاب شازده کوچولو را پیدا کن و با توضیحات صوتی من به حافظه و نقشت اضافه کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{"bookQuery":"شازده کوچولو"},"split":"dev"}
+{"text":"یه چیزی از اینترنت دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"dev"}
+{"text":"از اینترنت درباره هوش مصنوعی دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{"bookQuery":"هوش مصنوعی"},"split":"dev"}
+{"text":"https://fa.wikipedia.org/wiki/هوش_مصنوعی رو بخون","intent":"WEB_BOOK_LEARN_ROLE","slots":{"bookQuery":"https://fa.wikipedia.org/wiki/هوش_مصنوعی"},"split":"dev"}
+{"text":"در پس‌زمینه کتاب شازده کوچولو را دریافت کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{"bookQuery":"شازده کوچولو"},"split":"dev"}
+{"text":"به اینترنت برو کتاب عادت‌های اتمی را پیدا کن و با توضیحات صوتی من به حافظه و نقشت اضافه کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{"bookQuery":"عادت‌های اتمی"},"split":"dev"}
+{"text":"توی گوگل درباره تاریخ ایران جستجو کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"dev"}
+{"text":"کتاب کیمیاگر را از اینترنت دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{"bookQuery":"کیمیاگر"},"split":"dev"}
+{"text":"این لینک رو بخون https://example.com/article","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"dev"}
+{"text":"در اینترنت دنبال مقاله پرورش طیور بگرد و پیدا کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"dev"}
+{"text":"کتاب بیندیشید و ثروتمند شوید را پیدا کن و به حافظه اضافه کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"dev"}
+{"text":"یک مقاله از اینترنت درباره مدیریت زمان دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"dev"}
+{"text":"تو وب جست جو کن درباره زبان کاتلین","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"dev"}
+{"text":"کتاب اثر مرکب رو دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{"bookQuery":"اثر مرکب"},"split":"dev"}
+{"text":"از گوگل درباره تغذیه سالم مطلب بیار","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"dev"}
+{"text":"کتاب هنر شفاف اندیشیدن را از اینترنت پیدا کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"در اینترنت درباره کشاورزی هوشمند سرچ کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"https://fa.wikipedia.org/wiki/تهران رو بخون و خلاصه کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"از اینترنت درباره برنامه نویسی اندروید دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"کتاب انسان در جستجوی معنا رو پیدا کن و یاد بگیر","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"یه فایل از اینترنت دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"توی سایت ویکیپدیا درباره آب و هوا جستجو کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"کتاب قلعه حیوانات را از اینترنت بگیر","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"مقاله درباره امنیت موبایل را از وب پیدا کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"در پس زمینه کتاب ۴ اثر از اسکاول شین را دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"از اینترنت درباره انرژی خورشیدی مطلب دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"برو تو گوگل کتاب بینوایان رو پیدا کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"https://example.org/book.txt را دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"کتاب پدر پولدار پدر بی پول را به حافظه و نقشت اضافه کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"توی اینترنت درباره درمان خانگی سرچ کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"مقاله یادگیری عمیق را از اینترنت بیاور","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"کتاب بوف کور را از اینترنت پیدا کن و بخوان","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"آنلاین درباره تعمیر موتور جستجو کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"لینک زیر را از اینترنت بخوان http://example.com/guide","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"کتاب مدیتیشن را در پس‌زمینه دریافت کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{"bookQuery":"مدیتیشن"},"split":"test"}
+{"text":"از وب درباره روانشناسی کودک دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"توی گوگل درباره پایتون سرچ کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"کتاب هفت عادت مردمان موثر را پیدا کن و یاد بگیر","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"از اینترنت درباره مدیریت مالی دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{},"split":"test"}
+{"text":"کتاب شازده کوچولو را دانلود کن","intent":"WEB_BOOK_LEARN_ROLE","slots":{"bookQuery":"شازده کوچولو"},"split":"test"}
+{"text":"نقش تو مشاور کسب و کار است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مشاور کسب و کار"},"split":"dev"}
+{"text":"به عنوان مربی بهره‌وری عمل کن","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مربی بهره‌وری"},"split":"dev"}
+{"text":"از این به بعد نقش تو معلم زبان انگلیسی است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"معلم زبان انگلیسی"},"split":"dev"}
+{"text":"نقشت مدیر پروژه باشد","intent":"TEACH_ROLE_VOICE","slots":{},"split":"dev"}
+{"text":"به عنوان روانشناس شنونده باش","intent":"TEACH_ROLE_VOICE","slots":{},"split":"dev"}
+{"text":"نقش تو متخصص پرورش طیور است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"متخصص پرورش طیور"},"split":"dev"}
+{"text":"از این به بعد به عنوان دوست دلسوز عمل کن","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"دوست دلسوز"},"split":"dev"}
+{"text":"نقش تو حسابدار مالی هست","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"حسابدار مالی"},"split":"dev"}
+{"text":"نقشت مشاور برنامه‌ریزی روزانه است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مشاور برنامه‌ریزی روزانه"},"split":"dev"}
+{"text":"به عنوان دستیار اجرایی پاسخ بده","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"دستیار اجرایی"},"split":"dev"}
+{"text":"نقش تو مربی ورزشی است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مربی ورزشی"},"split":"dev"}
+{"text":"از این به بعد نقشت راهنمای مطالعه است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"راهنمای مطالعه"},"split":"dev"}
+{"text":"نقش جدیدت مشاور تغذیه است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مشاور تغذیه"},"split":"dev"}
+{"text":"به عنوان وکیل قراردادی عمل کن","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"وکیل قراردادی"},"split":"dev"}
+{"text":"نقش تو ناظم زمان است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"ناظم زمان"},"split":"dev"}
+{"text":"نقش تو مهندس مکانیک است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مهندس مکانیک"},"split":"test"}
+{"text":"به عنوان مربی تمرکز عمل کن","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مربی تمرکز"},"split":"test"}
+{"text":"از این به بعد نقش تو تحلیلگر مالی است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"تحلیلگر مالی"},"split":"test"}
+{"text":"نقشت استاد ادبیات فارسی است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"استاد ادبیات فارسی"},"split":"test"}
+{"text":"به عنوان مشاور خواب باش","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مشاور خواب"},"split":"test"}
+{"text":"نقش تو مسئول هماهنگی دفتر است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مسئول هماهنگی دفتر"},"split":"test"}
+{"text":"از این به بعد به عنوان راهنمای سفر عمل کن","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"راهنمای سفر"},"split":"test"}
+{"text":"نقش تو مربی عادت‌های خوب است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مربی عادت‌های خوب"},"split":"test"}
+{"text":"نقشت ویراستار متن فارسی است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"ویراستار متن فارسی"},"split":"test"}
+{"text":"به عنوان پشتیبان فنی پاسخ بده","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"پشتیبان فنی"},"split":"test"}
+{"text":"نقش جدیدت مربی سخنرانی است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مربی سخنرانی"},"split":"test"}
+{"text":"نقش تو آشپز ایرانی هست","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"آشپز ایرانی"},"split":"test"}
+{"text":"به عنوان پزشک عمومی راهنمای سلامت باش","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"پزشک عمومی راهنمای سلامت"},"split":"test"}
+{"text":"از این به بعد نقشت برنامه ریز هفته است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"برنامه ریز هفته"},"split":"test"}
+{"text":"نقش تو معلم ریاضی است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"معلم ریاضی"},"split":"test"}
+{"text":"به عنوان دوست شنونده عمل کن","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"دوست شنونده"},"split":"test"}
+{"text":"نقشت مدیر تولید کارخانه است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مدیر تولید کارخانه"},"split":"test"}
+{"text":"نقش تو کتابدار دیجیتال است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"کتابدار دیجیتال"},"split":"test"}
+{"text":"به عنوان مربی آرامش و تنفس عمل کن","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مربی آرامش و تنفس"},"split":"test"}
+{"text":"نقش جدیدت مدرس کاتلین هست","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مدرس کاتلین"},"split":"test"}
+{"text":"از این به بعد نقش تو دستیار کشاورزی است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"دستیار کشاورزی"},"split":"test"}
+{"text":"نقشت ناظر کیفیت سالن است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"ناظر کیفیت سالن"},"split":"test"}
+{"text":"به عنوان مشاور شغلی پاسخ بده","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مشاور شغلی"},"split":"test"}
+{"text":"نقش تو مربی انگیزشی است","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"مربی انگیزشی"},"split":"test"}
+{"text":"نقشت متخصص صرفه‌جویی هزینه هست","intent":"TEACH_ROLE_VOICE","slots":{"roleName":"متخصص صرفه‌جویی هزینه"},"split":"test"}
+{"text":"طبق نقشت درباره برنامه‌ریزی و عادت‌ها راهنماییم کن","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"بر اساس کتاب شازده کوچولو درباره دوستی توضیح بده","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"با توجه به کتاب عادت‌های اتمی چطور عادت بد را ترک کنم؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"طبق نقش فعال درباره مدیریت استرس راهنماییم کن","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"از روی کتاب اثر مرکب درباره نظم روزانه بگو","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"راهنماییم کن چطور تمرکزم را بالا ببرم","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"طبق نقشت یک برنامه برای صبح امروز پیشنهاد بده","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"بر اساس کتاب مدیریت مرغداری دمای سالن را چک کن","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"با توجه به کتاب‌های حافظه چطور وقت کمتری هدر بدهم؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"طبق نقشت درباره تصمیم‌گیری مالی راهنماییم کن","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"مشاوره می‌خوام از روی نقش مربی","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"بر اساس کتاب کیمیاگر پیام داستان چیست؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"طبق نقش درباره اولویت‌بندی کارهای امروز راهنماییم کن","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"راهنماییم کن برای شروع عادت مطالعه","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"با توجه به کتاب‌های آموخته‌شده نظر بده","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"dev"}
+{"text":"طبق نقشت درباره خواب بهتر راهنماییم کن","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"بر اساس کتاب هنر شفاف اندیشیدن خطای ذهنی چیه؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"با توجه به کتاب عادت‌های اتمی گام اول چیست؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"طبق نقش تو درباره کنترل خشم صحبت کن","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"از روی کتاب هفت عادت چه پیشنهادی داری؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"راهنماییم کن که استرس جلسه را کم کنم","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"بر اساس نقشت درباره مذاکره مشاوره بده","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"با توجه به کتاب شازده کوچولو راز روباه چه بود؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"طبق نقشت یک راهکار عملی برای بهره‌وری بگو","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"از روی کتاب بیندیشید و ثروتمند شوید راهنمایی بده","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"راهنماییم کن چطور تنبلی رو کنار بگذارم","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"طبق نقشت درباره تعادل کار و زندگی نظر بده","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"بر اساس کتاب مدیتیشن چطور آرامش بگیرم؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"با توجه به کتاب‌های ذخیره شده پاسخ بده","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"طبق نقش مربی چه پیشنهادی برای امروز داری؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"راهنماییم کن برای مدیریت تیم کوچک","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"از روی کتاب انسان در جستجوی معنا درباره امید بگو","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"طبق نقشت چطور زمانم رو بهتر تقسیم کنم؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"بر اساس کتاب پدر پولدار پس‌انداز چطور انجام شود؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"با توجه به کتاب پرورش طیور تهویه سالن مهمه؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"طبق نقشت یه مشاوره کوتاه بهم بده","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"راهنماییم کن چطور از فرسودگی شغلی دور بمانم","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"بر اساس کتاب اثر مرکب قدم کوچک یعنی چی؟","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"طبق نقشت درباره مطالعه روزانه راهنماییم کن","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"از روی کتاب خلاصه‌ای برای کار امروز بگو","intent":"CONSULT_ROLE_BOOK","slots":{},"split":"test"}
+{"text":"۲۰ قابلیت را نشان بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"فهرست قابلیت‌ها چیه؟","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"امکانات پس زمینه را نشون بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"20 قابلیت Sol رو باز کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"لیست قابلیت‌های دستیار را بیار","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"فهرست امکانات را نشان بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"بیست قابلیت سول چیا هستن؟","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"قابلیت‌های پس‌زمینه را نشان بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"کل قابلیت‌های اپ رو باز کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"همه قابلیت‌های سول را نشان بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"۲۰ قابلیت","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"فهرست قابلیت","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"لیست امکانات پس زمینه چیه؟","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"صفحه ۲۰ قابلیت رو باز کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"لیست قابلیت ها را نشان بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"dev"}
+{"text":"فهرست قابلیت‌های پس‌زمینه را بگو","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"20 قابلیت را نشان بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"لیست قابلیت را باز کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"امکانات پس‌زمینه چیه؟","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"فهرست امکانات سول را باز کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"بیست قابلیت دستیار رو بیار","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"قابلیت ها رو نشان بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"همه قابلیت ها را لیست کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"کل قابلیت ها چیه؟","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"کاتالوگ ۲۰ قابلیت را باز کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"لیست امکانات را نشان بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"قابلیتهای پس زمینه را باز کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"فهرست قابلیت های هوشمند چیه","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"۲۰ قابلیت سول را نشان بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"فهرست قابلیت‌های آفلاین را باز کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"لیست کل قابلیت‌ها را بیار","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"امکانات پس زمینه سول چیه","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"صفحه فهرست قابلیت را باز کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"قابلیت‌های دستیار را لیست کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"بیست قابلیت را نمایش بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"فهرست امکانات برنامه چیست","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"لیست قابلیت رو نشون بده","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"20 قابلیت رو بگو","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"قابلیت های پس زمینه چیا هستن","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"فهرست کل قابلیت ها را باز کن","intent":"SHOW_CAPABILITIES","slots":{},"split":"test"}
+{"text":"باید بروم بیرون کار دارم","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"زنگ تفریح کی هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"زنگ در خراب شده","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"اینترنت قطع شده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"حافظه گوشی پر شده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"ساعت دیوار خوابیده","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"پنجره را باز کن هوا بیاد","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"در را باز کن مهمان آمد","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"رمز وایفای چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"شماره علی چنده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"هوای تهران فردا چطوره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"پایتخت کشور ژاپن کجاست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"دو ضربدر هفده چند میشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"یه لطیفه بامزه تعریف کن","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"طرز تهیه قورمه سبزی چجوریه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"فاصله زمین تا ماه چقدره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"قیمت طلا امروز چنده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"نتیجه بازی فوتبال دیشب چی شد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چرا آسمان آبی رنگ است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"یک شعر از حافظ بخوان","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"پشتیبان تیم فوتبال کیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"کتابخوانی خیلی خوبه","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"باتری ساعت مچی تمام شده","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"کابل شارژم گم شده","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"بلوتوث چه فرکانسی دارد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"تاریخ انقضای شیر چه روزیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"بهترین زبان برنامه نویسی کدام است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"امروز خیلی خسته‌ام و دلم گرفته","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چطوری استرس امتحان رو کم کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"یه آهنگ شاد پخش کن","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"تراکتورسازی چه سالی تاسیس شد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"مخترع برق کی بود؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"برای سردرد چه چیزی خوب است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"کالری یک عدد سیب چقدر است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"آیا فردا باران می‌بارد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"فهرست کشورهای قاره اروپا چیا هستن؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"طول رود نیل چند کیلومتر است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"معنی کلمه انگلیسی اینتلجنس چیست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"سرعت نور در خلا چقدره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"دمای جوش آب در کوهستان چقدر است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"تفاوت رم و حافظه داخلی چیست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"امروز چه فیلمی ببینیم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"شعر درباره بهار بگو","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"پیشنهاد شام سبک چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چه ورزشی برای کمردرد مناسبه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"میدان آزادی چه سالی ساخته شد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"اسم بلندترین قله ایران چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چند تا استان در ایران وجود دارد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"قیمت دلار آزاد الان چقدره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"یه داستان کوتاه علمی تخیلی تعریف کن","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"پیام خطای سیستم یعنی چه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"زنگ مدرسه چه ساعتی می‌خوره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"می‌خوام بروم خرید نان","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"کتابخانه ملی ایران کجاست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چای سبز چه فوایدی دارد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چند تا قاره در جهان هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"جذب آهن با چه ویتامینی بهتر میشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"علائم کمبود ویتامین دی چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چرا برگ درختان در پاییز زرد می‌شود؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"بزرگترین اقیانوس دنیا کدام است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"تعداد روزهای سال کبیسه چقدر است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"ریشه دوم عدد ۱۴۴ چند است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چرا هوا امروز انقدر گرمه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"یک جمله انگیزشی قشنگ بگو","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"کجا میشه بلیط قطار خرید؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"فاصله تهران تا مشهد چند ساعت است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"پیشنهادت برای یادگیری زبان چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چطور قهوه ترک خوب درست کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"جمعیت شهر اصفهان چقدر است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"نام قدیمی شهر شیراز چه بوده است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"کدام سیاره به خورشید نزدیک‌تر است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"علت ترافیک صبحگاهی چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چطور لکه چربی را از لباس پاک کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"بهترین فصل سفر به شمال کی هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چه کتابی برای نوجوانان خوب است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"معنی ضرب‌المثل کار نیکو کردن از پر کردن است چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"کیبورد کامپیوترم کار نمی‌کنه","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"روغن موتور مناسب پراید چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"فشار باد لاستیک چقدر باید باشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"اسم کوچک انیشتین چی بود؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"اولین انسان روی ماه کی بود؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چطور خواب راحت‌تری داشته باشم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چه گلی برای آپارتمان کم‌نور خوبه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"آهنگ جدید چی اومده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چرا صدای یخچال زیاد شده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"امروز چیکار کنم حوصله‌ام سر نره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"ساعت مچی مکانیکی بهتره یا کوارتز؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"کدوم رنگ آرامش‌بخشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چند درصد بدن انسان از آب تشکیل شده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"فلش مموری رو کامپیوتر نمیشناسه","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چرا سرعت اینترنت امروز پایینه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"بهترین زمان آبیاری گل‌ها کی هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"نقش ویتامین سی در بدن چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"این جمله رو به انگلیسی ترجمه کن: من آماده‌ام","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"یک معما بگو من حدس بزنم","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چرا شب‌ها ستاره دیده میشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"فرق عسل طبیعی و مصنوعی چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چقدر آب باید در روز بنوشیم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"کدام حیوان سریع‌تر می‌دود؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"چرا باران بعد از رعد و برق می‌آید؟","intent":"OUT_OF_SCOPE","slots":{},"split":"dev"}
+{"text":"امشب شام چی بپزیم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"هوای مشهد آخر هفته چطوره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"باید بروم سر کار عجله دارم","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"زنگ کلاس اول کی نواخته میشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اینترنت همراه اول آنتن نمیده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"حافظه رم گوشیم چند گیگابایته؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"ساعت دیواری باطریش تموم شده","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"در حیاط را باز کن ماشین بیاد تو","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"پنجره اتاق خواب بازه ببندش","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"رمز مودم مخابرات چنده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"شماره تلفن رضا چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چهل و پنج تقسیم بر نه چند میشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"یه قصه کودکانه بگو","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"دستور پخت کباب تابه ای چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"پایتخت استرالیا کجاست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"مساحت ایران چند کیلومتر مربع است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"نرخ تورم امسال چقدره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا دریا شوره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"یک رباعی از خیام بخوان","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تیم ملی والیبال کی بازی داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"کتابخوانی باعث افزایش تمرکز میشه","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"شارژر فست شارژ برای گوشی ضرر داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بلوتوث نسخه ۵ چه فرقی با ۴ داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تاریخ جنگ جهانی دوم چه سالی بود؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تاریخ انقضای ماست کی هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"کدوم لپ تاپ برای کار اداری بهتره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"دلم خیلی پره و ناراحتم امروز","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"راه غلبه بر بی‌خوابی چیست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"یه موسیقی کلاسیک برام بگو","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"دانشگاه تهران چه سالی تاسیس شد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"مخترع تلفن کی بود؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"برای گلودرد چی بخورم خوبه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"یه تخم مرغ چند گرم پروتئین داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"آیا آخر هفته برف می‌بارد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"طولانی‌ترین رود جهان کدام است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"نام بزرگترین کویر ایران چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"معنی کلمه فیدبک به فارسی چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"سرعت صوت در هوا چقدره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا برف سفیده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فرق CPU و GPU چیست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"امشب فوتبال شبکه سه پخش میشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"غذاهای محلی گیلان چیا هستن؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بهترین ورزش برای کاهش وزن چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تخت جمشید در کدام استان است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بلندترین برج دنیا کجاست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند کشور عضو سازمان ملل هستن؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"یک ضرب المثل فارسی بگو","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"پیام خطای شبکه رو چطور حل کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"زنگ خطر ماشین من الکی صدا میده","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"می‌خوام بروم پیاده‌روی در پارک","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"کتابفروشی انقلاب تا ساعت چند بازه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فواید زردچوبه در غذا چیست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا رنگین کمان به وجود میاد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بزرگترین پستاندار دریایی چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"حاصل پانزده به علاوه بیست و سه چنده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"یک لطیفه درباره معلم بگو","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"از کجا بفهمم هندوانه شیرینه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فاصله شیراز تا اصفهان چقدره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چطور کیک شکلاتی بپزم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"جمعیت قاره آسیا چقدر است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بزرگترین جزیره خلیج فارس کدام است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"منظومه شمسی چند سیاره داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا صدای ماشین تغییر کرده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چطور جوهر خودکار را پاک کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بهترین زمان سفر به کیش کی هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"یه رمان پلیسی خوب معرفی کن","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"موس بی‌سیم باتریش ضعیفه","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"کی باید تسمه تایم عوض بشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فصل بهار چه ماه‌هایی داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"نام دانشمند ایرانی کتاب قانون چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"عمیق‌ترین نقطه اقیانوس کجاست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چطور تمرکز در مطالعه رو زیاد کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چه گیاهی هوای خانه رو تصفیه می‌کنه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"صداقت یعنی چی؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا آسمان شب سیاهه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"ساعت مچی قدیمی چقدر ارزش داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند استخوان در بدن انسان هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"هارد اکسترنال صدا میده چیکار کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"پینگ اینترنت بالا رفته چطور کمش کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا برگ کاکتوس زرد شده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"ویتامین ب۱۲ در چه غذاهایی هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"به انگلیسی بگو فردا هوا آفتابیه","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"یک چیستان سخت بگو","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا جزر و مد اتفاق می‌افته؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تفاوت ماست یونانی و معمولی چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"برای تقویت سیستم ایمنی چی خوبه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"پنگوئن‌ها کجا زندگی می‌کنن؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا رعد و برق خطرناکه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تاریخ تولد فردوسی کی بوده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"صدای بارون خیلی آرامش بخشه","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"باید بروم داروخانه نسخه بگیرم","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"حافظه کوتاه مدت چطور تقویت میشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اینترنت فیبر نوری توی محله ما هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"زنگ آخر مدرسه تموم شد","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا شمع آب میشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"میزان نمک مجاز روزانه چقدره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"کدام کشور بیشترین جمعیت رو داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فرق پلاستیک قابل بازیافت چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"آیا زرافه‌ها صدا دارن؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چطور باید دوچرخه‌سواری یاد بگیرم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"علت زردی برگ گوجه چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"شعر باران از کیست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"هوای تبریز الان سرده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"قیمت برنج ایرانی چطور حساب میشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اسم قمر کره زمین چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا عسل خراب نمی‌شه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"یک میلیون چند تا صفر داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"برای سوختگی خفیف چیکار کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"پیشنهاد ناهار سریع چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"کدام شهر به نصف جهان معروفه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا پرنده‌ها مهاجرت می‌کنن؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تفاوت سیم کارت اعتباری و دائمی چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند ساعت خواب برای بزرگسالان لازمه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بزرگترین کوه دنیا اورست چقدر ارتفاع داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اسم نویسنده شاهنامه چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چطور کتری را جرم‌گیری کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"برای کاهش استرس تنفس عمیق خوبه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"دلیل صدای قار و قور شکم چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"آیا ماه نور از خودش داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"طول خط استوا چند کیلومتره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فرق فولاد و آهن چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چه میوه‌ای بیشترین پتاسیم رو داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اولین شهر هوشمند دنیا کجاست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا زنبور عسل می‌سازد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"درخت بلوط چند سال عمر می‌کنه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اسم قدیمی پاریس چه بوده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند درصد هوا از اکسیژن تشکیل شده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"برای رفع بوی یخچال چی بذارم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا دریاها یخ نمی‌زنند؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چه عددی به هفت و هشت بخش‌پذیره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بهترین دمای نگهداری مواد غذایی چقدره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"معنی کلمه پارادایم چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند تا دندون در دهان انسان هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اسم بزرگترین دریاچه جهان چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چطور بوی سیر را از دست ببرم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"علت برق‌گرفتگی الکتریسیته ساکن چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فرق قهوه عربیکا و روبوستا چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"کدام ورزشکار بیشترین مدال المپیک رو داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا قطب‌نما همیشه شمال را نشون میده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند گرم در یک کیلوگرم هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بهترین زمان خوردن میوه کی هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تفاوت زردآلو و هلو چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اسم پایتخت کانادا چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چطور کفش سفید را تمیز کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا پوست دست در زمستان خشک میشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تعداد ماه‌های سال میلادی چنده؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فرق آلیاژ برنج و مس چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چه رنگی از ترکیب آبی و زرد درست میشه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"آیا گربه‌ها رنگ‌ها را می‌بینن؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا صدا در کوه اکو می‌شه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بهترین زمان تعویض مسواک چه وقتیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فواید پیاده‌روی صبحگاهی چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند تا کلید در پیانو هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اسم اولین ماه بهار چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا برگ نعنا خوشبو است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فرق ویروس و باکتری چیست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"برای خشکی چشم چه کار کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند دقیقه برای پخت تخم مرغ آب‌پز لازمه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بزرگترین پرنده جهان کدام است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا شیشه شفافه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"معنی نام کاروانسرا چیست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تفاوت لپه و عدس چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"امروز شاخص بورس مثبت بود؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بهترین روش نگهداری سبزیجات چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا ستاره‌ها چشمک می‌زنند؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"کدام شهر قدیمی‌ترین شهر ایرانه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"یک ساعت چند ثانیه است؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چطور برنج کته خوب درست کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فرق پسته اکبری و احمدآقایی چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اسم خالق شخصیت شرلوک هلمز چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا چشم‌ها موقع پیاز خرد کردن می‌سوزه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند رنگ در رنگین کمان هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"برای خستگی چشم بعد از کار با گوشی چیکار کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تفاوت بین ابر باران‌زا و ابر معمولی چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"کدام کشور قهوه بیشتری تولید می‌کنه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا آب گرم زودتر یا دیرتر یخ می‌زنه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"نام دریای شمال ایران چیست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند هفته در یک سال هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"بهترین دمای اتاق خواب چقدره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا مورچه‌ها صف می‌بندند؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"کدام فلز در دمای اتاق مایعه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چطور می‌توانم تمرکز بیشتری هنگام رانندگی داشته باشم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"فرق گردو و بادام از نظر انرژی چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اسم بزرگترین بیابان دنیا چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا دود بالا می‌رود؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند تا صفر در یک میلیارد وجود دارد؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"برای نرم شدن نان خشک چیکار کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تاریخ ساخت برج ایفل چه سالیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تفاوت ماهی قزل‌آلا و سالمون چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا دریا در غروب قرمز می‌شه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"کدام میوه ویتامین ث بیشتری داره؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"اسم بلندترین آبشار دنیا چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چطور کیک بدون فر درست کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تفاوت روغن زیتون بکر و تصفیه‌شده چیه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا گربه خرخر می‌کنه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چند کشور در آمریکای جنوبی هست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"برای رفع خواب‌آلودگی بعد از ناهار چیکار کنم؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"چرا آسمان در طول روز روشن می‌ماند؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"نام شاعر کتاب بوستان کیست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"امروز هوا برای پیاده‌روی مناسبه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}

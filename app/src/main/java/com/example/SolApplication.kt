@@ -79,7 +79,8 @@ class SolAppContainer(private val application: Application) {
     }
 
     val learningEngine by lazy { LearningEngine(memoryRepository, personRepository, locationRepository) }
-    val intentParser by lazy { IntentParser(EntityExtractor()) }
+    val colloquialLexicon by lazy { com.example.sol.text.ColloquialLexicon.fromContext(application) }
+    val intentParser by lazy { IntentParser(EntityExtractor(), colloquialLexicon) }
     val commandBrain by lazy {
         CommandBrain(
             context = application,

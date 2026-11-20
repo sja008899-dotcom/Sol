@@ -235,12 +235,7 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
         if (text.isBlank()) return
         val engine = tts ?: return
 
-        val cleanForTts = text
-            .replace(Regex("https?://\\S+"), "لینک")
-            .replace("•", "،")
-            .replace(Regex("[🎭📘🔎🎙⚠️✅❌]"), "")
-            .replace(Regex("\\s+"), " ")
-            .trim()
+        val cleanForTts = com.example.sol.text.PersianNumbers.prepareTextForTts(text)
         if (cleanForTts.isBlank()) return
 
         stop()

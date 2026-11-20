@@ -34,6 +34,10 @@ class ExampleRobolectricTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appName = context.getString(R.string.app_name)
         assertEquals("Sol", appName)
+
+        val lexicon = com.example.sol.text.ColloquialLexicon.fromContext(context)
+        assertTrue(lexicon.phraseReplacements.isNotEmpty())
+        assertTrue(lexicon.tokenReplacements.containsKey("خونه"))
     }
 
     @Test

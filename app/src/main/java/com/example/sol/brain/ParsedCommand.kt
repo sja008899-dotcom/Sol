@@ -30,6 +30,26 @@ enum class SolAction {
     UNKNOWN,
 }
 
+sealed interface SlotValue {
+    data class Text(val value: String) : SlotValue
+    data class Number(val value: Double) : SlotValue
+    data class DurationMinutes(val minutes: Long) : SlotValue
+    data class Contact(
+        val name: String,
+        val phone: String? = null,
+        val relation: String? = null,
+    ) : SlotValue
+    data class Location(
+        val reference: String,
+        val resolvedName: String? = null,
+    ) : SlotValue
+    data class Schedule(
+        val value: com.example.sol.calendar.ParsedJalaliSchedule,
+    ) : SlotValue
+    data class Steps(val items: List<String>) : SlotValue
+    data class Flag(val enabled: Boolean) : SlotValue
+}
+
 data class ParsedCommand(
     val action: SolAction,
     val rawText: String,
@@ -53,6 +73,17 @@ data class ParsedCommand(
     val jalaliSchedule: com.example.sol.calendar.ParsedJalaliSchedule? = null,
     val requireConfirmation: Boolean = true,
     val steps: List<String> = emptyList(),
+    val slots: Map<String, SlotValue> = emptyMap(),
+    val confidence: Float = 1.0f,
+    val matchedRuleId: String? = null,
+)
+
+data class IntentCandidate(
+    val matcherId: String,
+    val action: SolAction,
+    val score: Float,
+    val command: ParsedCommand,
+    val evidence: List<String> = emptyList(),
 )
 
 data class BrainExecutionResult(

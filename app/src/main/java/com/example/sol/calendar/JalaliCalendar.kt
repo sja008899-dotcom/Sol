@@ -384,24 +384,6 @@ object JalaliCalendar {
     }
 
     private fun normalizePersianNumberWords(text: String): String {
-        var result = text
-        val replacements = listOf(
-            "یک " to "1 ",
-            "دو " to "2 ",
-            "سه روز" to "3 روز",
-            "سه ساعت" to "3 ساعت",
-            "سه دقیقه" to "3 دقیقه",
-            "چهار " to "4 ",
-            "پنج روز" to "5 روز",
-            "پنج ساعت" to "5 ساعت",
-            "پنج دقیقه" to "5 دقیقه",
-            "شش " to "6 ",
-            "هفت " to "7 ",
-            "هشت " to "8 ",
-            "نه " to "9 ",
-            "ده " to "10 ",
-        )
-        replacements.forEach { (w, d) -> result = result.replace(w, d) }
-        return result
+        return com.example.sol.text.PersianNumbers.replaceWordNumbersWithDigits(text)
     }
 }

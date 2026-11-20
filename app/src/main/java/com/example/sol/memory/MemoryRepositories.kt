@@ -1,31 +1,12 @@
 package com.example.sol.memory
 
+import com.example.sol.text.PersianTextNormalizer
 import kotlinx.coroutines.flow.Flow
 
 object PersianNormalizer {
-    fun normalize(raw: String): String {
-        return raw.trim()
-            .replace('ي', 'ی')
-            .replace('ك', 'ک')
-            .replace('ة', 'ه')
-            .replace('أ', 'ا')
-            .replace('إ', 'ا')
-            .replace('ؤ', 'و')
-            .replace('\u200C', ' ')
-            .replace(Regex("[۰-۹]")) { (it.value[0] - '۰').toString() }
-            .replace(Regex("[٠-٩]")) { (it.value[0] - '٠').toString() }
-            .replace(Regex("\\s+"), " ")
-            .lowercase()
-    }
+    fun normalize(raw: String): String = PersianTextNormalizer.normalizeForMatching(raw)
 
-    fun cleanText(raw: String): String {
-        return raw.trim()
-            .replace('ي', 'ی')
-            .replace('ك', 'ک')
-            .replace(Regex("[۰-۹]")) { (it.value[0] - '۰').toString() }
-            .replace(Regex("[٠-٩]")) { (it.value[0] - '٠').toString() }
-            .replace(Regex("\\s+"), " ")
-    }
+    fun cleanText(raw: String): String = PersianTextNormalizer.cleanDisplayText(raw)
 }
 
 class MemoryRepository(private val dao: MemoryDao) {
