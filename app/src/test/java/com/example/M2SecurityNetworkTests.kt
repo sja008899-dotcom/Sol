@@ -198,42 +198,44 @@ class M2SecurityNetworkTests {
     // =========================================================================
 
     @Test
-    fun `a4 refuses unverified catalog checksums fail-safe for both slm and vosk`() = runBlocking {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        var connectionCalled = false
-        val trapHttpClient = SolHttpClient(
-            dnsResolver = publicDns(),
-            connectionOpener = { url ->
-                connectionCalled = true
-                FakeHttpURLConnection(url, 200)
-            },
-        )
+    fun `a4 refuses unverified catalog checksums fail-safe for both slm and vosk`() {
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            var connectionCalled = false
+            val trapHttpClient = SolHttpClient(
+                dnsResolver = publicDns(),
+                connectionOpener = { url ->
+                    connectionCalled = true
+                    FakeHttpURLConnection(url, 200)
+                },
+            )
 
-        val slmEngine = LocalSlmEngine(
-            context = context,
-            httpClient = trapHttpClient,
-            availableBytesProvider = { 10L * 1024L * 1024L * 1024L },
-        )
-        val slmResult = slmEngine.downloadModelSync(SlmModelCatalog.models.first()) {}
-        assertTrue(slmResult.isFailure)
-        assertTrue(slmResult.exceptionOrNull() is SolNetworkException.IntegrityMetadataMissingException)
-        assertTrue(slmEngine.runtimeState.value is SlmRuntimeState.Error)
+            val slmEngine = LocalSlmEngine(
+                context = context,
+                httpClient = trapHttpClient,
+                availableBytesProvider = { 10L * 1024L * 1024L * 1024L },
+            )
+            val slmResult = slmEngine.downloadModelSync(SlmModelCatalog.models.first()) {}
+            assertTrue(slmResult.isFailure)
+            assertTrue(slmResult.exceptionOrNull() is SolNetworkException.IntegrityMetadataMissingException)
+            assertTrue(slmEngine.runtimeState.value is SlmRuntimeState.Error)
 
-        val voskEngine = VoskVoiceEngine(
-            context = context,
-            httpClient = trapHttpClient,
-            availableBytesProvider = { 10L * 1024L * 1024L * 1024L },
-        )
-        val voskResult = voskEngine.downloadPersianSmallModelSync()
-        assertTrue(voskResult.isFailure)
-        assertTrue(voskResult.exceptionOrNull() is SolNetworkException.IntegrityMetadataMissingException)
-        assertTrue(voskEngine.modelStatus.value is VoskModelStatus.Error)
+            val voskEngine = VoskVoiceEngine(
+                context = context,
+                httpClient = trapHttpClient,
+                availableBytesProvider = { 10L * 1024L * 1024L * 1024L },
+            )
+            val voskResult = voskEngine.downloadPersianSmallModelSync()
+            assertTrue(voskResult.isFailure)
+            assertTrue(voskResult.exceptionOrNull() is SolNetworkException.IntegrityMetadataMissingException)
+            assertTrue(voskEngine.modelStatus.value is VoskModelStatus.Error)
 
-        assertFalse("Network must never be contacted when SHA-256 metadata is TODO(verify)", connectionCalled)
+            assertFalse("Network must never be contacted when SHA-256 metadata is TODO(verify)", connectionCalled)
+        }
     }
 
     @Test
-    fun `a4 verifies streaming sha256, 206 range resume, part deletion on tamper, host allowlist and disk guard`() = runBlocking {
+    fun `a4 verifies streaming sha256, 206 range resume, part deletion on tamper, host allowlist and disk guard`(): Unit = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val payload = ByteArray(1_050_000) { idx -> ((idx * 31 + 7) and 0xFF).toByte() }
         val validSha = sha256Hex(payload)
@@ -347,7 +349,7 @@ class M2SecurityNetworkTests {
     }
 
     @Test
-    fun `a4 verifies vosk verified zip install, slm 4gb catalog filter, and absence of System gc`() = runBlocking {
+    fun `a4 verifies vosk verified zip install, slm 4gb catalog filter, and absence of System gc`(): Unit = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         // Create valid dummy Vosk ZIP archive containing am/final.mdl + conf/mfcc.conf
         val zipBytes = ByteArrayOutputStream().use { baos ->
@@ -411,7 +413,7 @@ class M2SecurityNetworkTests {
     // =========================================================================
 
     @Test
-    fun `a5 v3 streaming backup roundtrip, tamper protection, and atomic transaction rollback`() = runBlocking {
+    fun `a5 v3 streaming backup roundtrip, tamper protection, and atomic transaction rollback`(): Unit = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = Room.inMemoryDatabaseBuilder(context, MemoryDatabase::class.java)
             .allowMainThreadQueries()
@@ -449,7 +451,15 @@ class M2SecurityNetworkTests {
             )
             knowledgeRepo.replaceChunksForBook(
                 bookId,
-                listOf(BookChunkEntity(bookId = bookId, chunkIndex = 0, contentText = "محتوای بخش اول", normalizedTokens = "محتوای بخش اول")),
+                listOf(
+                    BookChunkEntity(
+                        bookId = bookId,
+                        bookTitle = "عادت‌های اتمی",
+                        chunkIndex = 0,
+                        contentText = "محتوای بخش اول",
+                        normalizedTokens = "محتوای بخش اول",
+                    )
+                ),
             )
             knowledgeRepo.saveRole("مشاور عادت", "با لحن آرام راهنمایی کن", linkedBookTitle = "عادت‌های اتمی")
             prefsRepo.setOwnerName("سهراب")
@@ -523,6 +533,7 @@ class M2SecurityNetworkTests {
             assertEquals("سهراب", prefsRepo.getSnapshot().ownerName)
             assertEquals(HistoryRetentionMode.SEVEN_DAYS, prefsRepo.getSnapshot().historyRetentionMode)
             outFile.delete()
+            Unit
         } finally {
             prefsRepo.resetAllPreferences()
             db.close()
@@ -534,7 +545,7 @@ class M2SecurityNetworkTests {
     // =========================================================================
 
     @Test
-    fun `a7 privacy audit accurately reports asr backend and retention, private mode & wipe work`() = runBlocking {
+    fun `a7 privacy audit accurately reports asr backend and retention, private mode & wipe work`(): Unit = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = Room.inMemoryDatabaseBuilder(context, MemoryDatabase::class.java)
             .allowMainThreadQueries()
@@ -623,7 +634,18 @@ class M2SecurityNetworkTests {
             personRepo.savePerson("علی")
             locRepo.saveLocation("دفتر", "کارنو")
             val bId = knowledgeRepo.saveBook(BookKnowledgeEntity(title = "کتاب", author = "نویسنده", summaryText = "خلاصه"))
-            knowledgeRepo.replaceChunksForBook(bId, listOf(BookChunkEntity(bookId = bId, chunkIndex = 0, contentText = "متن", normalizedTokens = "متن")))
+            knowledgeRepo.replaceChunksForBook(
+                bId,
+                listOf(
+                    BookChunkEntity(
+                        bookId = bId,
+                        bookTitle = "کتاب",
+                        chunkIndex = 0,
+                        contentText = "متن",
+                        normalizedTokens = "متن",
+                    )
+                ),
+            )
             knowledgeRepo.saveRole("نقش", "دستور")
             knowledgeRepo.logBackgroundJob("job", "عنوان", "DONE", "جزئیات")
             knowledgeRepo.insertAlarmWithUniqueRequestCode(
