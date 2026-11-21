@@ -86,10 +86,14 @@ object PersianNumbers {
     private val TENS_FA = arrayOf("", "", "بیست", "سی", "چهل", "پنجاه", "شصت", "هفتاد", "هشتاد", "نود")
     private val HUNDREDS_FA = arrayOf("", "صد", "دویست", "سیصد", "چهارصد", "پانصد", "ششصد", "هفتصد", "هشتصد", "نهصد")
 
-    private val URL_REGEX = Regex("https?://\\S+", RegexOption.IGNORE_CASE)
-    private val EMOJI_DECOR_REGEX = Regex("[🎭📘🔎🎙⚠️✅❌•]")
+    private val MARKDOWN_LINK_REGEX = Regex("\\[([^\\]]+)]\\((https?://[^)\\s]+|www\\.[^)\\s]+)\\)", RegexOption.IGNORE_CASE)
+    private val URL_REGEX = Regex("(?:https?://|www\\.)\\S+", RegexOption.IGNORE_CASE)
+    private val MARKDOWN_HEADING_OR_QUOTE_REGEX = Regex("(?m)^\\s{0,3}(?:#{1,6}|>|[-*+]\\s+)\\s*")
+    private val MARKDOWN_FORMAT_REGEX = Regex("(\\*\\*|__|~~|`)")
+    private val DECORATIVE_CHAR_SET = setOf('•', '⚠', '✅', '❌', '⏳')
     private val MULTI_SPACE_REGEX = Regex("\\s+")
     private val TIME_HH_MM_REGEX = Regex("(?<!\\d)(\\d{1,2}):(\\d{2})(?!\\d)")
+    private val JALALI_OR_SLASH_DATE_REGEX = Regex("(?<!\\d)(\\d{4})/(\\d{1,2})/(\\d{1,2})(?!\\d)")
     private val DECIMAL_NUMBER_REGEX = Regex("(?<!\\d)(\\d{1,4})[.,٫/](\\d{1,2})(?!\\d)")
     private val PERCENT_BEFORE_REGEX = Regex("%(\\d{1,3})")
     private val PERCENT_AFTER_REGEX = Regex("(\\d{1,3})\\s*[%٪]")
@@ -281,15 +285,20 @@ object PersianNumbers {
 
     /**
      * Prepares Persian response text for SherpaTTS / system TTS engines:
-     * cleans URLs/emojis, expands percentages, times (14:30), decimals (1.5 -> یک و نیم),
+     * strips Markdown, emojis, and URLs, expands percentages, times (14:30),
+     * Jalali dates (1404/01/02 -> دو فروردین هزار و چهارصد و چهار), decimals (1.5 -> یک و نیم),
      * and standalone 1..4 digit numbers into spoken Persian words while keeping 5+ digit phone numbers intact.
      */
     fun prepareTextForTts(text: String): String {
         if (text.isBlank()) return ""
         var s = PersianTextNormalizer.cleanDisplayText(text)
+            .let { MARKDOWN_LINK_REGEX.replace(it) { m -> m.groupValues[1] } }
             .let { URL_REGEX.replace(it, "لینک") }
+            .let { MARKDOWN_HEADING_OR_QUOTE_REGEX.replace(it, "") }
+            .let { MARKDOWN_FORMAT_REGEX.replace(it, "") }
+            .replace("*", "")
             .replace("•", "،")
-            .let { EMOJI_DECOR_REGEX.replace(it, "") }
+            .let(::stripDecorativeEmojis)
 
         // Percentages: "50%" or "%50" -> "پنجاه درصد"
         s = PERCENT_AFTER_REGEX.replace(s) { m ->
@@ -301,25 +310,32 @@ object PersianNumbers {
             "${numberToWords(n)} درصد"
         }
 
-        // Clock times like 14:30 or 9:05 -> "چهارده و سی" / "نه و پنج"
+        // Clock times like 14:30 or 9:05 -> "چهارده و نیم" / "نه و پنج"
         s = TIME_HH_MM_REGEX.replace(s) { m ->
             val hh = m.groupValues[1].toLongOrNull() ?: return@replace m.value
             val mm = m.groupValues[2].toLongOrNull() ?: return@replace m.value
             if (hh in 0..23 && mm in 0..59) {
-                if (mm == 0L) numberToWords(hh)
-                else if (mm == 30L) "${numberToWords(hh)} و نیم"
-                else "${numberToWords(hh)} و ${numberToWords(mm)}"
+                when (mm) {
+                    0L -> numberToWords(hh)
+                    30L -> "${numberToWords(hh)} و نیم"
+                    else -> "${numberToWords(hh)} و ${numberToWords(mm)}"
+                }
             } else {
                 m.value
             }
         }
 
-        // Jalali / Gregorian slash dates like 1404/01/02 -> spoken date components
-        s = Regex("(?<!\\d)(\\d{4})/(\\d{1,2})/(\\d{1,2})(?!\\d)").replace(s) { m ->
-            val y = m.groupValues[1].toLongOrNull() ?: return@replace m.value
-            val mo = m.groupValues[2].toLongOrNull() ?: return@replace m.value
-            val d = m.groupValues[3].toLongOrNull() ?: return@replace m.value
-            "${numberToWords(y)} / ${numberToWords(mo)} / ${numberToWords(d)}"
+        // Jalali slash dates like 1404/01/02 -> spoken Persian date with month name
+        s = JALALI_OR_SLASH_DATE_REGEX.replace(s) { m ->
+            val y = m.groupValues[1].toIntOrNull() ?: return@replace m.value
+            val mo = m.groupValues[2].toIntOrNull() ?: return@replace m.value
+            val d = m.groupValues[3].toIntOrNull() ?: return@replace m.value
+            if (y in 1300..1500 && mo in 1..12 && d in 1..31) {
+                val monthName = com.example.sol.calendar.JalaliCalendar.MONTH_NAMES_FA[mo - 1]
+                "${numberToWords(d.toLong())} $monthName ${numberToWords(y.toLong())}"
+            } else {
+                "${numberToWords(y.toLong())} ${numberToWords(mo.toLong())} ${numberToWords(d.toLong())}"
+            }
         }
 
         // Decimals like 1.5 -> "یک و نیم" (skip if adjacent to more dots/digits)
@@ -337,6 +353,25 @@ object PersianNumbers {
         }
 
         return MULTI_SPACE_REGEX.replace(s, " ").trim()
+    }
+
+    private fun stripDecorativeEmojis(input: String): String = buildString(input.length) {
+        var i = 0
+        while (i < input.length) {
+            val cp = Character.codePointAt(input, i)
+            val count = Character.charCount(cp)
+            val isEmojiOrDecor = cp in 0x1F000..0x1FAFF ||
+                cp in 0x2600..0x27BF ||
+                cp in 0xFE00..0xFE0F ||
+                cp == 0x200D ||
+                (cp <= 0xFFFF && cp.toChar() in DECORATIVE_CHAR_SET)
+            if (isEmojiOrDecor) {
+                append(' ')
+            } else {
+                appendCodePoint(cp)
+            }
+            i += count
+        }
     }
 
     private fun threeDigitsToWords(n: Int): String {

@@ -13,6 +13,8 @@ import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.contacts.ContactManager
 import com.example.sol.contacts.ContactResolutionResult
 import com.example.sol.contacts.ResolvedContact
+import com.example.sol.knowledge.SlmIntentProposal
+import com.example.sol.knowledge.SlmIntentProposalValidator
 import com.example.sol.memory.UserUtteranceRepository
 import com.example.sol.text.PersianNumbers
 import com.example.sol.text.PersianTextNormalizer
@@ -205,6 +207,26 @@ class DialogueManager(
                 )
             }
         }
+    }
+
+    /**
+     * Re-enters stages D (slot filling & disambiguation) and E (mandatory user confirmation)
+     * from a schema-validated SLM intent proposal. SLM can never execute actions directly.
+     */
+    suspend fun handleValidatedSlmProposal(
+        rawUserUtterance: String,
+        proposal: SlmIntentProposal,
+    ): DialogueResult {
+        val baseCmd = SlmIntentProposalValidator.toParsedCommand(
+            proposal = proposal,
+            rawUserUtterance = rawUserUtterance,
+            extractor = extractor,
+        )
+        val enrichedCmd = resolvePronounsFromContext(baseCmd)
+        return proceedAfterSlotsReady(
+            command = enrichedCmd,
+            confidenceLabel = "پیشنهاد مدل زبانی محلی (نیازمند تأیید)",
+        )
     }
 
     suspend fun requestBackupRestoreConfirmation(

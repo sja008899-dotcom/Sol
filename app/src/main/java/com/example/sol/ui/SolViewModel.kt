@@ -409,6 +409,58 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val prefs = preferences.value
+
+                // B10 Stage 2: When no grounded book/role context is active, try strict isolated JSON intent proposal first.
+                if (task.allowIntentProposal) {
+                    val proposal = c.localSlmEngine.proposeIntent(
+                        userUtterance = rawInput,
+                        preferredPath = prefs.slmModelPath,
+                        preferGpu = prefs.slmPreferGpu,
+                    ).getOrNull()
+                    if (proposal != null) {
+                        val routed = c.dialogueManager.handleValidatedSlmProposal(rawInput, proposal)
+                        val replyText = routed.replyText.ifBlank { "درخواست شما تحلیل شد." }
+                        updateMessage(
+                            messageId = placeholderId,
+                            updatedText = replyText,
+                            actionBadge = "${routed.parsedCommand.action.name}_SLM",
+                            choices = routed.actionChoices,
+                        )
+                        c.historyRepository.recordIfAllowed(
+                            userText = rawInput,
+                            solText = replyText,
+                            intentAction = "${routed.parsedCommand.action.name}_SLM_PROPOSED",
+                            retentionMode = prefs.historyRetentionMode,
+                            privateModeEnabled = prefs.privateModeEnabled,
+                        )
+                        if (routed.speakReply && prefs.autoSpeak) {
+                            speakText(replyText)
+                        }
+                        when (val nextPending = routed.pendingTask) {
+                            is PendingSolTask.Communicate -> {
+                                c.taskManager.startPendingTask(nextPending) { statusMsg ->
+                                    appendMessage(isUser = false, text = statusMsg, actionBadge = "TASK")
+                                    if (preferences.value.autoSpeak) speakText(statusMsg)
+                                }
+                            }
+                            is PendingSolTask.InternetBookRoleFetch -> {
+                                _pendingBookFetch.value = PendingBookFetchConfirmation(
+                                    query = nextPending.bookQuery,
+                                    roleHint = nextPending.requestedRoleHint,
+                                    runInBackground = nextPending.runInBackground,
+                                )
+                            }
+                            is PendingSolTask.OpenCapabilitiesCatalog -> {
+                                _showCapabilitiesSheet.value = true
+                            }
+                            is PendingSolTask.RunLocalSlmChat, null -> Unit
+                        }
+                        refreshSystemSnapshots()
+                        return@launch
+                    }
+                }
+
+                // B10 Stage 1: Free-text bounded streaming chat (with RAG text wrapped in <DATA>...</DATA>)
                 val res = c.localSlmEngine.generateReplyStream(
                     userPrompt = task.userPrompt,
                     systemInstruction = task.systemInstruction,
@@ -571,8 +623,14 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun listenVoiceExplanationForRole() {
+        val prefs = preferences.value
         _voiceRoleSession.value = _voiceRoleSession.value?.copy(isListeningForExplanation = true)
-        c.voiceEngine.startListening(preferVosk = preferences.value.voskOfflineEnabled) { spoken ->
+        c.voiceEngine.startListening(
+            preferVosk = prefs.voskOfflineEnabled,
+            vadSilenceMs = prefs.vadSilenceTimeoutMs,
+            maxDurationMs = prefs.maxVoiceListenSeconds * 1000L,
+            playCue = prefs.voiceCueFeedbackEnabled,
+        ) { spoken ->
             val current = _voiceRoleSession.value
             if (current != null) {
                 val merged = listOf(current.voiceExplanationDraft, spoken)
@@ -660,7 +718,15 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startWakeWordGuard() {
-        c.voiceEngine.startWakeWordListening {
+        val prefs = preferences.value
+        c.voiceEngine.startWakeWordListening(
+            wakeTimeoutMs = prefs.wakeWordTimeoutMinutes * 60_000L,
+            allowBargeIn = true,
+            playCue = prefs.voiceCueFeedbackEnabled,
+            onTimeout = { timeoutMsg ->
+                _statusBannerMessage.value = timeoutMsg
+            },
+        ) {
             appendMessage(isUser = false, text = "واژه بیدارباش «Sol» شنیده شد — در حال گوش‌دادن به فرمان شما…", actionBadge = "WAKE_WORD")
             startVoiceListening()
         }
@@ -781,7 +847,13 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Voice & TTS ---
     fun startVoiceListening() {
-        c.voiceEngine.startListening(preferVosk = preferences.value.voskOfflineEnabled) { recognizedText ->
+        val prefs = preferences.value
+        c.voiceEngine.startListening(
+            preferVosk = prefs.voskOfflineEnabled,
+            vadSilenceMs = prefs.vadSilenceTimeoutMs,
+            maxDurationMs = prefs.maxVoiceListenSeconds * 1000L,
+            playCue = prefs.voiceCueFeedbackEnabled,
+        ) { recognizedText ->
             _inputText.value = recognizedText
             submitCommand(recognizedText)
         }
@@ -789,6 +861,15 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopVoiceListening() = c.voiceEngine.stopListening()
     fun clearVoiceError() = c.voiceEngine.clearError()
+
+    fun onAppBackgrounded() {
+        _isListeningForConfirm.value = false
+        c.voiceEngine.stopListening()
+    }
+
+    fun openAppPermissionSettings() {
+        c.deviceController.settingsController.openAppDetailsSettings()
+    }
 
     fun speakText(text: String) {
         val prefs = preferences.value
@@ -827,9 +908,15 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Confirmation & Communication (+ Hands-Free Voice Confirm/Cancel) ---
     fun startVoiceConfirmationListening() {
+        val prefs = preferences.value
         _isListeningForConfirm.value = true
         _confirmVoiceFeedback.value = "بگویید «تأیید» یا «لغو»…"
-        c.voiceEngine.startConfirmationVoiceListening(preferVosk = preferences.value.voskOfflineEnabled) { decision, spoken ->
+        c.voiceEngine.startConfirmationVoiceListening(
+            preferVosk = prefs.voskOfflineEnabled,
+            vadSilenceMs = prefs.vadSilenceTimeoutMs,
+            maxDurationMs = prefs.maxVoiceListenSeconds * 1000L,
+            playCue = prefs.voiceCueFeedbackEnabled,
+        ) { decision, spoken ->
             _isListeningForConfirm.value = false
             when (decision) {
                 true -> {
@@ -988,6 +1075,10 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     fun setDarkTheme(dark: Boolean) = viewModelScope.launch { c.preferencesRepository.setDarkTheme(dark) }
     fun setVoskOfflineEnabled(enabled: Boolean) = viewModelScope.launch { c.preferencesRepository.setVoskOfflineEnabled(enabled) }
     fun setWakeWordEnabled(enabled: Boolean) = viewModelScope.launch { c.preferencesRepository.setWakeWordEnabled(enabled) }
+    fun setVadSilenceTimeoutMs(timeoutMs: Long) = viewModelScope.launch { c.preferencesRepository.setVadSilenceTimeoutMs(timeoutMs) }
+    fun setMaxVoiceListenSeconds(seconds: Int) = viewModelScope.launch { c.preferencesRepository.setMaxVoiceListenSeconds(seconds) }
+    fun setWakeWordTimeoutMinutes(minutes: Int) = viewModelScope.launch { c.preferencesRepository.setWakeWordTimeoutMinutes(minutes) }
+    fun setVoiceCueFeedbackEnabled(enabled: Boolean) = viewModelScope.launch { c.preferencesRepository.setVoiceCueFeedbackEnabled(enabled) }
     fun setSlmSynthesisEnabled(enabled: Boolean) = viewModelScope.launch {
         c.preferencesRepository.setSlmSynthesisEnabled(enabled)
         if (!enabled) {
@@ -1159,6 +1250,21 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     private fun updateMessageText(messageId: Long, updatedText: String) {
         _messages.value = _messages.value.map { msg ->
             if (msg.id == messageId) msg.copy(text = updatedText) else msg
+        }
+    }
+
+    private fun updateMessage(
+        messageId: Long,
+        updatedText: String,
+        actionBadge: String,
+        choices: List<DialogueUiChoice> = emptyList(),
+    ) {
+        _messages.value = _messages.value.map { msg ->
+            if (msg.id == messageId) {
+                msg.copy(text = updatedText, actionBadge = actionBadge, choices = choices)
+            } else {
+                msg
+            }
         }
     }
 

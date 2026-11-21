@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -63,11 +64,16 @@ data class SolPreferences(
     val wakeWordEnabled: Boolean = false,
     val slmSynthesisEnabled: Boolean = false,
     val slmModelPath: String = "",
-    val slmPreferGpu: Boolean = true,
+    val slmPreferGpu: Boolean = false,
     val lastBackupAt: Long = 0L,
     // M2 Privacy honesty & retention controls
     val historyRetentionMode: HistoryRetentionMode = HistoryRetentionMode.TWO_HUNDRED_ITEMS,
     val privateModeEnabled: Boolean = false,
+    // M6 Voice pipeline end-pointing & wake-word controls
+    val vadSilenceTimeoutMs: Long = 1350L,
+    val maxVoiceListenSeconds: Int = 15,
+    val wakeWordTimeoutMinutes: Int = 3,
+    val voiceCueFeedbackEnabled: Boolean = true,
 )
 
 class PreferencesRepository(private val context: Context) {
@@ -93,6 +99,10 @@ class PreferencesRepository(private val context: Context) {
         val LAST_BACKUP_AT = longPreferencesKey("last_backup_at")
         val HISTORY_RETENTION_MODE = stringPreferencesKey("history_retention_mode")
         val PRIVATE_MODE_ENABLED = booleanPreferencesKey("private_mode_enabled")
+        val VAD_SILENCE_TIMEOUT_MS = longPreferencesKey("vad_silence_timeout_ms")
+        val MAX_VOICE_LISTEN_SECONDS = intPreferencesKey("max_voice_listen_seconds")
+        val WAKE_WORD_TIMEOUT_MINUTES = intPreferencesKey("wake_word_timeout_minutes")
+        val VOICE_CUE_FEEDBACK_ENABLED = booleanPreferencesKey("voice_cue_feedback_enabled")
     }
 
     val preferences: Flow<SolPreferences> = context.solPrefsDataStore.data.map { p ->
@@ -116,13 +126,17 @@ class PreferencesRepository(private val context: Context) {
             wakeWordEnabled = p[Keys.WAKE_WORD_ENABLED] ?: false,
             slmSynthesisEnabled = p[Keys.SLM_SYNTHESIS_ENABLED] ?: false,
             slmModelPath = p[Keys.SLM_MODEL_PATH] ?: "",
-            slmPreferGpu = p[Keys.SLM_PREFER_GPU] ?: true,
+            slmPreferGpu = p[Keys.SLM_PREFER_GPU] ?: false,
             lastBackupAt = p[Keys.LAST_BACKUP_AT] ?: 0L,
             historyRetentionMode = enumOrDefault(
                 p[Keys.HISTORY_RETENTION_MODE],
                 HistoryRetentionMode.TWO_HUNDRED_ITEMS
             ),
             privateModeEnabled = p[Keys.PRIVATE_MODE_ENABLED] ?: false,
+            vadSilenceTimeoutMs = (p[Keys.VAD_SILENCE_TIMEOUT_MS] ?: 1350L).coerceIn(700L, 3500L),
+            maxVoiceListenSeconds = (p[Keys.MAX_VOICE_LISTEN_SECONDS] ?: 15).coerceIn(8, 45),
+            wakeWordTimeoutMinutes = (p[Keys.WAKE_WORD_TIMEOUT_MINUTES] ?: 3).coerceIn(1, 10),
+            voiceCueFeedbackEnabled = p[Keys.VOICE_CUE_FEEDBACK_ENABLED] ?: true,
         )
     }
 
@@ -214,6 +228,22 @@ class PreferencesRepository(private val context: Context) {
         context.solPrefsDataStore.edit { it[Keys.PRIVATE_MODE_ENABLED] = enabled }
     }
 
+    suspend fun setVadSilenceTimeoutMs(timeoutMs: Long) {
+        context.solPrefsDataStore.edit { it[Keys.VAD_SILENCE_TIMEOUT_MS] = timeoutMs.coerceIn(700L, 3500L) }
+    }
+
+    suspend fun setMaxVoiceListenSeconds(seconds: Int) {
+        context.solPrefsDataStore.edit { it[Keys.MAX_VOICE_LISTEN_SECONDS] = seconds.coerceIn(8, 45) }
+    }
+
+    suspend fun setWakeWordTimeoutMinutes(minutes: Int) {
+        context.solPrefsDataStore.edit { it[Keys.WAKE_WORD_TIMEOUT_MINUTES] = minutes.coerceIn(1, 10) }
+    }
+
+    suspend fun setVoiceCueFeedbackEnabled(enabled: Boolean) {
+        context.solPrefsDataStore.edit { it[Keys.VOICE_CUE_FEEDBACK_ENABLED] = enabled }
+    }
+
     suspend fun resetAllPreferences() {
         context.solPrefsDataStore.edit { it.clear() }
     }
@@ -239,6 +269,10 @@ class PreferencesRepository(private val context: Context) {
             p[Keys.SLM_PREFER_GPU] = restored.slmPreferGpu
             p[Keys.HISTORY_RETENTION_MODE] = restored.historyRetentionMode.name
             p[Keys.PRIVATE_MODE_ENABLED] = restored.privateModeEnabled
+            p[Keys.VAD_SILENCE_TIMEOUT_MS] = restored.vadSilenceTimeoutMs.coerceIn(700L, 3500L)
+            p[Keys.MAX_VOICE_LISTEN_SECONDS] = restored.maxVoiceListenSeconds.coerceIn(8, 45)
+            p[Keys.WAKE_WORD_TIMEOUT_MINUTES] = restored.wakeWordTimeoutMinutes.coerceIn(1, 10)
+            p[Keys.VOICE_CUE_FEEDBACK_ENABLED] = restored.voiceCueFeedbackEnabled
         }
     }
 

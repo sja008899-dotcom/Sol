@@ -29,10 +29,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 data class SlmModelSpec(
     val id: String,
@@ -586,12 +588,22 @@ class LocalSlmEngine(
         }
     }
 
+    private enum class GenerationStopReason {
+        NONE,
+        USER_CANCELLED,
+        TOKEN_LIMIT,
+        TIMEOUT,
+    }
+
     suspend fun generateReplyStream(
         userPrompt: String,
         systemInstruction: String,
         preferredPath: String,
         preferGpu: Boolean,
         isQwen3Hint: Boolean? = null,
+        maxNewTokens: Int = DEFAULT_MAX_NEW_TOKENS,
+        timeoutMs: Long = DEFAULT_GENERATION_TIMEOUT_MS,
+        forceFreshConversation: Boolean = false,
         onPartialCleanText: (String) -> Unit,
     ): Result<String> = withContext(slmDispatcher) {
         lifecycleMutex.withLock {
@@ -599,7 +611,7 @@ class LocalSlmEngine(
                 preferredPath = preferredPath,
                 preferGpu = preferGpu,
                 systemInstruction = systemInstruction,
-                forceFreshConversation = false,
+                forceFreshConversation = forceFreshConversation,
             )
             if (loadRes.isFailure) {
                 return@withLock Result.failure(loadRes.exceptionOrNull() ?: IllegalStateException("مدل آماده نیست"))
@@ -611,7 +623,10 @@ class LocalSlmEngine(
             val modelFile = File(loadedModelPath)
             val useNoThinkPrefix = isQwen3Hint ?: modelFile.name.contains("qwen3", ignoreCase = true)
             val effectivePrompt = if (useNoThinkPrefix) "/no_think\n$userPrompt" else userPrompt
+            val safeMaxTokens = maxNewTokens.coerceIn(32, MAX_ALLOWED_NEW_TOKENS)
+            val safeTimeoutMs = timeoutMs.coerceIn(2_000L, MAX_ALLOWED_TIMEOUT_MS)
 
+            val stopReason = AtomicReference(GenerationStopReason.NONE)
             isBusyGenerating.set(true)
             _runtimeState.value = SlmRuntimeState.Generating(
                 modelName = modelFile.name,
@@ -621,28 +636,72 @@ class LocalSlmEngine(
             val rawBuilder = StringBuilder()
             var lastEmitted = ""
             try {
-                conv.sendMessageAsync(effectivePrompt).collect { chunk ->
-                    if (!isActive || !isBusyGenerating.get()) {
-                        throw CancellationException("تولید توسط کاربر متوقف شد")
+                val completedInTime = withTimeoutOrNull(safeTimeoutMs) {
+                    conv.sendMessageAsync(effectivePrompt).collect { chunk ->
+                        if (!isActive || !isBusyGenerating.get()) {
+                            if (stopReason.get() == GenerationStopReason.NONE) {
+                                stopReason.set(GenerationStopReason.USER_CANCELLED)
+                            }
+                            throw CancellationException("تولید متوقف شد")
+                        }
+                        rawBuilder.append(chunk.toString())
+                        val cleanSoFar = stripThinkingTags(rawBuilder.toString(), hideUnclosedThinkWhileStreaming = true)
+                        if (cleanSoFar.isNotBlank() && cleanSoFar != lastEmitted) {
+                            lastEmitted = cleanSoFar
+                            onPartialCleanText(cleanSoFar)
+                        }
+                        if (estimateTokenCount(cleanSoFar) >= safeMaxTokens) {
+                            stopReason.set(GenerationStopReason.TOKEN_LIMIT)
+                            runCatching { conv.cancelProcess() }
+                            throw CancellationException("سقف توکن پاسخ")
+                        }
                     }
-                    rawBuilder.append(chunk.toString())
-                    val cleanSoFar = stripThinkingTags(rawBuilder.toString(), hideUnclosedThinkWhileStreaming = true)
-                    if (cleanSoFar.isNotBlank() && cleanSoFar != lastEmitted) {
-                        lastEmitted = cleanSoFar
-                        onPartialCleanText(cleanSoFar)
-                    }
+                    true
                 }
+                if (completedInTime == null) {
+                    stopReason.set(GenerationStopReason.TIMEOUT)
+                    runCatching { conv.cancelProcess() }
+                }
+
                 val finalClean = stripThinkingTags(rawBuilder.toString(), hideUnclosedThinkWhileStreaming = false)
-                if (finalClean.isBlank()) {
-                    return@withLock Result.failure(IllegalStateException("مدل خروجی معتبری تولید نکرد؛ دوباره امتحان کنید یا گفت‌وگو را تازه کنید."))
+                when (stopReason.get()) {
+                    GenerationStopReason.TIMEOUT -> {
+                        if (finalClean.isNotBlank()) {
+                            Result.success(finalClean)
+                        } else {
+                            Result.failure(IllegalStateException("زمان پردازش مدل زبانی به پایان رسید."))
+                        }
+                    }
+                    GenerationStopReason.USER_CANCELLED -> {
+                        if (finalClean.isNotBlank()) {
+                            Result.success("$finalClean\n(توقف توسط کاربر)")
+                        } else {
+                            Result.failure(CancellationException("تولید توسط کاربر متوقف شد"))
+                        }
+                    }
+                    GenerationStopReason.TOKEN_LIMIT, GenerationStopReason.NONE -> {
+                        if (finalClean.isBlank()) {
+                            Result.failure(IllegalStateException("مدل خروجی معتبری تولید نکرد؛ دوباره امتحان کنید یا گفت‌وگو را تازه کنید."))
+                        } else {
+                            Result.success(finalClean)
+                        }
+                    }
                 }
-                Result.success(finalClean)
             } catch (ce: CancellationException) {
                 val partial = stripThinkingTags(rawBuilder.toString(), hideUnclosedThinkWhileStreaming = false)
-                if (partial.isNotBlank()) {
-                    Result.success("$partial\n(توقف توسط کاربر)")
-                } else {
-                    Result.failure(ce)
+                when (stopReason.get()) {
+                    GenerationStopReason.TOKEN_LIMIT -> {
+                        if (partial.isNotBlank()) Result.success(partial)
+                        else Result.failure(IllegalStateException("مدل خروجی معتبری تولید نکرد."))
+                    }
+                    GenerationStopReason.TIMEOUT -> {
+                        if (partial.isNotBlank()) Result.success(partial)
+                        else Result.failure(IllegalStateException("زمان پردازش مدل زبانی به پایان رسید."))
+                    }
+                    else -> {
+                        if (partial.isNotBlank()) Result.success("$partial\n(توقف توسط کاربر)")
+                        else Result.failure(ce)
+                    }
                 }
             } catch (t: Throwable) {
                 Result.failure(IllegalStateException("خطا هنگام پردازش مدل زبانی: ${t.localizedMessage ?: "نامشخص"}", t))
@@ -651,6 +710,56 @@ class LocalSlmEngine(
                 refreshRuntimeStatus(loadedModelPath)
             }
         }
+    }
+
+    /**
+     * Bounded, prompt-injection-isolated intent proposal (M6 B10).
+     * Prompt contains ONLY the raw user utterance + closed intent allowlist (zero RAG/book/web text).
+     * Retries once if first response is not valid strict JSON; invalid outputs are discarded cleanly.
+     */
+    suspend fun proposeIntent(
+        userUtterance: String,
+        preferredPath: String,
+        preferGpu: Boolean,
+        timeoutMs: Long = INTENT_PROPOSAL_TIMEOUT_MS,
+    ): Result<SlmIntentProposal?> {
+        val sysPrompt = SlmPromptBuilder.buildIntentProposalSystemInstruction()
+        val firstRes = generateReplyStream(
+            userPrompt = SlmPromptBuilder.buildIntentProposalPrompt(userUtterance),
+            systemInstruction = sysPrompt,
+            preferredPath = preferredPath,
+            preferGpu = preferGpu,
+            maxNewTokens = DEFAULT_MAX_NEW_TOKENS,
+            timeoutMs = timeoutMs,
+            forceFreshConversation = true,
+            onPartialCleanText = {},
+        )
+        if (firstRes.isFailure) {
+            return Result.failure(firstRes.exceptionOrNull() ?: IllegalStateException("خطای پیشنهاد فرمان"))
+        }
+        val firstParsed = SlmIntentProposalValidator.parseOrNull(firstRes.getOrNull().orEmpty())
+        if (firstParsed != null) {
+            resetConversation()
+            return Result.success(firstParsed)
+        }
+
+        // Single retry with compact strict JSON prompt if model didn't emit valid JSON first time
+        val retryRes = generateReplyStream(
+            userPrompt = SlmPromptBuilder.buildIntentProposalRetryPrompt(userUtterance),
+            systemInstruction = sysPrompt,
+            preferredPath = preferredPath,
+            preferGpu = preferGpu,
+            maxNewTokens = DEFAULT_MAX_NEW_TOKENS,
+            timeoutMs = timeoutMs,
+            forceFreshConversation = true,
+            onPartialCleanText = {},
+        )
+        resetConversation()
+        if (retryRes.isFailure) {
+            return Result.success(null)
+        }
+        val secondParsed = SlmIntentProposalValidator.parseOrNull(retryRes.getOrNull().orEmpty())
+        return Result.success(secondParsed)
     }
 
     fun stopGeneration() {
@@ -877,9 +986,23 @@ class LocalSlmEngine(
     companion object {
         private const val MODELS_DIR_NAME = "slm_models"
         private const val MIN_VALID_MODEL_BYTES = 1L * 1024L * 1024L
+        const val DEFAULT_MAX_NEW_TOKENS = 160
+        private const val MAX_ALLOWED_NEW_TOKENS = 320
+        const val DEFAULT_GENERATION_TIMEOUT_MS = 30_000L
+        const val INTENT_PROPOSAL_TIMEOUT_MS = 15_000L
+        private const val MAX_ALLOWED_TIMEOUT_MS = 60_000L
 
         private val COMPLETED_THINK_REGEX = Regex("(?is)<think>.*?</think>")
         private val EXCESS_NEWLINES_REGEX = Regex("\\n{3,}")
+        private val TOKEN_SPLIT_REGEX = Regex("\\s+")
+
+        fun estimateTokenCount(text: String): Int {
+            val trimmed = text.trim()
+            if (trimmed.isEmpty()) return 0
+            val wordUnits = trimmed.split(TOKEN_SPLIT_REGEX).size
+            val charEstimate = (trimmed.length + 2) / 3
+            return maxOf(wordUnits, charEstimate)
+        }
 
         fun buildSystemInstruction(
             ownerName: String,
@@ -889,37 +1012,15 @@ class LocalSlmEngine(
             memoryHighlights: List<String>,
             groundedBookChunks: List<RankedBookChunk>,
             voiceNotes: String,
-        ): String = buildString {
-            appendLine("تو «Sol» هستی؛ یک دستیار شخصی فارسی، محترم، دقیق و همراه فکری روی گوشی کاربر.")
-            appendLine("نام کاربر: $ownerName")
-            if (confirmedLocation.isNotBlank()) {
-                appendLine("موقعیت فعلی تأییدشده کاربر: $confirmedLocation")
-            }
-            if (!activeRoleName.isNullOrBlank()) {
-                appendLine("نقش فعال فعلی تو: $activeRoleName")
-                if (!activeRoleInstructions.isNullOrBlank()) {
-                    appendLine("دستورالعمل نقش فعال: ${activeRoleInstructions.take(350)}")
-                }
-            }
-            if (memoryHighlights.isNotEmpty()) {
-                appendLine("حافظه شخصی ذخیره‌شده کاربر (فقط به این موارد استناد کن و چیزی از خودت نساز):")
-                memoryHighlights.take(8).forEach { appendLine("- $it") }
-            }
-            if (groundedBookChunks.isNotEmpty()) {
-                appendLine("بخش‌های مرتبط از کتابخانه آفلاین کاربر:")
-                groundedBookChunks.take(2).forEach { hit ->
-                    appendLine("- از «${hit.chunk.bookTitle}»: ${hit.chunk.contentText.take(360)}")
-                }
-            }
-            if (voiceNotes.isNotBlank()) {
-                appendLine("یادداشت صوتی کاربر درباره کتاب: ${voiceNotes.take(220)}")
-            }
-            appendLine("قواعد حتمی پاسخ‌گویی:")
-            appendLine("۱. فقط به زبان فارسی روان، محترمانه، کاربردی و بدون پرگویی پاسخ بده.")
-            appendLine("۲. اگر اطلاعاتی در حافظه بالا نیست، حدس نزن و صادقانه بگو که نمی‌دانی یا در حافظه ثبت نشده.")
-            appendLine("۳. در گفت‌وگوی همدلانه و همفکری، شنوندهٔ محترمی باش؛ ولی هرگز نقش پزشک، روان‌پزشک یا متخصص مجوزدار بالینی را ادعا نکن و در بحران‌های حاد به تماس با نزدیکان یا مراکز تخصصی راهنمایی کن.")
-            appendLine("۴. خروجی را کوتاه، واضح و مناسب خواندن با صدای گوشی (TTS) بنویس.")
-        }.trim()
+        ): String = SlmPromptBuilder.buildChatSystemInstruction(
+            ownerName = ownerName,
+            confirmedLocation = confirmedLocation,
+            activeRoleName = activeRoleName,
+            activeRoleInstructions = activeRoleInstructions,
+            memoryHighlights = memoryHighlights,
+            groundedBookChunks = groundedBookChunks,
+            voiceNotes = voiceNotes,
+        )
 
         fun hasEnoughRamForModel(availableRamMb: Long, minRequiredRamMb: Long): Boolean {
             if (availableRamMb < 0L) return true

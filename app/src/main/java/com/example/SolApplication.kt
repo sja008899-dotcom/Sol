@@ -49,8 +49,8 @@ class SolAppContainer(private val application: Application) {
     val memoryOptimizer by lazy { SolMemoryOptimizer(application) }
 
     val audioManager by lazy { SolAudioManager(application) }
-    val voiceEngine by lazy { VoiceEngine(application) }
-    val persianTts by lazy { PersianTTS(application) }
+    val persianTts by lazy { PersianTTS(application, audioManager) }
+    val voiceEngine by lazy { VoiceEngine(application, audioManager = audioManager, persianTts = persianTts) }
 
     val deviceController by lazy { DeviceController(application, audioManager) }
     val contactManager by lazy { ContactManager(application, personRepository) }

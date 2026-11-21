@@ -554,6 +554,7 @@ class UnknownFallbackSkill(
                         systemInstruction = sysPrompt,
                         fallbackReplyText = fallbackText,
                         hasBookGrounding = rag.topChunks.isNotEmpty(),
+                        allowIntentProposal = rag.topChunks.isEmpty() && rag.activeRole == null,
                     ),
                 )
             }

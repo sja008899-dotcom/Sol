@@ -43,6 +43,13 @@ sealed interface VoskModelStatus {
     data class Error(val messageFa: String) : VoskModelStatus
 }
 
+enum class EndPointingAction {
+    CONTINUE,
+    FINALIZE_SPEECH,
+    TIMEOUT_NO_SPEECH,
+    WAKE_TIMEOUT,
+}
+
 class VoiceVocabularyBias {
     @Volatile
     private var domainTerms: List<String> = emptyList()
@@ -245,10 +252,12 @@ class VoskVoiceEngine(
     fun startListening(
         grammarJson: String? = null,
         isWakeWordMode: Boolean = false,
-        vadSilenceMs: Long = 1350L,
+        vadSilenceMs: Long = DEFAULT_VAD_SILENCE_MS,
+        maxDurationMs: Long = if (isWakeWordMode) DEFAULT_WAKE_TIMEOUT_MS else DEFAULT_MAX_LISTEN_DURATION_MS,
         onPartial: (String) -> Unit,
         onRmsChanged: (Float) -> Unit,
         onFinalResult: (String) -> Unit,
+        onTimeout: ((String) -> Unit)? = null,
         onError: (String) -> Unit,
     ) {
         val modelDir = findValidModelDir()
@@ -256,6 +265,9 @@ class VoskVoiceEngine(
             onError("مدل آفلاین Vosk نصب نشده است.")
             return
         }
+
+        val safeVadSilenceMs = vadSilenceMs.coerceIn(MIN_VAD_SILENCE_MS, MAX_VAD_SILENCE_MS)
+        val safeMaxDurationMs = maxDurationMs.coerceAtLeast(3_000L)
 
         stopListening()
         autoUnloadJob?.cancel()
@@ -295,8 +307,9 @@ class VoskVoiceEngine(
 
                 recorder.startRecording()
                 val shortBuf = ShortArray(2048)
+                val startedAt = System.currentTimeMillis()
                 var hasHeardSpeech = false
-                var lastVoiceActivityAt = System.currentTimeMillis()
+                var lastVoiceActivityAt = startedAt
                 var lastPartialSent = ""
 
                 while (isRecording.get()) {
@@ -350,19 +363,59 @@ class VoskVoiceEngine(
                         }
                     }
 
-                    // Smart VAD pause auto-finalize when user finishes speaking
-                    if (!isWakeWordMode && hasHeardSpeech && (now - lastVoiceActivityAt) >= vadSilenceMs) {
-                        val finalTxt = extractVoskText(recognizer.finalResult, "text")
-                            .ifBlank { lastPartialSent }
-                        isRecording.set(false)
-                        if (finalTxt.isNotBlank()) {
-                            val corrected = vocabularyBias.applyBiasCorrection(finalTxt)
-                            mainHandler.post { onFinalResult(corrected) }
-                        } else {
-                            mainHandler.post { onError("صدایی تشخیص داده نشد؛ لطفاً دوباره بگو") }
+                    when (
+                        evaluateEndPointing(
+                            isWakeWordMode = isWakeWordMode,
+                            hasHeardSpeech = hasHeardSpeech,
+                            nowMs = now,
+                            startedAtMs = startedAt,
+                            lastVoiceActivityAtMs = lastVoiceActivityAt,
+                            vadSilenceMs = safeVadSilenceMs,
+                            maxDurationMs = safeMaxDurationMs,
+                        )
+                    ) {
+                        EndPointingAction.FINALIZE_SPEECH -> {
+                            val finalTxt = extractVoskText(recognizer.finalResult, "text")
+                                .ifBlank { lastPartialSent }
+                            isRecording.set(false)
+                            if (finalTxt.isNotBlank()) {
+                                val corrected = vocabularyBias.applyBiasCorrection(finalTxt)
+                                mainHandler.post { onFinalResult(corrected) }
+                            } else {
+                                mainHandler.post { onError("صدایی تشخیص داده نشد؛ لطفاً دوباره بگو") }
+                            }
+                            break
                         }
-                        break
+
+                        EndPointingAction.TIMEOUT_NO_SPEECH -> {
+                            val fallbackTxt = extractVoskText(recognizer.finalResult, "text")
+                                .ifBlank { lastPartialSent }
+                            isRecording.set(false)
+                            if (fallbackTxt.isNotBlank()) {
+                                val corrected = vocabularyBias.applyBiasCorrection(fallbackTxt)
+                                mainHandler.post { onFinalResult(corrected) }
+                            } else {
+                                val timeoutMsg = "زمان شنود به پایان رسید؛ صدایی تشخیص داده نشد"
+                                mainHandler.post {
+                                    if (onTimeout != null) onTimeout(timeoutMsg) else onError(timeoutMsg)
+                                }
+                            }
+                            break
+                        }
+
+                        EndPointingAction.WAKE_TIMEOUT -> {
+                            isRecording.set(false)
+                            val timeoutMsg = "گوش‌به‌زنگ واژه «Sol» پس از سکوت خودکار متوقف شد."
+                            mainHandler.post { onTimeout?.invoke(timeoutMsg) }
+                            break
+                        }
+
+                        EndPointingAction.CONTINUE -> Unit
                     }
+                }
+            } catch (sec: SecurityException) {
+                if (isRecording.get()) {
+                    mainHandler.post { onError("مجوز میکروفون صادر نشده است") }
                 }
             } catch (t: Throwable) {
                 if (isRecording.get()) {
@@ -481,6 +534,12 @@ class VoskVoiceEngine(
         private const val SAMPLE_RATE = 16000
         private const val VAD_SPEECH_THRESHOLD = 0.08f
         private const val IDLE_UNLOAD_DELAY_MS = 90_000L
+        const val MIN_VAD_SILENCE_MS = 700L
+        const val MAX_VAD_SILENCE_MS = 3_500L
+        const val DEFAULT_VAD_SILENCE_MS = 1_350L
+        const val DEFAULT_MAX_LISTEN_DURATION_MS = 15_000L
+        const val DEFAULT_WAKE_TIMEOUT_MS = 180_000L
+
         const val VOSK_FA_SMALL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.4.zip"
         // TODO(verify): Alpha Cephei repository index does not publish raw SHA-256 / byte length; keep fail-safe until verified.
         const val VOSK_FA_SMALL_SHA256 = "TODO(verify)"
@@ -488,5 +547,30 @@ class VoskVoiceEngine(
 
         fun hasVerifiedDownloadMetadata(): Boolean =
             SolHttpClient.isValidSha256Hex(VOSK_FA_SMALL_SHA256) && VOSK_FA_SMALL_EXPECTED_BYTES > 0L
+
+        fun evaluateEndPointing(
+            isWakeWordMode: Boolean,
+            hasHeardSpeech: Boolean,
+            nowMs: Long,
+            startedAtMs: Long,
+            lastVoiceActivityAtMs: Long,
+            vadSilenceMs: Long,
+            maxDurationMs: Long,
+        ): EndPointingAction {
+            val elapsedFromStart = (nowMs - startedAtMs).coerceAtLeast(0L)
+            val silenceMs = (nowMs - lastVoiceActivityAtMs).coerceAtLeast(0L)
+            return if (isWakeWordMode) {
+                if (silenceMs >= maxDurationMs) EndPointingAction.WAKE_TIMEOUT
+                else EndPointingAction.CONTINUE
+            } else {
+                when {
+                    hasHeardSpeech && silenceMs >= vadSilenceMs -> EndPointingAction.FINALIZE_SPEECH
+                    elapsedFromStart >= maxDurationMs -> {
+                        if (hasHeardSpeech) EndPointingAction.FINALIZE_SPEECH else EndPointingAction.TIMEOUT_NO_SPEECH
+                    }
+                    else -> EndPointingAction.CONTINUE
+                }
+            }
+        }
     }
 }

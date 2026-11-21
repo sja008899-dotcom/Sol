@@ -112,6 +112,10 @@ fun SettingsScreen(
     onRecheckSystemTts: () -> Unit,
     onVoskOfflineToggle: (Boolean) -> Unit,
     onWakeWordToggle: (Boolean) -> Unit,
+    onVadSilenceTimeoutChange: (Long) -> Unit,
+    onMaxVoiceListenSecondsChange: (Int) -> Unit,
+    onWakeWordTimeoutMinutesChange: (Int) -> Unit,
+    onVoiceCueFeedbackChange: (Boolean) -> Unit,
     onDownloadVoskModel: () -> Unit,
     onPickVoskZip: () -> Unit,
     onUnloadVoskRam: () -> Unit,
@@ -274,9 +278,55 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("حالت بیدارباش «Sol» با تشخیص مکث VAD", style = MaterialTheme.typography.bodyMedium)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("بیدارباش «Sol» (فقط هنگام باز بودن برنامه)", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "در پس‌زمینه و سکوت طولانی خودکار متوقف می‌شود تا باتری مصرف نشود.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Switch(checked = preferences.wakeWordEnabled, onCheckedChange = onWakeWordToggle)
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("بوق و لرزش کوتاه شروع/پایان شنود", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = preferences.voiceCueFeedbackEnabled, onCheckedChange = onVoiceCueFeedbackChange)
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("مهلت سکوت پایان جمله (VAD)", style = MaterialTheme.typography.bodySmall)
+                    Text("${preferences.vadSilenceTimeoutMs} ms", style = MaterialTheme.typography.labelMedium)
+                }
+                Slider(
+                    value = preferences.vadSilenceTimeoutMs.toFloat(),
+                    onValueChange = { onVadSilenceTimeoutChange((it / 50f).roundToInt() * 50L) },
+                    valueRange = 700f..3500f,
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("حداکثر مدت شنود هر فرمان", style = MaterialTheme.typography.bodySmall)
+                    Text("${preferences.maxVoiceListenSeconds} ثانیه", style = MaterialTheme.typography.labelMedium)
+                }
+                Slider(
+                    value = preferences.maxVoiceListenSeconds.toFloat(),
+                    onValueChange = { onMaxVoiceListenSecondsChange(it.roundToInt()) },
+                    valueRange = 8f..45f,
+                )
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("توقف خودکار بیدارباش در سکوت", style = MaterialTheme.typography.bodySmall)
+                    Text("${preferences.wakeWordTimeoutMinutes} دقیقه", style = MaterialTheme.typography.labelMedium)
+                }
+                Slider(
+                    value = preferences.wakeWordTimeoutMinutes.toFloat(),
+                    onValueChange = { onWakeWordTimeoutMinutesChange(it.roundToInt()) },
+                    valueRange = 1f..10f,
+                )
             }
         }
 
@@ -406,7 +456,7 @@ fun SettingsScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("اولویت با شتاب‌دهنده گرافیکی GPU", style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            text = "در صورت نبود OpenCL یا خطای تراشه، خودکار روی CPU اجرا می‌شود.",
+                            text = "پیش‌فرض خاموش (CPU) برای پایداری گوشی‌های ۴GB؛ در صورت نبود OpenCL خودکار روی CPU اجرا می‌شود.",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -761,6 +811,24 @@ fun SettingsScreen(
                         MaterialTheme.colorScheme.error
                     },
                 )
+
+                if (ttsAvailability == TtsAvailability.MISSING_PERSIAN_DATA ||
+                    ttsAvailability == TtsAvailability.UNAVAILABLE
+                ) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = "راهنما: Sol برای حفظ حجم سبک و حریم خصوصی موتور TTS داخلی ندارد. برای شنیدن پاسخ‌های فارسی، اپلیکیشن آزاد SherpaTTS (یا بسته صدای فارسی در تنظیمات صدای اندروید) را نصب و انتخاب کنید.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(10.dp),
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text("انتخاب موتور صدای نصب‌شده روی گوشی:", style = MaterialTheme.typography.labelMedium)

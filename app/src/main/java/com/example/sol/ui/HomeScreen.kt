@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Hearing
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -41,6 +42,7 @@ import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
@@ -60,7 +62,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -77,6 +81,7 @@ import com.example.sol.memory.SolRoleEntity
 import com.example.sol.tasks.ActiveTaskState
 import com.example.sol.voice.ActiveAsrBackend
 import com.example.sol.voice.TtsAvailability
+import com.example.sol.voice.VoiceErrorAction
 import com.example.sol.voice.VoiceListeningState
 import com.example.sol.voice.VoskModelStatus
 
@@ -116,9 +121,12 @@ fun HomeScreen(
     onQuickCommand: (String) -> Unit,
     onMicClick: () -> Unit,
     onWakeWordClick: () -> Unit,
+    onStopVoiceListening: () -> Unit,
+    onVoiceErrorAction: (VoiceErrorAction) -> Unit,
     onClearVoiceError: () -> Unit,
     onSpeakMessage: (String) -> Unit,
     onStopSpeaking: () -> Unit,
+    onOpenSystemTtsSettings: () -> Unit,
     onStopSlmGeneration: () -> Unit,
     onResetSlmConversation: () -> Unit,
     onConfirmCurrentLocation: (String) -> Unit,
@@ -130,6 +138,17 @@ fun HomeScreen(
     var showLocationDialog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val todayJalali = remember { JalaliCalendar.fromMillis().formatFullFa() }
+    val haptic = LocalHapticFeedback.current
+    var wasVoiceActive by remember { mutableStateOf(false) }
+
+    LaunchedEffect(listeningState, preferences.voiceCueFeedbackEnabled) {
+        val isNowActive = listeningState is VoiceListeningState.Listening ||
+            listeningState is VoiceListeningState.WakeWordArmed
+        if (preferences.voiceCueFeedbackEnabled && isNowActive != wasVoiceActive) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
+        wasVoiceActive = isNowActive
+    }
 
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -433,8 +452,32 @@ fun HomeScreen(
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                             )
+                            Text(
+                                text = "فقط در اپ باز",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
+                }
+            }
+
+            if (listeningState is VoiceListeningState.Listening ||
+                listeningState is VoiceListeningState.Processing ||
+                listeningState is VoiceListeningState.WakeWordArmed
+            ) {
+                Spacer(modifier = Modifier.height(6.dp))
+                FilledTonalButton(
+                    onClick = onStopVoiceListening,
+                    modifier = Modifier.testTag("stop_voice_button"),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Stop,
+                        contentDescription = "توقف شنود",
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("توقف / لغو شنود", style = MaterialTheme.typography.labelMedium)
                 }
             }
 
@@ -447,7 +490,7 @@ fun HomeScreen(
                 is VoiceListeningState.Listening ->
                     if (partialSpeechText.isNotBlank()) "«$partialSpeechText»" else "در حال شنیدن فارسی ($backendLabel)…"
                 is VoiceListeningState.WakeWordArmed ->
-                    "گوش‌به‌زنگ کلمهٔ بیدارباش «Sol» یا «سول» هستم (آفلاین)…"
+                    "گوش‌به‌زنگ «Sol» فقط هنگام باز بودن برنامه • توقف خودکار پس از ${preferences.wakeWordTimeoutMinutes} دقیقه سکوت"
                 is VoiceListeningState.Processing -> "در حال پردازش گفتار…"
                 is VoiceListeningState.Error -> listeningState.messageFa
                 VoiceListeningState.Idle -> when {
@@ -480,10 +523,16 @@ fun HomeScreen(
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    maxLines = 2,
+                    maxLines = if (listeningState is VoiceListeningState.Error) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (listeningState is VoiceListeningState.Error) {
+                    TextButton(
+                        onClick = { onVoiceErrorAction(listeningState.action) },
+                        modifier = Modifier.testTag("voice_error_action_button"),
+                    ) {
+                        Text(listeningState.action.labelFa, style = MaterialTheme.typography.labelSmall)
+                    }
                     TextButton(onClick = onClearVoiceError) {
                         Text("بستن", style = MaterialTheme.typography.labelSmall)
                     }
@@ -497,6 +546,48 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("توقف صدا", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            if (ttsAvailability == TtsAvailability.MISSING_PERSIAN_DATA ||
+                ttsAvailability == TtsAvailability.UNAVAILABLE
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .testTag("tts_missing_guide_card"),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.RecordVoiceOver,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "صدای فارسی نصب نیست؛ برای پاسخ صوتی در تنظیمات صدای گوشی SherpaTTS یا داده فارسی را فعال کنید.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        TextButton(onClick = onOpenSystemTtsSettings) {
+                            Text("تنظیمات صدا", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
             }
@@ -516,7 +607,7 @@ fun HomeScreen(
                             modifier = Modifier.testTag("online_asr_badge"),
                         ) {
                             Text(
-                                text = "تشخیص گفتار سیستم (احتمال ارسال صدا به اینترنت — برای ۱۰۰٪ آفلاین Vosk را نصب کنید)",
+                                text = "تشخیص گفتار سیستم (ممکن است از اینترنت استفاده کند — برای ۱۰۰٪ آفلاین Vosk را نصب کنید)",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
                                 maxLines = 1,

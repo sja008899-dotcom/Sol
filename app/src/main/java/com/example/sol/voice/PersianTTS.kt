@@ -9,7 +9,9 @@ import com.example.sol.memory.VoicePersona
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.Collections
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicLong
 
 enum class TtsAvailability(val labelFa: String) {
     INITIALIZING("در حال اتصال به موتور صدای گوشی…"),
@@ -31,7 +33,10 @@ data class TtsEngineInfo(
     val isSherpa: Boolean,
 )
 
-class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
+class PersianTTS(
+    context: Context,
+    private val audioManager: SolAudioManager? = null,
+) : TextToSpeech.OnInitListener {
     private val appContext = context.applicationContext
 
     private var tts: TextToSpeech? = null
@@ -41,11 +46,17 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
     private var sherpaFallbackPackage: String? = null
     private var usingFallbackBind = false
 
+    private val utteranceSeq = AtomicLong(0L)
+    private val activeUtteranceIds: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
+
     private val _availability = MutableStateFlow(TtsAvailability.INITIALIZING)
     val availability: StateFlow<TtsAvailability> = _availability.asStateFlow()
 
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
+
+    private val _speechProgress = MutableStateFlow(0 to 0)
+    val speechProgress: StateFlow<Pair<Int, Int>> = _speechProgress.asStateFlow()
 
     private val _persianVoices = MutableStateFlow<List<TtsVoiceInfo>>(emptyList())
     val persianVoices: StateFlow<List<TtsVoiceInfo>> = _persianVoices.asStateFlow()
@@ -212,18 +223,37 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
             }
 
             override fun onDone(utteranceId: String?) {
-                _isSpeaking.value = false
+                onUtteranceCompleted(utteranceId)
+            }
+
+            override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                onUtteranceCompleted(utteranceId, clearAll = interrupted)
             }
 
             @Deprecated("Deprecated in Java")
             override fun onError(utteranceId: String?) {
-                _isSpeaking.value = false
+                onUtteranceCompleted(utteranceId, clearAll = true)
             }
 
             override fun onError(utteranceId: String?, errorCode: Int) {
-                _isSpeaking.value = false
+                onUtteranceCompleted(utteranceId, clearAll = true)
             }
         })
+    }
+
+    private fun onUtteranceCompleted(utteranceId: String?, clearAll: Boolean = false) {
+        if (clearAll) {
+            activeUtteranceIds.clear()
+        } else if (utteranceId != null) {
+            activeUtteranceIds.remove(utteranceId)
+        }
+        val (done, total) = _speechProgress.value
+        val nextDone = if (clearAll) total else (done + 1).coerceAtMost(total)
+        _speechProgress.value = nextDone to total
+        if (activeUtteranceIds.isEmpty()) {
+            _isSpeaking.value = false
+            audioManager?.abandonSpeakingFocus()
+        }
     }
 
     fun speak(
@@ -237,6 +267,8 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
 
         val cleanForTts = com.example.sol.text.PersianNumbers.prepareTextForTts(text)
         if (cleanForTts.isBlank()) return
+        val chunks = splitIntoSentences(cleanForTts)
+        if (chunks.isEmpty()) return
 
         stop()
 
@@ -249,9 +281,18 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
             }
         }
 
+        audioManager?.requestSpeakingFocus { stop() }
         engine.setSpeechRate(speechRate.coerceIn(0.6f, 1.5f))
         engine.setPitch(persona.pitch)
-        engine.speak(cleanForTts, TextToSpeech.QUEUE_FLUSH, null, "sol_${System.currentTimeMillis()}")
+
+        val seqBase = utteranceSeq.incrementAndGet()
+        _speechProgress.value = 0 to chunks.size
+        chunks.forEachIndexed { index, chunk ->
+            val utteranceId = "sol_${seqBase}_$index"
+            activeUtteranceIds.add(utteranceId)
+            val queueMode = if (index == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD
+            engine.speak(chunk, queueMode, null, utteranceId)
+        }
     }
 
     fun openSystemTtsSettings() {
@@ -266,8 +307,11 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
     }
 
     fun stop() {
+        activeUtteranceIds.clear()
+        _speechProgress.value = 0 to 0
         runCatching { tts?.stop() }
         _isSpeaking.value = false
+        audioManager?.abandonSpeakingFocus()
     }
 
     fun shutdown() {
@@ -279,6 +323,56 @@ class PersianTTS(context: Context) : TextToSpeech.OnInitListener {
 
     companion object {
         private const val GOOGLE_TTS_PKG = "com.google.android.tts"
+        private val SENTENCE_SPLIT_REGEX = Regex("(?:(?<!\\d)\\.(?!\\d)|[؟?!؛;\\n])+")
+
+        fun splitIntoSentences(text: String, maxChunkChars: Int = 320): List<String> {
+            val normalized = text.replace(Regex("\\s+"), " ").trim()
+            if (normalized.isEmpty()) return emptyList()
+
+            val rawPieces = normalized
+                .split(SENTENCE_SPLIT_REGEX)
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+
+            if (rawPieces.isEmpty()) return listOf(normalized.take(maxChunkChars))
+
+            val boundedPieces = mutableListOf<String>()
+            for (piece in rawPieces) {
+                if (piece.length <= maxChunkChars) {
+                    boundedPieces.add(piece)
+                } else {
+                    // Split overly long sentence along comma or whitespace boundaries
+                    var remaining = piece
+                    while (remaining.length > maxChunkChars) {
+                        val window = remaining.substring(0, maxChunkChars)
+                        val splitAt = listOf(
+                            window.lastIndexOf('،'),
+                            window.lastIndexOf(','),
+                            window.lastIndexOf(' '),
+                        ).maxOrNull()?.takeIf { it > maxChunkChars / 3 } ?: maxChunkChars
+                        boundedPieces.add(remaining.substring(0, splitAt).trim())
+                        remaining = remaining.substring(splitAt).trim()
+                    }
+                    if (remaining.isNotEmpty()) {
+                        boundedPieces.add(remaining)
+                    }
+                }
+            }
+
+            // Merge very short fragments into adjacent chunk so prosody sounds natural
+            val merged = mutableListOf<String>()
+            for (piece in boundedPieces) {
+                val last = merged.lastOrNull()
+                if (last != null && (last.length < 18 || piece.length < 18) &&
+                    last.length + piece.length + 2 <= maxChunkChars
+                ) {
+                    merged[merged.lastIndex] = "$last، $piece"
+                } else {
+                    merged.add(piece)
+                }
+            }
+            return merged
+        }
 
         private val PERSIAN_LOCALES = listOf(
             Locale.forLanguageTag("fa-IR"),

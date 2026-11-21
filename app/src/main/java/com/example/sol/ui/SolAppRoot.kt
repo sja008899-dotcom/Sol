@@ -35,6 +35,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -46,6 +47,9 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
@@ -54,6 +58,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.tasks.CommunicationChannel
+import com.example.sol.voice.VoiceErrorAction
 import com.example.sol.voice.VoiceListeningState
 import com.example.ui.theme.SolTheme
 import kotlinx.coroutines.launch
@@ -251,6 +256,20 @@ fun SolAppRoot(
             viewModel.listenVoiceExplanationForRole()
         } else {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    // Stop microphone/wake-word cleanly when app moves to background (Android 12 constraint + battery safety)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                viewModel.onAppBackgrounded()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -458,9 +477,23 @@ fun SolAppRoot(
                                         onQuickCommand = { cmd -> viewModel.submitCommand(cmd) },
                                         onMicClick = handleMicClick,
                                         onWakeWordClick = handleWakeWordClick,
+                                        onStopVoiceListening = viewModel::stopVoiceListening,
+                                        onVoiceErrorAction = { action ->
+                                            when (action) {
+                                                VoiceErrorAction.OPEN_MIC_PERMISSION_SETTINGS -> viewModel.openAppPermissionSettings()
+                                                VoiceErrorAction.OPEN_VOSK_SETTINGS -> navigateTo(ROUTE_SETTINGS)
+                                                VoiceErrorAction.RETRY_LISTENING -> {
+                                                    viewModel.clearVoiceError()
+                                                    handleMicClick()
+                                                }
+                                                VoiceErrorAction.SWITCH_TO_TEXT_INPUT -> viewModel.clearVoiceError()
+                                                VoiceErrorAction.OPEN_TTS_OR_SYSTEM_SETTINGS -> viewModel.openSystemTtsSettings()
+                                            }
+                                        },
                                         onClearVoiceError = viewModel::clearVoiceError,
                                         onSpeakMessage = viewModel::speakText,
                                         onStopSpeaking = viewModel::stopSpeaking,
+                                        onOpenSystemTtsSettings = viewModel::openSystemTtsSettings,
                                         onStopSlmGeneration = viewModel::stopSlmGeneration,
                                         onResetSlmConversation = viewModel::resetSlmConversation,
                                         onConfirmCurrentLocation = viewModel::confirmCurrentLocation,
@@ -570,6 +603,10 @@ fun SolAppRoot(
                                         onRecheckSystemTts = viewModel::recheckSystemTts,
                                         onVoskOfflineToggle = viewModel::setVoskOfflineEnabled,
                                         onWakeWordToggle = viewModel::setWakeWordEnabled,
+                                        onVadSilenceTimeoutChange = viewModel::setVadSilenceTimeoutMs,
+                                        onMaxVoiceListenSecondsChange = viewModel::setMaxVoiceListenSeconds,
+                                        onWakeWordTimeoutMinutesChange = viewModel::setWakeWordTimeoutMinutes,
+                                        onVoiceCueFeedbackChange = viewModel::setVoiceCueFeedbackEnabled,
                                         onDownloadVoskModel = viewModel::downloadVoskPersianModel,
                                         onPickVoskZip = {
                                             voskZipPickerLauncher.launch(arrayOf("application/zip", "application/octet-stream"))

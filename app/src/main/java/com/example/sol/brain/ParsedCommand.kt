@@ -124,5 +124,6 @@ sealed interface PendingSolTask {
         val systemInstruction: String,
         val fallbackReplyText: String,
         val hasBookGrounding: Boolean,
+        val allowIntentProposal: Boolean = false,
     ) : PendingSolTask
 }
