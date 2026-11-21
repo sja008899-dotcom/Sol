@@ -239,17 +239,141 @@ class EntityExtractor {
             }
             SolAction.OPEN_SETTINGS -> {
                 val settingTarget = when {
+                    ctx.hasAnyToken("هواپیما", "پرواز", "airplane") -> "AIRPLANE"
+                    ctx.hasAnyToken("دیتا", "دیتای", "داده") || ctx.hasPhrase("اینترنت همراه") -> "DATA"
                     ctx.hasAnyToken("وای", "وایفای", "اینترنت", "wifi") -> "WIFI"
                     ctx.hasAnyToken("بلوتوث", "bluetooth") -> "BLUETOOTH"
                     ctx.hasAnyToken("مکان", "جی", "gps", "لوکیشن") -> "LOCATION"
                     ctx.hasAnyToken("صدا", "آهنگ", "ویبره", "sound") -> "SOUND"
                     else -> "BATTERY"
                 }
+                val toggleRequested = ctx.hasAnyToken("روشن", "خاموش", "وصل", "قطع", "فعال", "غیرفعال")
                 ParsedCommand(
                     action = SolAction.OPEN_SETTINGS,
                     rawText = raw,
                     normalizedText = ctx.normalized,
                     settingTarget = settingTarget,
+                    slots = mapOf(
+                        "setting_target" to SlotValue.Text(settingTarget),
+                        "toggle_requested" to SlotValue.Flag(toggleRequested),
+                    ),
+                    requireConfirmation = false,
+                    confidence = confidence,
+                    matchedRuleId = matchedRuleId,
+                )
+            }
+            SolAction.TIMER_STOPWATCH -> {
+                val isStopwatch = ctx.hasAnyToken("کرنومتر", "کرونومتر") || ctx.hasPhrase("زمان سنج")
+                val durationSec = if (!isStopwatch) TimerStopwatchMatcher.extractDurationSeconds(ctx) else 0L
+                val mode = if (isStopwatch) "STOPWATCH" else "TIMER"
+                val op = when {
+                    isStopwatch && ctx.hasAnyToken("ریست", "صفر") -> "RESET"
+                    isStopwatch && ctx.hasAnyToken("توقف", "نگهدار", "استاپ") -> "STOP"
+                    !isStopwatch && ctx.hasAnyToken("لغو", "کنسل", "حذف") -> "CANCEL"
+                    ctx.hasAnyToken("وضعیت", "چقدر", "مانده") && durationSec <= 0L -> "STATUS"
+                    else -> "START"
+                }
+                val slots = buildMap<String, SlotValue> {
+                    put("timer_mode", SlotValue.Text(mode))
+                    put("timer_op", SlotValue.Text(op))
+                    if (durationSec > 0L) put("duration_seconds", SlotValue.Number(durationSec.toDouble()))
+                }
+                ParsedCommand(
+                    action = SolAction.TIMER_STOPWATCH,
+                    rawText = raw,
+                    normalizedText = ctx.normalized,
+                    delayMinutes = (durationSec / 60L).coerceAtLeast(1L),
+                    slots = slots,
+                    requireConfirmation = false,
+                    confidence = confidence,
+                    matchedRuleId = matchedRuleId,
+                )
+            }
+            SolAction.FLASHLIGHT -> {
+                val torchFlag = when {
+                    ctx.hasAnyToken("خاموش", "ببند", "قطع") -> false
+                    ctx.hasAnyToken("روشن", "باز", "بزن") -> true
+                    else -> null
+                }
+                ParsedCommand(
+                    action = SolAction.FLASHLIGHT,
+                    rawText = raw,
+                    normalizedText = ctx.normalized,
+                    slots = torchFlag?.let { mapOf("torch_enabled" to SlotValue.Flag(it)) } ?: emptyMap(),
+                    requireConfirmation = false,
+                    confidence = confidence,
+                    matchedRuleId = matchedRuleId,
+                )
+            }
+            SolAction.CREATE_CALENDAR_EVENT -> {
+                val title = CalendarEventMatcher.extractEventTitle(ctx.cleaned)
+                val range = JalaliCalendar.parseEventDateTimeRange(ctx.cleaned)
+                val slots = buildMap<String, SlotValue> {
+                    put("message", SlotValue.Text(title))
+                    range?.let { put("event_begin_ms", SlotValue.Number(it.first.toDouble())) }
+                }
+                ParsedCommand(
+                    action = SolAction.CREATE_CALENDAR_EVENT,
+                    rawText = raw,
+                    normalizedText = ctx.normalized,
+                    message = title,
+                    slots = slots,
+                    requireConfirmation = false,
+                    confidence = confidence,
+                    matchedRuleId = matchedRuleId,
+                )
+            }
+            SolAction.CALCULATOR -> ParsedCommand(
+                action = SolAction.CALCULATOR,
+                rawText = raw,
+                normalizedText = ctx.normalized,
+                message = ctx.cleaned,
+                slots = mapOf("message" to SlotValue.Text(ctx.cleaned)),
+                requireConfirmation = false,
+                confidence = confidence,
+                matchedRuleId = matchedRuleId,
+            )
+            SolAction.NOTES_TODO -> {
+                val kind = when {
+                    ctx.hasAnyPhrase("لیست خرید", "فهرست خرید", "سبد خرید") -> "SHOPPING"
+                    ctx.hasAnyPhrase("کارهای امروز", "فهرست کار", "لیست کار", "کارهای روزانه") ||
+                        ctx.hasAnyToken("کارهام", "تودو") -> "TODO"
+                    else -> "NOTE"
+                }
+                val op = when {
+                    ctx.hasAnyToken("حذف", "پاک") -> "DELETE"
+                    ctx.hasAnyPhrase("انجام شد", "تیک بزن", "خریدم") || ctx.hasToken("تیک") -> "DONE"
+                    ctx.hasAnyToken("چیه", "چیست", "بخوان", "بخون", "بگو", "نشان", "نشون") -> "LIST"
+                    else -> "ADD"
+                }
+                val content = NotesTodoMatcher.extractNoteItemContent(ctx.cleaned)
+                ParsedCommand(
+                    action = SolAction.NOTES_TODO,
+                    rawText = raw,
+                    normalizedText = ctx.normalized,
+                    message = content.ifBlank { null },
+                    slots = buildMap {
+                        put("note_kind", SlotValue.Text(kind))
+                        put("note_op", SlotValue.Text(op))
+                        if (content.isNotBlank()) put("message", SlotValue.Text(content))
+                    },
+                    requireConfirmation = false,
+                    confidence = confidence,
+                    matchedRuleId = matchedRuleId,
+                )
+            }
+            SolAction.MEDIA_CONTROL -> {
+                val op = when {
+                    ctx.hasToken("بعدی") || ctx.hasToken("نکست") -> "NEXT"
+                    ctx.hasToken("قبلی") -> "PREVIOUS"
+                    ctx.hasAnyToken("توقف", "قطع", "متوقف", "پاز", "مکث") -> "PAUSE"
+                    else -> "PLAY"
+                }
+                ParsedCommand(
+                    action = SolAction.MEDIA_CONTROL,
+                    rawText = raw,
+                    normalizedText = ctx.normalized,
+                    slots = mapOf("media_op" to SlotValue.Text(op)),
                     requireConfirmation = false,
                     confidence = confidence,
                     matchedRuleId = matchedRuleId,
@@ -286,7 +410,7 @@ class EntityExtractor {
             }
             SolAction.SET_CURRENT_LOCATION -> {
                 val locText = ctx.cleaned
-                    .replace(Regex("^(?:الان|من الان|در حال حاضر)\\s*(?:در)?\\s*"), "")
+                    .replace(Regex("^(?:من\\s+)?(?:الان|در حال حاضر)\\s*(?:در)?\\s*"), "")
                     .replace(Regex("\\s*(?:هستم|هستیم)$"), "")
                     .trim()
                 ParsedCommand(

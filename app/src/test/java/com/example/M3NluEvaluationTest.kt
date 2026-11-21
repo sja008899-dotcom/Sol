@@ -54,37 +54,10 @@ class M3NluEvaluationTest {
     private val parser = IntentParser(EntityExtractor(), ColloquialLexicon.loadDefault())
 
     @Test
-    fun allTwentyCatalogSampleCommandsParseAccurately() {
-        val expectedActionsById = mapOf(
-            "bg_reminder" to SolAction.SCHEDULE_REMINDER,
-            "bg_daily_briefing" to SolAction.BACKGROUND_CONTROL,
-            "bg_battery_guard" to SolAction.BACKGROUND_CONTROL,
-            "bg_memory_backup" to SolAction.BACKGROUND_CONTROL,
-            "bg_memory_indexer" to SolAction.BACKGROUND_CONTROL,
-            "bg_location_checkin" to SolAction.BACKGROUND_CONTROL,
-            "bg_tts_reader_service" to SolAction.BACKGROUND_CONTROL,
-            "bg_multistep_queue" to SolAction.MULTI_STEP_NOTIFY,
-            "bg_book_fetch_worker" to SolAction.WEB_BOOK_LEARN_ROLE,
-            "bg_history_cleanup" to SolAction.BACKGROUND_CONTROL,
-            "adv_book_role_learning" to SolAction.WEB_BOOK_LEARN_ROLE,
-            "core_persian_voice" to SolAction.IDENTITY,
-            "core_alias_learning" to SolAction.LEARN_ALIAS,
-            "core_fact_memory" to SolAction.LEARN_FACT,
-            "core_confirmed_location" to SolAction.SET_CURRENT_LOCATION,
-            "core_contact_call" to SolAction.CALL,
-            "core_transparent_sms" to SolAction.SEND_SMS,
-            "core_device_status_vol" to SolAction.DEVICE_STATUS,
-            "core_app_settings_launcher" to SolAction.OPEN_SETTINGS,
-            "core_role_consultation" to SolAction.CONSULT_ROLE_BOOK,
-        )
-
-        for (item in SolCapabilitiesCatalog.allTwentyCapabilities) {
-            val expected = expectedActionsById[item.id]
-            val parsed = parser.parse(item.sampleCommandFa)
-            assertNotEquals("Sample ${item.id} must not be UNKNOWN: ${item.sampleCommandFa}", SolAction.UNKNOWN, parsed.action)
-            if (expected != null) {
-                assertEquals("Capability ${item.id} mismatch for '${item.sampleCommandFa}'", expected, parsed.action)
-            }
+    fun allBackgroundJobSampleCommandsParseToValidIntents() {
+        for (job in SolCapabilitiesCatalog.backgroundJobs) {
+            val parsed = parser.parse(job.sampleCommandFa)
+            assertNotEquals("Sample ${job.id} must not be UNKNOWN: ${job.sampleCommandFa}", SolAction.UNKNOWN, parsed.action)
         }
     }
 

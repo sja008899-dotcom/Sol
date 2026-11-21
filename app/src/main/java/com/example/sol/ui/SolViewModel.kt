@@ -118,6 +118,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val enabledPeriodicJobs: StateFlow<Set<String>> = c.backgroundTaskCoordinator.enabledPeriodicJobs
+    val capabilitiesCatalog: List<com.example.sol.knowledge.SolCapabilityItem> get() = c.capabilitiesCatalog
 
     val listeningState: StateFlow<VoiceListeningState> = c.voiceEngine.state
     val partialSpeechText: StateFlow<String> = c.voiceEngine.partialText

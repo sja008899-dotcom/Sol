@@ -1,10 +1,23 @@
 package com.example.sol.knowledge
 
+import com.example.sol.brain.SolAction
+import com.example.sol.brain.skills.Sensitivity
+import com.example.sol.brain.skills.SkillCategory
+import com.example.sol.brain.skills.SkillRegistry
+
 enum class CapabilityCategory(val labelFa: String) {
-    BACKGROUND("۱۰ اجرای پس‌زمینه (Background)"),
-    ADVANCED_LEARNING("۱ دستور پیشرفته: اینترنت + کتاب + یادگیری نقش"),
-    CORE_ASSISTANT("۹ قابلیت هوشمند، حافظه و کنترل گوشی"),
+    BACKGROUND("اجراهای پس‌زمینه (Background)"),
+    ADVANCED_LEARNING("یادگیری پیشرفته: اینترنت + کتاب + نقش"),
+    CORE_ASSISTANT("مهارت‌های هوشمند، حافظه و ابزارهای آفلاین"),
 }
+
+data class BackgroundJobDescriptor(
+    val id: String,
+    val titleFa: String,
+    val descriptionFa: String,
+    val sampleCommandFa: String,
+    val backingSkillId: String,
+)
 
 data class SolCapabilityItem(
     val number: Int,
@@ -13,185 +26,127 @@ data class SolCapabilityItem(
     val titleFa: String,
     val descriptionFa: String,
     val sampleCommandFa: String,
+    val backingSkillId: String,
+    val sensitivity: Sensitivity = Sensitivity.NONE,
     val isBackgroundToggleable: Boolean = false,
 )
 
 object SolCapabilitiesCatalog {
-    val allTwentyCapabilities: List<SolCapabilityItem> = listOf(
-        // --- 10 Background Execution Capabilities ---
-        SolCapabilityItem(
-            number = 1,
+    val backgroundJobs: List<BackgroundJobDescriptor> = listOf(
+        BackgroundJobDescriptor(
             id = "bg_reminder",
-            category = CapabilityCategory.BACKGROUND,
             titleFa = "یادآور زمان‌بندی‌شده در پس‌زمینه",
-            descriptionFa = "تنظیم یادآور با WorkManager که حتی با بسته‌شدن اپ اعلان فارسی نمایش می‌دهد.",
+            descriptionFa = "تنظیم یادآور با AlarmManager دقیق + BootReceiver (بازیابی خودکار پس از روشن‌شدن گوشی) که حتی با بسته‌شدن اپ اعلان فارسی نمایش می‌دهد.",
             sampleCommandFa = "۱ دقیقه دیگر یادآوری کن وضعیت پروژه را بررسی کنم",
-            isBackgroundToggleable = true,
+            backingSkillId = "skill_reminder_alarm",
         ),
-        SolCapabilityItem(
-            number = 2,
+        BackgroundJobDescriptor(
             id = "bg_daily_briefing",
-            category = CapabilityCategory.BACKGROUND,
             titleFa = "روتین روزانه و گزارش صبحگاهی پس‌زمینه",
-            descriptionFa = "اجرای دوره‌ای روزانه برای خلاصه باتری، موقعیت تأییدشده و نکات مهم.",
+            descriptionFa = "اجرای دوره‌ای روزانه با WorkManager برای خلاصه باتری، موقعیت تأییدشده و نکات مهم.",
             sampleCommandFa = "روتین صبحگاهی پس‌زمینه را فعال کن",
-            isBackgroundToggleable = true,
+            backingSkillId = "skill_background_control",
         ),
-        SolCapabilityItem(
-            number = 3,
+        BackgroundJobDescriptor(
             id = "bg_battery_guard",
-            category = CapabilityCategory.BACKGROUND,
             titleFa = "پایش هوشمند باتری در پس‌زمینه",
-            descriptionFa = "بررسی دوره‌ای سطح شارژ و دما و ارسال هشدار در صورت کاهش شدید باتری.",
+            descriptionFa = "بررسی دوره‌ای سطح شارژ و دما با WorkManager و ارسال هشدار در صورت کاهش شدید باتری.",
             sampleCommandFa = "پایش باتری در پس‌زمینه را اجرا کن",
-            isBackgroundToggleable = true,
+            backingSkillId = "skill_background_control",
         ),
-        SolCapabilityItem(
-            number = 4,
+        BackgroundJobDescriptor(
             id = "bg_memory_backup",
-            category = CapabilityCategory.BACKGROUND,
             titleFa = "پشتیبان‌گیری خودکار حافظه در فضای خصوصی",
-            descriptionFa = "تهیه فایل پشتیبان JSON از حافظه، کتاب‌ها و نقش‌های Sol در حافظه خصوصی اپ.",
+            descriptionFa = "تهیه فایل پشتیبان رمزنگاری‌شدهٔ محلی از حافظه، کتاب‌ها و نقش‌های Sol در حافظه خصوصی اپ.",
             sampleCommandFa = "از حافظه در پس‌زمینه پشتیبان بگیر",
-            isBackgroundToggleable = true,
+            backingSkillId = "skill_background_control",
         ),
-        SolCapabilityItem(
-            number = 5,
+        BackgroundJobDescriptor(
             id = "bg_memory_indexer",
-            category = CapabilityCategory.BACKGROUND,
             titleFa = "مرتب‌سازی و نمایه‌سازی حافظه و نقش‌ها",
             descriptionFa = "به‌روزرسانی شاخص مترادف‌ها، اشخاص و کتاب‌های یادگرفته‌شده در پس‌زمینه.",
             sampleCommandFa = "حافظه را در پس‌زمینه مرتب کن",
-            isBackgroundToggleable = true,
+            backingSkillId = "skill_background_control",
         ),
-        SolCapabilityItem(
-            number = 6,
+        BackgroundJobDescriptor(
             id = "bg_location_checkin",
-            category = CapabilityCategory.BACKGROUND,
             titleFa = "یادآور تأیید موقعیت فعلی",
             descriptionFa = "ارسال اعلان ملایم برای تأیید دستی موقعیت فعلی بدون ردیابی پنهانی GPS.",
             sampleCommandFa = "یادآور تأیید موقعیت را فعال کن",
-            isBackgroundToggleable = true,
+            backingSkillId = "skill_background_control",
         ),
-        SolCapabilityItem(
-            number = 7,
+        BackgroundJobDescriptor(
             id = "bg_tts_reader_service",
-            category = CapabilityCategory.BACKGROUND,
             titleFa = "سرویس روخوانی صوتی کتاب و گزارش (Foreground Service)",
             descriptionFa = "پخش صوتی خلاصه کتاب یا گزارش حافظه با اعلان پایدار و دکمه توقف.",
             sampleCommandFa = "گزارش حافظه را با سرویس صوتی بخوان",
-            isBackgroundToggleable = true,
+            backingSkillId = "skill_background_control",
         ),
-        SolCapabilityItem(
-            number = 8,
+        BackgroundJobDescriptor(
             id = "bg_multistep_queue",
-            category = CapabilityCategory.BACKGROUND,
             titleFa = "صف اجرای فرمان‌های چندمرحله‌ای",
-            descriptionFa = "ادامهٔ پردازش مراحل و ثبت گزارش نتیجه در پایگاه داده حتی هنگام جابه‌جایی اپ.",
+            descriptionFa = "ادامهٔ پردازش مراحل و ثبت گزارش نتیجه در پایگاه داده پس از تأیید کاربر.",
             sampleCommandFa = "وضعیت شرکت را به علی اطلاع بده و بعد نتیجه را به من گزارش کن",
-            isBackgroundToggleable = true,
+            backingSkillId = "skill_sms_notify",
         ),
-        SolCapabilityItem(
-            number = 9,
+        BackgroundJobDescriptor(
             id = "bg_book_fetch_worker",
-            category = CapabilityCategory.BACKGROUND,
             titleFa = "دریافت کتاب در پس‌زمینه پس از تأیید",
             descriptionFa = "واکشی کتاب از مخازن عمومی پس از اجازه کاربر و ذخیره آفلاین در Room.",
             sampleCommandFa = "در پس‌زمینه کتاب شازده کوچولو را دریافت کن",
-            isBackgroundToggleable = true,
+            backingSkillId = "skill_web_book_role",
         ),
-        SolCapabilityItem(
-            number = 10,
+        BackgroundJobDescriptor(
             id = "bg_history_cleanup",
-            category = CapabilityCategory.BACKGROUND,
             titleFa = "نگهداری و هرس خودکار سوابق قدیمی",
             descriptionFa = "مدیریت حجم سوابق قدیمی در پس‌زمینه برای سبک نگه‌داشتن پایگاه داده.",
             sampleCommandFa = "سوابق قدیمی را در پس‌زمینه بهینه‌سازی کن",
-            isBackgroundToggleable = true,
-        ),
-
-        // --- 1 Advanced Command: Internet Book Fetch + Voice Role Learning ---
-        SolCapabilityItem(
-            number = 11,
-            id = "adv_book_role_learning",
-            category = CapabilityCategory.ADVANCED_LEARNING,
-            titleFa = "دستور پیشرفته: اینترنت + کتاب + یادگیری نقش با صدای شما",
-            descriptionFa = "با تأیید شما به اینترنت می‌رود، کتاب را پیدا و ذخیره می‌کند و با توضیحات صوتی شما آن را به حافظه و نقش فعال Sol اضافه می‌کند.",
-            sampleCommandFa = "به اینترنت برو کتاب عادت‌های اتمی را پیدا کن و با توضیحات صوتی من به حافظه و نقشت اضافه کن",
-        ),
-
-        // --- 9 Core Smart Assistant, Memory, Contacts & Device Control ---
-        SolCapabilityItem(
-            number = 12,
-            id = "core_persian_voice",
-            category = CapabilityCategory.CORE_ASSISTANT,
-            titleFa = "شنود و درک گفتار فارسی با اصلاح متنی",
-            descriptionFa = "تشخیص صدای fa-IR با ترجیح آفلاین و نمایش متن قابل ویرایش پیش از اجرا.",
-            sampleCommandFa = "سلام Sol، اسم تو چیه؟",
-        ),
-        SolCapabilityItem(
-            number = 13,
-            id = "core_alias_learning",
-            category = CapabilityCategory.CORE_ASSISTANT,
-            titleFa = "آموزش مترادف‌ها و قواعد شخصی",
-            descriptionFa = "یادگیری نام مکان‌ها و اصطلاحات اختصاصی کاربر بدون نیاز به اینترنت.",
-            sampleCommandFa = "هر وقت می‌گم دفتر منظورم شرکت کارنو صنعت ماکیان است",
-        ),
-        SolCapabilityItem(
-            number = 14,
-            id = "core_fact_memory",
-            category = CapabilityCategory.CORE_ASSISTANT,
-            titleFa = "ذخیره و فراموشی نکات شخصی",
-            descriptionFa = "ثبت دائمی یادداشت‌های مهم در SQLite/Room و امکان حذف فوری با دستور صوتی.",
-            sampleCommandFa = "یاد بگیر جلسه هفتگی شنبه ساعت ۱۰ صبح است",
-        ),
-        SolCapabilityItem(
-            number = 15,
-            id = "core_confirmed_location",
-            category = CapabilityCategory.CORE_ASSISTANT,
-            titleFa = "ثبت موقعیت فعلی جدا از مکان‌های ذخیره‌شده",
-            descriptionFa = "جلوگیری از اشتباه شدن محل حضور فعلی با آدرس‌های ثابت ذخیره‌شده.",
-            sampleCommandFa = "الان شرکت هستم",
-        ),
-        SolCapabilityItem(
-            number = 16,
-            id = "core_contact_call",
-            category = CapabilityCategory.CORE_ASSISTANT,
-            titleFa = "جست‌وجوی مخاطب و تماس با تأیید اجباری",
-            descriptionFa = "نمایش نام، شماره و متن معرفی Sol پیش از باز کردن شماره‌گیر تلفن.",
-            sampleCommandFa = "با علی تماس بگیر و بگو بیاد شرکت",
-        ),
-        SolCapabilityItem(
-            number = 17,
-            id = "core_transparent_sms",
-            category = CapabilityCategory.CORE_ASSISTANT,
-            titleFa = "تنظیم پیامک با معرفی شفاف هویت Sol",
-            descriptionFa = "آماده‌سازی پیامک متنی با معرفی دستیار از طرف شما و باز کردن پیام‌رسان پس از تأیید.",
-            sampleCommandFa = "به علی پیام بده ساعت ۵ جلسه داریم",
-        ),
-        SolCapabilityItem(
-            number = 18,
-            id = "core_device_status_vol",
-            category = CapabilityCategory.CORE_ASSISTANT,
-            titleFa = "گزارش باتری و کنترل صدای گوشی",
-            descriptionFa = "خواندن درصد شارژ، منبع برق، دما و تغییر مستقیم صدای رسانه دستگاه.",
-            sampleCommandFa = "وضعیت باتری چطوره؟",
-        ),
-        SolCapabilityItem(
-            number = 19,
-            id = "core_app_settings_launcher",
-            category = CapabilityCategory.CORE_ASSISTANT,
-            titleFa = "باز کردن برنامه‌ها و پنل تنظیمات مجاز",
-            descriptionFa = "دسترسی سریع به وای‌فای، مکان، بلوتوث، دوربین، ساعت و برنامه‌های نصب‌شده.",
-            sampleCommandFa = "تنظیمات وای‌فای را باز کن",
-        ),
-        SolCapabilityItem(
-            number = 20,
-            id = "core_role_consultation",
-            category = CapabilityCategory.CORE_ASSISTANT,
-            titleFa = "مشاوره و پاسخ‌گویی طبق نقش‌ها و کتاب‌های آموخته‌شده",
-            descriptionFa = "استفاده آفلاین از نقش و کتابی که با صدای خودتان به Sol آموزش داده‌اید.",
-            sampleCommandFa = "طبق نقشت درباره برنامه‌ریزی و عادت‌ها راهنماییم کن",
+            backingSkillId = "skill_background_control",
         ),
     )
+
+    fun buildCatalog(skillRegistry: SkillRegistry): List<SolCapabilityItem> {
+        val items = mutableListOf<SolCapabilityItem>()
+
+        for (job in backgroundJobs) {
+            val backingSkill = skillRegistry.getSkillById(job.backingSkillId)
+                ?: error("Background job '${job.id}' references missing skill '${job.backingSkillId}'")
+            items += SolCapabilityItem(
+                number = items.size + 1,
+                id = job.id,
+                category = CapabilityCategory.BACKGROUND,
+                titleFa = job.titleFa,
+                descriptionFa = job.descriptionFa,
+                sampleCommandFa = job.sampleCommandFa,
+                backingSkillId = backingSkill.id,
+                sensitivity = backingSkill.sensitivity,
+                isBackgroundToggleable = true,
+            )
+        }
+
+        val interactiveSkills = skillRegistry.allSkills()
+            .filter { SolAction.UNKNOWN !in it.intents }
+            .sortedBy { if (it.category == SkillCategory.ADVANCED_LEARNING) 0 else 1 }
+
+        for (skill in interactiveSkills) {
+            val mappedCategory = when (skill.category) {
+                SkillCategory.BACKGROUND -> CapabilityCategory.BACKGROUND
+                SkillCategory.ADVANCED_LEARNING -> CapabilityCategory.ADVANCED_LEARNING
+                SkillCategory.CORE_ASSISTANT -> CapabilityCategory.CORE_ASSISTANT
+            }
+            items += SolCapabilityItem(
+                number = items.size + 1,
+                id = skill.id,
+                category = mappedCategory,
+                titleFa = skill.titleFa,
+                descriptionFa = skill.descriptionFa,
+                sampleCommandFa = skill.sampleCommandsFa.firstOrNull().orEmpty(),
+                backingSkillId = skill.id,
+                sensitivity = skill.sensitivity,
+                isBackgroundToggleable = false,
+            )
+        }
+
+        return items
+    }
 }

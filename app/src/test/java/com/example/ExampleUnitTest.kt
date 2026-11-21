@@ -115,12 +115,15 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun verifyTwentyCapabilitiesCatalogCounts() {
-        val all = SolCapabilitiesCatalog.allTwentyCapabilities
-        assertEquals(20, all.size)
-        assertEquals(10, all.count { it.category == CapabilityCategory.BACKGROUND })
-        assertEquals(1, all.count { it.category == CapabilityCategory.ADVANCED_LEARNING })
-        assertEquals(9, all.count { it.category == CapabilityCategory.CORE_ASSISTANT })
+    fun verifyCapabilitiesCatalogBackgroundJobsAndNoWorkManagerClaim() {
+        val jobs = SolCapabilitiesCatalog.backgroundJobs
+        assertTrue(jobs.isNotEmpty())
+        val reminderJob = jobs.first { it.id == "bg_reminder" }
+        assertTrue(reminderJob.descriptionFa.contains("AlarmManager"))
+        assertFalse(reminderJob.descriptionFa.contains("WorkManager"))
+        assertTrue(
+            com.example.sol.brain.SafeCalculator.evaluate("دو ضرب در سه") is com.example.sol.brain.CalculationResult.Success
+        )
     }
 
     @Test

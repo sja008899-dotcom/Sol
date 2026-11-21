@@ -283,3 +283,101 @@
 {"text":"یک برنامه غذایی سالم برای صبحانه پیشنهاد بده","intent":"OUT_OF_SCOPE"}
 {"text":"مساحت دایره با شعاع پنج چقدر میشه","intent":"OUT_OF_SCOPE"}
 {"text":"حالت چطوره برام از خودت حرف بزن امشب تنهام","intent":"OUT_OF_SCOPE"}
+{"text":"تایمر ده دقیقه بگذار برای پختن ماکارونی","intent":"TIMER_STOPWATCH"}
+{"text":"یه تایمر بیست و پنج دقیقه پومودورو تنظیم کن","intent":"TIMER_STOPWATCH"}
+{"text":"تایمر پنج دقیقه شمارش معکوس بگذار","intent":"TIMER_STOPWATCH"}
+{"text":"زمان سنج را شروع کن تا رکورد بگیرم","intent":"TIMER_STOPWATCH"}
+{"text":"کرنومتر را استارت بزن","intent":"TIMER_STOPWATCH"}
+{"text":"کرنومتر را متوقف کن ببینم چند شد","intent":"TIMER_STOPWATCH"}
+{"text":"کرونومتر رو صفر کن از اول شروع کنیم","intent":"TIMER_STOPWATCH"}
+{"text":"تایمر چقدر ازش مونده بگو","intent":"TIMER_STOPWATCH"}
+{"text":"تایمر فعال رو کنسل کن لطفا","intent":"TIMER_STOPWATCH"}
+{"text":"چهل و پنج ثانیه تایمر بگذار","intent":"TIMER_STOPWATCH"}
+{"text":"شمارش معکوس نیم ساعت بگذار","intent":"TIMER_STOPWATCH"}
+{"text":"وضعیت کرنومتر الان چنده","intent":"TIMER_STOPWATCH"}
+{"text":"کرنومتر جدید را روشن کن","intent":"TIMER_STOPWATCH"}
+{"text":"تایمر یک ربع بگذار برای استراحت","intent":"TIMER_STOPWATCH"}
+{"text":"شمارش معکوس دو دقیقه برای جوشیدن آب بگذار","intent":"TIMER_STOPWATCH"}
+{"text":"چراغ قوه موبایل را روشن کن لطفا","intent":"FLASHLIGHT"}
+{"text":"چراغ قوه را الان خاموش کن","intent":"FLASHLIGHT"}
+{"text":"فلش گوشی رو روشن کن تاریکه","intent":"FLASHLIGHT"}
+{"text":"فلاش پشت گوشی رو ببند","intent":"FLASHLIGHT"}
+{"text":"لطفا نور فلش را روشن کن","intent":"FLASHLIGHT"}
+{"text":"چراغ گوشی رو خاموشش کن","intent":"FLASHLIGHT"}
+{"text":"چراغ‌قوه رو بزن روشن شه","intent":"FLASHLIGHT"}
+{"text":"چراغ قوه را قطع کن","intent":"FLASHLIGHT"}
+{"text":"فلش دوربین گوشی را روشن کن","intent":"FLASHLIGHT"}
+{"text":"چراغ قوه رو خاموش کن باتری نره","intent":"FLASHLIGHT"}
+{"text":"نور چراغ‌قوه رو روشن بگذار","intent":"FLASHLIGHT"}
+{"text":"فلاش گوشی را فعال کن","intent":"FLASHLIGHT"}
+{"text":"چراغ گوشی رو بزن ببینم زیر میز چی افتاده","intent":"FLASHLIGHT"}
+{"text":"چراغ‌قوه را ببند لطفا","intent":"FLASHLIGHT"}
+{"text":"فلش گوشی رو غیرفعال کن","intent":"FLASHLIGHT"}
+{"text":"رویداد جلسه بررسی قرارداد فردا ساعت ده به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"جلسه هفتگی تیم را پس فردا ساعت سه عصر در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"یک رویداد ویزیت دندانپزشکی امروز ساعت هجده توی تقویم بگذار","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"تاریخ 1404/02/15 ساعت 11 جلسه با مهندس را در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"قرار ناهار کاری فردا ساعت یک بعدازظهر به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"مراسم جشن پایان سال را در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"رویداد تحویل پروژه را برای شنبه ساعت نه صبح به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"امتحان ریاضی دوشنبه ساعت هشت صبح رو تو تقویم بذار","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"سفر کاری شیراز را فردا در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"تولد مادرم را به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"یک رویداد جدید تماس با کارخانه فردا ساعت شانزده ایجاد کن در تقویم","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"برنامه مرور هفتگی امروز ساعت نه شب توی تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"رویداد کلاس آنلاین فردا ساعت پنج عصر در تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"ملاقات با مشتری ویژه پس‌فردا ساعت یازده صبح به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"رویداد تمدید گواهینامه را در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT"}
+{"text":"بیست و پنج درصد چهارصد چقدر میشه","intent":"CALCULATOR"}
+{"text":"هفت ضرب در دوازده را حساب کن","intent":"CALCULATOR"}
+{"text":"صد و پنجاه به علاوه هفتاد و پنج تقسیم بر سه","intent":"CALCULATOR"}
+{"text":"جذر صد و چهل و چهار چند میشه","intent":"CALCULATOR"}
+{"text":"سه به توان چهار را محاسبه کن","intent":"CALCULATOR"}
+{"text":"چهل و پنج منهای نوزده چند میشه","intent":"CALCULATOR"}
+{"text":"(18 + 12) * 4 رو حساب کن","intent":"CALCULATOR"}
+{"text":"دوازده ضربدر پانزده به علاوه ده","intent":"CALCULATOR"}
+{"text":"سیصد و شصت تقسیم بر دوازده چند میشه","intent":"CALCULATOR"}
+{"text":"هفتاد درصد دویست هزار چقدره","intent":"CALCULATOR"}
+{"text":"نه به علاوه پنج ضرب در دو","intent":"CALCULATOR"}
+{"text":"2 ^ 5 + 8 را محاسبه کن","intent":"CALCULATOR"}
+{"text":"چهارصد منهای صد و بیست و پنج","intent":"CALCULATOR"}
+{"text":"جذر 225 چند است","intent":"CALCULATOR"}
+{"text":"بیست ضرب در سی به اضافه پنجاه","intent":"CALCULATOR"}
+{"text":"به لیست خرید تخم مرغ و پنیر اضافه کن","intent":"NOTES_TODO"}
+{"text":"لیست خرید ما چی بود بخوان","intent":"NOTES_TODO"}
+{"text":"شیر از لیست خرید تیک بزن خریدم","intent":"NOTES_TODO"}
+{"text":"نان را از لیست خرید حذف کن","intent":"NOTES_TODO"}
+{"text":"کارهای امروز من رو لیست کن لطفا","intent":"NOTES_TODO"}
+{"text":"به کارهای امروز ارسال ایمیل به مدیر اضافه کن","intent":"NOTES_TODO"}
+{"text":"کارهای امروز ارسال گزارش انجام شد","intent":"NOTES_TODO"}
+{"text":"یادداشت کن فاکتور جدید شماره نهصد و بیست صادر شد","intent":"NOTES_TODO"}
+{"text":"یادداشت هام را بخوان لطفا","intent":"NOTES_TODO"}
+{"text":"توی لیست یادداشت بنویس کلید انبار دست محمد است","intent":"NOTES_TODO"}
+{"text":"فهرست خرید خانه چیا توشه","intent":"NOTES_TODO"}
+{"text":"به فهرست کارهای روزانه مطالعه نیم ساعته اضافه کن","intent":"NOTES_TODO"}
+{"text":"دفترچه یادداشت را نشان بده","intent":"NOTES_TODO"}
+{"text":"گوجه فرنگی به سبد خرید اضافه کن","intent":"NOTES_TODO"}
+{"text":"تیک کار خرید دفترچه در کارهای امروز بزن","intent":"NOTES_TODO"}
+{"text":"آهنگ بعدی را پخش کن لطفا","intent":"MEDIA_CONTROL"}
+{"text":"برو آهنگ قبلی رو بذار","intent":"MEDIA_CONTROL"}
+{"text":"موزیک در حال پخش را متوقف کن","intent":"MEDIA_CONTROL"}
+{"text":"آهنگ را پاز کن","intent":"MEDIA_CONTROL"}
+{"text":"موزیک را پلی کن ادامه بده","intent":"MEDIA_CONTROL"}
+{"text":"ترک بعدی موسیقی رو پخش کن","intent":"MEDIA_CONTROL"}
+{"text":"برگرد آهنگ قبلی لطفا","intent":"MEDIA_CONTROL"}
+{"text":"توقف آهنگ فعلی","intent":"MEDIA_CONTROL"}
+{"text":"ادامه پخش موزیک را شروع کن","intent":"MEDIA_CONTROL"}
+{"text":"موزیک بعدی رو بگذار","intent":"MEDIA_CONTROL"}
+{"text":"پخش را متوقف کن","intent":"MEDIA_CONTROL"}
+{"text":"آهنگ را پخش کن لطفا","intent":"MEDIA_CONTROL"}
+{"text":"نکست بزن بره ترک بعدی","intent":"MEDIA_CONTROL"}
+{"text":"توقف موسیقی همین الان","intent":"MEDIA_CONTROL"}
+{"text":"موسیقی را قطع کن لطفا","intent":"MEDIA_CONTROL"}
+{"text":"دیتای موبایل را روشن کن","intent":"OPEN_SETTINGS"}
+{"text":"اینترنت همراه را خاموش کن","intent":"OPEN_SETTINGS"}
+{"text":"حالت هواپیما رو الان فعال کن","intent":"OPEN_SETTINGS"}
+{"text":"حالت پرواز گوشی را خاموش کن","intent":"OPEN_SETTINGS"}
+{"text":"امسال سال کبیسه است یا نه","intent":"TIME_DATE"}
+{"text":"تاریخ 1404/01/01 به میلادی چندم است","intent":"TIME_DATE"}
+{"text":"چند روز تا نوروز مانده است","intent":"TIME_DATE"}
+{"text":"بیست و یک مارس دو هزار و بیست و پنج به شمسی چندم میشه","intent":"TIME_DATE"}

@@ -211,7 +211,13 @@ class HybridNluEngine(
             SolAction.WEB_BOOK_LEARN_ROLE -> "دریافت کتاب یا صفحه از اینترنت"
             SolAction.TEACH_ROLE_VOICE -> "آموزش نقش جدید به Sol"
             SolAction.CONSULT_ROLE_BOOK -> "مشورت با نقش و کتاب‌ها"
-            SolAction.SHOW_CAPABILITIES -> "نمایش ۲۰ قابلیت Sol"
+            SolAction.SHOW_CAPABILITIES -> "نمایش فهرست قابلیت‌های Sol"
+            SolAction.TIMER_STOPWATCH -> "تایمر و کرنومتر آفلاین"
+            SolAction.FLASHLIGHT -> "کنترل چراغ‌قوه"
+            SolAction.CREATE_CALENDAR_EVENT -> "افزودن رویداد به تقویم"
+            SolAction.CALCULATOR -> "ماشین‌حساب فارسی"
+            SolAction.NOTES_TODO -> "یادداشت و لیست خرید / کارها"
+            SolAction.MEDIA_CONTROL -> "کنترل پخش موسیقی"
             SolAction.UNKNOWN -> "گفت‌وگوی آزاد / پرسش عمومی"
         }
 
@@ -220,12 +226,18 @@ class HybridNluEngine(
             val directPairs = listOf(
                 listOf("تماس", "زنگ", "تلفن") to SolAction.CALL,
                 listOf("پیامک", "پیام", "اس ام اس") to SolAction.SEND_SMS,
+                listOf("تایمر", "کرنومتر", "کرونومتر", "شمارش معکوس") to SolAction.TIMER_STOPWATCH,
+                listOf("چراغ قوه", "فلش گوشی", "فلاش") to SolAction.FLASHLIGHT,
+                listOf("رویداد تقویم", "به تقویم اضافه", "ثبت رویداد") to SolAction.CREATE_CALENDAR_EVENT,
+                listOf("ماشین حساب", "محاسبه", "حساب کن", "ضرب", "تقسیم", "درصد", "جذر") to SolAction.CALCULATOR,
+                listOf("یادداشت", "لیست خرید", "کارهای امروز", "فهرست کار") to SolAction.NOTES_TODO,
+                listOf("موسیقی", "آهنگ بعدی", "آهنگ قبلی", "پخش آهنگ", "توقف آهنگ") to SolAction.MEDIA_CONTROL,
                 listOf("یاداور", "یادآور", "الارم", "آلارم") to SolAction.SCHEDULE_REMINDER,
-                listOf("تقویم", "تاریخ", "ساعت", "چندم") to SolAction.TIME_DATE,
-                listOf("باتری", "دستگاه", "وضعیت گوشی") to SolAction.DEVICE_STATUS,
+                listOf("تقویم", "تاریخ", "ساعت", "چندم", "میلادی", "کبیسه") to SolAction.TIME_DATE,
+                listOf("باتری", "دستگاه", "وضعیت گوشی", "حافظه خالی", "رم گوشی") to SolAction.DEVICE_STATUS,
                 listOf("صدا", "ولوم") to SolAction.ADJUST_VOLUME,
                 listOf("اپ", "برنامه") to SolAction.OPEN_APP,
-                listOf("تنظیمات", "وایفای", "بلوتوث") to SolAction.OPEN_SETTINGS,
+                listOf("تنظیمات", "وایفای", "بلوتوث", "دیتا", "هواپیما") to SolAction.OPEN_SETTINGS,
                 listOf("فراموش", "حذف حافظه", "پاک کن") to SolAction.FORGET_MEMORY,
                 listOf("حافظه", "فهرست حافظه") to SolAction.LIST_MEMORY,
                 listOf("مکان فعلی", "کجام", "کجا هستم") to SolAction.SET_CURRENT_LOCATION,
@@ -239,7 +251,7 @@ class HybridNluEngine(
                 listOf("قابلیت") to SolAction.SHOW_CAPABILITIES,
                 listOf("راهنما", "کمک") to SolAction.HELP,
                 listOf("مترادف", "هر وقت میگم") to SolAction.LEARN_ALIAS,
-                listOf("نکته", "یادداشت") to SolAction.LEARN_FACT,
+                listOf("نکته") to SolAction.LEARN_FACT,
             )
             for ((keywords, action) in directPairs) {
                 if (keywords.any { norm.contains(it) }) return action

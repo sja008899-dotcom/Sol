@@ -86,7 +86,7 @@ object SafeCalculator {
             .replace(Regex("\\s*(?:ضربدر|ضرب\\s+در|ضرب)\\s*"), " * ")
             .replace(Regex("\\s*(?:تقسیم\\s+بر|تقسیم\\s+به|تقسیم)\\s*"), " / ")
             .replace(Regex("\\s*(?:به\\s+توان|توان)\\s*"), " ^ ")
-            .replace(Regex("\\b(?:جذر|رادیکال)\\b"), " sqrt ")
+            .replace(Regex("(?<!\\p{L})(?:جذر|رادیکال)(?!\\p{L})"), " sqrt ")
 
         // Pad punctuation/operators for clean word-number boundary splitting
         s = s

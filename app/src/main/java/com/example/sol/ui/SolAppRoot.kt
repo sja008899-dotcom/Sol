@@ -369,6 +369,7 @@ fun SolAppRoot(
                 ) { innerPadding ->
                     if (showCapabilitiesSheet) {
                         CapabilitiesScreen(
+                            capabilities = viewModel.capabilitiesCatalog,
                             enabledPeriodicJobs = enabledPeriodicJobs,
                             backgroundLogs = backgroundLogs,
                             hasNotificationPermission = hasNotificationPermission,
@@ -434,6 +435,7 @@ fun SolAppRoot(
                             ) {
                                 composable(ROUTE_HOME) {
                                     HomeScreen(
+                                        capabilitiesCount = viewModel.capabilitiesCatalog.size,
                                         preferences = preferences,
                                         batteryStatus = batteryStatus,
                                         listeningState = listeningState,

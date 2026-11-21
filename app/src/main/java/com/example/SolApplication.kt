@@ -21,6 +21,7 @@ import com.example.sol.memory.KnowledgeRepository
 import com.example.sol.memory.LocationRepository
 import com.example.sol.memory.MemoryDatabase
 import com.example.sol.memory.MemoryRepository
+import com.example.sol.memory.NoteTodoRepository
 import com.example.sol.memory.PersonRepository
 import com.example.sol.memory.PreferencesRepository
 import com.example.sol.security.EncryptedBackupManager
@@ -42,6 +43,7 @@ class SolAppContainer(private val application: Application) {
     val locationRepository by lazy { LocationRepository(dao) }
     val historyRepository by lazy { HistoryRepository(dao) }
     val knowledgeRepository by lazy { KnowledgeRepository(dao) }
+    val noteTodoRepository by lazy { NoteTodoRepository(dao) }
     val preferencesRepository by lazy { PreferencesRepository(application) }
 
     val memoryOptimizer by lazy { SolMemoryOptimizer(application) }
@@ -62,6 +64,7 @@ class SolAppContainer(private val application: Application) {
     val bookRagEngine by lazy { BookRagEngine(knowledgeRepository) }
     val localSlmEngine by lazy { LocalSlmEngine(application) }
     val exactAlarmScheduler by lazy { ExactAlarmScheduler(application, knowledgeRepository) }
+    val timerController by lazy { com.example.sol.calendar.TimerController(application, exactAlarmScheduler, knowledgeRepository) }
     val encryptedBackupManager by lazy {
         EncryptedBackupManager(
             context = application,
@@ -71,6 +74,7 @@ class SolAppContainer(private val application: Application) {
             locationRepository = locationRepository,
             knowledgeRepository = knowledgeRepository,
             preferencesRepository = preferencesRepository,
+            noteTodoRepository = noteTodoRepository,
         )
     }
 
@@ -100,44 +104,70 @@ class SolAppContainer(private val application: Application) {
             config = nluConfig,
         )
     }
-    val skillRegistry by lazy {
-        val knowledgeSkill = com.example.sol.brain.skills.KnowledgeAndRoleSkill(
-            context = application,
+    val skillRegistry: com.example.sol.brain.skills.SkillRegistry by lazy {
+        val consultSkill = com.example.sol.brain.skills.ConsultRoleBookSkill(
             memoryRepository = memoryRepository,
-            knowledgeRepository = knowledgeRepository,
             preferencesRepository = preferencesRepository,
             bookRagEngine = bookRagEngine,
             localSlmEngine = localSlmEngine,
         )
         com.example.sol.brain.skills.SkillRegistry(
-            listOf(
-                com.example.sol.brain.skills.ConversationSkill(knowledgeRepository, preferencesRepository),
-                com.example.sol.brain.skills.MemoryAndLocationSkill(
-                    context = application,
+            context = application,
+            preferencesRepository = preferencesRepository,
+            openPermissionSettings = { deviceController.settingsController.openAppDetailsSettings() },
+            skills = listOf(
+                com.example.sol.brain.skills.GreetingSkill(knowledgeRepository),
+                com.example.sol.brain.skills.IdentitySkill(knowledgeRepository),
+                com.example.sol.brain.skills.CapabilitiesSkill { capabilitiesCatalog.size },
+                com.example.sol.brain.skills.HelpSkill(),
+                com.example.sol.brain.skills.AliasMemorySkill(learningEngine),
+                com.example.sol.brain.skills.FactMemorySkill(
                     learningEngine = learningEngine,
                     memoryRepository = memoryRepository,
                     locationRepository = locationRepository,
                     knowledgeRepository = knowledgeRepository,
                     preferencesRepository = preferencesRepository,
                 ),
-                com.example.sol.brain.skills.CalendarAndBackgroundSkill(backgroundTaskCoordinator, exactAlarmScheduler),
-                knowledgeSkill,
-                com.example.sol.brain.skills.DeviceAndCommunicationSkill(
+                com.example.sol.brain.skills.PersonMemorySkill(learningEngine),
+                com.example.sol.brain.skills.LocationMemorySkill(
+                    context = application,
                     learningEngine = learningEngine,
-                    deviceController = deviceController,
+                    locationRepository = locationRepository,
+                    knowledgeRepository = knowledgeRepository,
                     preferencesRepository = preferencesRepository,
                 ),
+                com.example.sol.brain.skills.TimeDateQaSkill(),
+                com.example.sol.brain.skills.ReminderAlarmSkill(backgroundTaskCoordinator, exactAlarmScheduler),
+                com.example.sol.brain.skills.BackgroundControlSkill(backgroundTaskCoordinator),
+                com.example.sol.brain.skills.WebBookRoleSkill(),
+                com.example.sol.brain.skills.TeachRoleVoiceSkill(application, knowledgeRepository),
+                consultSkill,
+                com.example.sol.brain.skills.CallSkill(learningEngine),
+                com.example.sol.brain.skills.SmsAndNotifySkill(learningEngine),
+                com.example.sol.brain.skills.DeviceStatusSkill(deviceController),
+                com.example.sol.brain.skills.VolumeControlSkill(deviceController),
+                com.example.sol.brain.skills.OpenSettingsSkill(deviceController),
+                com.example.sol.brain.skills.OpenAppSkill(deviceController),
+                com.example.sol.brain.skills.RoutineSkill(deviceController),
+                com.example.sol.brain.skills.TimerStopwatchSkill(timerController),
+                com.example.sol.brain.skills.FlashlightSkill(deviceController),
+                com.example.sol.brain.skills.CalendarEventSkill(deviceController),
+                com.example.sol.brain.skills.CalculatorSkill(),
+                com.example.sol.brain.skills.NotesTodoSkill(noteTodoRepository),
+                com.example.sol.brain.skills.MediaControlSkill(deviceController),
                 com.example.sol.brain.skills.UnknownFallbackSkill(
                     learningEngine = learningEngine,
                     memoryRepository = memoryRepository,
                     locationRepository = locationRepository,
-                    preferencesRepository = preferencesRepository,
                     bookRagEngine = bookRagEngine,
                     localSlmEngine = localSlmEngine,
-                    knowledgeSkill = knowledgeSkill,
+                    consultSkill = consultSkill,
                 ),
-            )
+            ),
         )
+    }
+    val capabilitiesCatalog: List<com.example.sol.knowledge.SolCapabilityItem> by lazy {
+        com.example.sol.knowledge.SolCapabilitiesCatalog.buildCatalog(skillRegistry)
     }
     val dialogueManager by lazy {
         com.example.sol.dialogue.DialogueManager(

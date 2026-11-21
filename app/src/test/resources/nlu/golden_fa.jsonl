@@ -203,7 +203,7 @@
 {"text":"یاد بگیر جلسه هفتگی شنبه ساعت ۱۰ صبح است","intent":"LEARN_FACT","slots":{},"split":"dev"}
 {"text":"به خاطر بسپار که رمز گاوصندوق ۴۴۱۲ نیست بلکه ۱۱۲۲ است","intent":"LEARN_FACT","slots":{},"split":"dev"}
 {"text":"ذخیره کن پلاک ماشینم ۶۸ ب ۴۲۱ است","intent":"LEARN_FACT","slots":{},"split":"dev"}
-{"text":"یادداشت کن امروز ۳ میلیون تومان خرید داشتم","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"یادداشت کن امروز ۳ میلیون تومان خرید داشتم","intent":"NOTES_TODO","slots":{},"split":"dev"}
 {"text":"یادت باشه من قهوه تلخ دوست دارم","intent":"LEARN_FACT","slots":{},"split":"dev"}
 {"text":"یادت بمونه دمای استاندارد سالن ۳۰ درجه است","intent":"LEARN_FACT","slots":{},"split":"dev"}
 {"text":"بنویس فردا نوبت دندانپزشکی دارم","intent":"LEARN_FACT","slots":{},"split":"dev"}
@@ -211,7 +211,7 @@
 {"text":"این را به خاطر بسپار مدیر بخش آقای سهرابی است","intent":"LEARN_FACT","slots":{},"split":"dev"}
 {"text":"ذخیره کن کد پستی منزل ۱۴۱۵۵ است","intent":"LEARN_FACT","slots":{},"split":"dev"}
 {"text":"اسم من سارا هست","intent":"LEARN_FACT","slots":{"aliasKey":"owner_name","aliasValue":"سارا"},"split":"dev"}
-{"text":"یادداشت کن لیست خرید شیر و نان و تخم مرغ است","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"یادداشت کن لیست خرید شیر و نان و تخم مرغ است","intent":"NOTES_TODO","slots":{},"split":"dev"}
 {"text":"یادت باشه داروهای فشار خون را صبح‌ها می‌خورم","intent":"LEARN_FACT","slots":{},"split":"dev"}
 {"text":"لطفاً اسم من محمد است","intent":"LEARN_FACT","slots":{"aliasKey":"owner_name","aliasValue":"محمد"},"split":"test"}
 {"text":"یاد بگیر تاریخ بیمه ماشین ۱۵ اردیبهشت است","intent":"LEARN_FACT","slots":{},"split":"test"}
@@ -219,7 +219,7 @@
 {"text":"ذخیره کن گروه خونی من O مثبت است","intent":"LEARN_FACT","slots":{},"split":"test"}
 {"text":"بنویس پروژه آلفا تحویل آخر ماه دارد","intent":"LEARN_FACT","slots":{},"split":"test"}
 {"text":"به خاطر بسپار شماره اشتراک آب ۹۸۴۵ است","intent":"LEARN_FACT","slots":{},"split":"test"}
-{"text":"یادداشت کن هزینه تعمیر موتور ۵ میلیون شد","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادداشت کن هزینه تعمیر موتور ۵ میلیون شد","intent":"NOTES_TODO","slots":{},"split":"test"}
 {"text":"یادت بمونه کلید یدک داخل کشوی میز است","intent":"LEARN_FACT","slots":{},"split":"test"}
 {"text":"اسم من مریم هست","intent":"LEARN_FACT","slots":{"aliasKey":"owner_name","aliasValue":"مریم"},"split":"test"}
 {"text":"یاد بگیر سررسید قسط بانک پنجم هر ماه است","intent":"LEARN_FACT","slots":{},"split":"test"}
@@ -228,7 +228,7 @@
 {"text":"یادت باشه کلاس شنا روزهای زوج برگزار میشه","intent":"LEARN_FACT","slots":{},"split":"test"}
 {"text":"به خاطر بسپار وزن خوراک امروز ۳۲۰ کیلوگرم بود","intent":"LEARN_FACT","slots":{},"split":"test"}
 {"text":"اینو ذخیره کن شماره شاسی در داشبورد است","intent":"LEARN_FACT","slots":{},"split":"test"}
-{"text":"یادداشت کن آبگرمکن سالن سرویس شد","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادداشت کن آبگرمکن سالن سرویس شد","intent":"NOTES_TODO","slots":{},"split":"test"}
 {"text":"یادت بمونه اسم سگ من تدی است","intent":"LEARN_FACT","slots":{},"split":"test"}
 {"text":"یاد بگیر من صبح‌ها ساعت ۶ بیدار می‌شوم","intent":"LEARN_FACT","slots":{},"split":"test"}
 {"text":"نام من اميرحسين هست","intent":"LEARN_FACT","slots":{"aliasKey":"owner_name","aliasValue":"اميرحسين"},"split":"test"}
@@ -236,8 +236,13 @@
 {"text":"به خاطر بسپار واکسن طیور سه‌شنبه تزریق می‌شود","intent":"LEARN_FACT","slots":{},"split":"test"}
 {"text":"ذخیره کن سایز کفش من ۴۳ است","intent":"LEARN_FACT","slots":{},"split":"test"}
 {"text":"یادت باشه قرار دوشنبه ساعت ۱۱ لغو شد","intent":"LEARN_FACT","slots":{},"split":"test"}
-{"text":"یادداشت کن مصرف برق امروز ۵۰ کیلووات بود","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادداشت کن مصرف برق امروز ۵۰ کیلووات بود","intent":"NOTES_TODO","slots":{},"split":"test"}
 {"text":"یاد بگیر من چای سبز بیشتر دوست دارم","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"یادت باشه رمز کارت بانکی اولم ۱۲۳۴ نیست","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"به خاطر بسپار ساعت شروع شیفت صبح ۷ است","intent":"LEARN_FACT","slots":{},"split":"dev"}
+{"text":"یادت بمونه کارت ملی در کیف مشکی است","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"ذخیره کن قد من ۱۷۸ سانتی‌متر است","intent":"LEARN_FACT","slots":{},"split":"test"}
+{"text":"به خاطر بسپار جلسه سالانه شرکت اواخر اسفند است","intent":"LEARN_FACT","slots":{},"split":"test"}
 {"text":"دفتر را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
 {"text":"از حافظه پاک کن رمز مودم را","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
 {"text":"پلاک ماشین را فراموش کن","intent":"FORGET_MEMORY","slots":{},"split":"dev"}
@@ -1338,3 +1343,263 @@
 {"text":"چرا آسمان در طول روز روشن می‌ماند؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
 {"text":"نام شاعر کتاب بوستان کیست؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
 {"text":"امروز هوا برای پیاده‌روی مناسبه؟","intent":"OUT_OF_SCOPE","slots":{},"split":"test"}
+{"text":"تایمر ۱۰ دقیقه","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"تایمر ۵ دقیقه بگذار","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"یک تایمر ۲۰ دقیقه‌ای تنظیم کن","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"تایمر ۳۰ ثانیه بذار","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"شمارش معکوس ۱۵ دقیقه بگذار","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"تایمر یک ساعت تنظیم کن","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"تایمر چقدر مانده؟","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"تایمر را لغو کن","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"کرنومتر را شروع کن","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"کرنومتر را متوقف کن","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"کرنومتر را صفر کن","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"زمان‌سنج را استارت بزن","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"وضعیت کرنومتر چطوره؟","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"تایمر ۳ دقیقه برای دم کشیدن چای بگذار","intent":"TIMER_STOPWATCH","slots":{},"split":"dev"}
+{"text":"تایمر ۲ دقیقه بذار","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"یک تایمر ۸ دقیقه تنظیم کن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر ۱۲ دقیقه روشن کن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر ۹۰ ثانیه بگذار","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"شمارش معکوس ۴ دقیقه شروع کن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"یه تایمر ۲۵ دقیقه برای مطالعه بذار","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر ۷ دقیقه برای کیک بذار","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر نیم ساعت بگذار","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر یک ربع تنظیم کن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"چقدر از تایمر باقی مونده؟","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر را خاموش کن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر فعال را قطع کن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"لطفاً تایمر را کنسل کن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"زمان سنج را شروع کن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"کرونومتر رو بزن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"کرنومتر را نگه دار","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"استاپ کرنومتر را بزن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"کرنومتر رو ریست کن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"کرونومتر چند ثانیه ثبت کرده؟","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر ۴۰ ثانیه برای ورزش بگذار","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"شمارش معکوس ۶ دقیقه بگذار","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر ۱۸ دقیقه تنظیم کن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر ۴ دقیقه و ۳۰ ثانیه بذار","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر ۲ ساعت بگذار","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"وضعیت تایمر چطوره؟","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"زمان‌سنج را متوقف کن","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"کرنومتر را ببند","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"تایمر ۶ دقیقه بگذار برای تخم مرغ","intent":"TIMER_STOPWATCH","slots":{},"split":"test"}
+{"text":"چراغ قوه را روشن کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"چراغ قوه را خاموش کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"چراغ‌قوه روشن کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"چراغ‌قوه خاموش کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"فلش گوشی را روشن کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"فلش گوشی را خاموش کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"نور فلش را روشن کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"چراغ گوشی را روشن کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"چراغ گوشی را خاموش کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"فلاش دوربین را روشن کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"چراغ قوه رو ببند","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"چراغ قوه رو بزن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"فلاش گوشی رو خاموش کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"نور فلش را قطع کن","intent":"FLASHLIGHT","slots":{},"split":"dev"}
+{"text":"لطفاً چراغ قوه را روشن کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"لطفاً چراغ قوه را خاموش کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ قوه رو روشنش کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ قوه رو قطع کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"فلش گوشی رو روشنش کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"فلش گوشی رو ببند","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ‌قوه را فعال کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ‌قوه را غیرفعال کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"فلاش گوشی را فعال کن لطفاً","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"فلاش گوشی را خاموشش کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ قوه موبایل رو روشن کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ قوه موبایل رو خاموش کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"نور چراغ قوه را بزن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ قوه رو روشن بگذار","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ قوه رو خاموش بگذار","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"فلاش دوربین را خاموش کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"نور فلش گوشی را روشن کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"نور فلش گوشی را خاموش کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغقوه را روشن کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغقوه را خاموش کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"فلش گوشی را بزن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"فلش گوشی را قطع کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ گوشی رو بزن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ گوشی رو ببند","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ‌قوه را ببند","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ‌قوه رو باز کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"نور فلش را ببند","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"چراغ قوه را قطعش کن","intent":"FLASHLIGHT","slots":{},"split":"test"}
+{"text":"رویداد جلسه فردا ساعت ۱۰ به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"جلسه با علی را فردا ساعت ۵ عصر در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"۱۴۰۴/۰۱/۰۲ ساعت ۱۴ جلسه کارنو را در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"رویداد دندانپزشکی پس‌فردا ساعت ۱۱ به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"قرار ملاقات فردا ساعت ۹ صبح رو تو تقویم بذار","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"رویداد تحویل پروژه را به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"جشن تولد سارا را در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"امتحان فردا ساعت ۸ صبح را توی تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"رویداد جدید در تقویم ایجاد کن برای جلسه فروش","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"جلسه مدیران امروز ساعت ۱۶ به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"قرار ناهار امروز ساعت ۱۳ تو تقویم بذار","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"سفر هفته آینده را در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"یک رویداد تقویم برای کلاس زبان بساز","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"جلسه هماهنگی فردا ساعت ۸ در تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"dev"}
+{"text":"رویداد جلسه کارنو فردا ساعت ۱۰ به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"۱۴۰۴/۰۳/۱۰ ساعت ۹ صبح جلسه فنی در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"جلسه مصاحبه فردا ساعت ۱۱ صبح به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"قرار پزشک پس‌فردا ساعت ۱۷ توی تقویم بذار","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"رویداد تمدید بیمه ماشین را به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"مراسم عروسی را در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"رویداد پرداخت اجاره را در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"قرار ملاقات با وکیل را تو تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"کلاس یوگا فردا ساعت ۷ صبح به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"رویداد گزارش ماهانه امروز ساعت ۱۵ به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"جلسه آموزشی تیم امروز ساعت ۱۰ توی تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"رویداد سرویس خودرو فردا ساعت ۹ در تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"ملاقات با مهندس رضایی را به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"امتحان پایان ترم ۱۴۰۴/۰۴/۰۱ در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"سفر اصفهان را فردا ساعت ۶ صبح به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"جلسه آنلاین امروز ساعت ۱۹ تو تقویم بذار","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"رویداد تولد رضا را در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"ثبت رویداد جلسه بانک فردا ساعت ۱۰ در تقویم","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"ایجاد رویداد ملاقات کاری برای فردا ساعت ۱۴","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"قرار شام با خانواده امشب ساعت ۲۰ به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"جلسه بودجه پس فردا ساعت ۱۲ در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"رویداد تحویل سفارش مشتری را در تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"قرار آرایشگاه فردا ساعت ۱۶ تو تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"رویداد تماس هفتگی امروز ساعت ۱۱ به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"مراسم افتتاحیه ۱۴۰۴/۰۵/۱۲ در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"برنامه مرور کتاب امشب ساعت ۲۱ به تقویم اضافه کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"رویداد آزمایش خون فردا ساعت ۸ صبح در تقویم ثبت کن","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"جلسه معارفه جدید را توی تقویم بگذار","intent":"CREATE_CALENDAR_EVENT","slots":{},"split":"test"}
+{"text":"دو ضرب در سه","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"۲۵ درصد ۸۰۰ چند میشه؟","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"صد به علاوه پنجاه تقسیم بر دو","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"(12 + 8) * 3 - 4^2","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"جذر ۸۱ چند میشه؟","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"۱۲ * ۴ چقدر میشه؟","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"۱۰۰ - ۳۷ چند است؟","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"۱۴۴ تقسیم بر ۱۲","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"سه به توان سه","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"۱۸ به اضافه ۲۲ چقدر میشه؟","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"۶۰ منهای ۱۵ را حساب کن","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"۱۰ درصد ۲۵۰۰ چند میشه؟","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"۴۵ + ۵۵ را محاسبه کن","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"۸ ضربدر ۹","intent":"CALCULATOR","slots":{},"split":"dev"}
+{"text":"پنج ضرب در شش چند میشه؟","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۳۰ درصد ۶۰۰ چقدره؟","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"دویست تقسیم بر چهار","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۱۹ به علاوه ۳۱ چقدر میشه؟","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۹۰ منهای ۲۴","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۲ به توان ۶","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"جذر ۶۴ را حساب کن","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"(50 - 10) / 5 + 3","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۱۵ * ۶ را محاسبه کن","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۱۲۰ + ۸۰ + ۵۰","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۷۲ تقسیم بر ۸ چند میشه؟","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۲۰ درصد ۱۵۰۰ چند میشه؟","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۹ ضرب در ۹ به علاوه ۱","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"جذر ۱۰۰ چنده؟","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۵۰۰ منهای ۱۲۰ تقسیم بر ۴","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۴ به توان ۳ چقدره؟","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۱۱ ضربدر ۱۱","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۸۵ - ۴۰","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۳۵۰ + ۲۵۰","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۱۵ درصد ۲۰۰","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۶۴ / ۸ + ۲","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"هشتاد به علاوه چهل چقدر میشه؟","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"جذر ۳۶ چند است؟","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۷ * ۷ * ۲","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۹۹ منهای ۳۳ را حساب کن","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۱۲۵ تقسیم بر ۵ چقدره؟","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"(25 + 15) * 2","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"۵۰ درصد ۱۲۰۰ چند میشه؟","intent":"CALCULATOR","slots":{},"split":"test"}
+{"text":"لیست خرید نان و شیر اضافه کن","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"لیست خرید چیه؟","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"شیر به لیست خرید اضافه کن","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"نان را از لیست خرید تیک بزن","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"پنیر از لیست خرید حذف کن","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"کارهای امروز چیا هست؟","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"به کارهای امروز تماس با بانک اضافه کن","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"کارهای امروز ارسال فاکتور انجام شد","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"یادداشت‌ها را بخوان","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"یادداشت کن شیر و تخم مرغ بگیرم","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"یادداشت بردار فردا بسته را ارسال کنم","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"فهرست خرید ما را بگو","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"سبد خرید چیه؟","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"کارهای امروز را نشان بده","intent":"NOTES_TODO","slots":{},"split":"dev"}
+{"text":"به لیست خرید برنج و روغن اضافه کن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"سیب به سبد خرید اضافه کن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"گوشت را از لیست خرید تیک بزن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"ماست را از لیست خرید پاک کن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"لیست خرید را بخوان لطفاً","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"فهرست خرید رو نشون بده","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"کارهای امروز گزارش فروش اضافه کن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"به لیست کارها پرداخت قبض آب اضافه کن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"کار خرید دفتر از کارهای امروز انجام شد","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"فهرست کارهای من چیه؟","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"کارهام را بخوان لطفاً","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"کارهامو نشون بده","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"یادداشت هام چیه؟","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"یادداشت هامو بخون","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"لیست یادداشت ها را بگو","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"به یادداشت ها اضافه کن جلسه با طراح لغو شد","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"توی یادداشت ها بنویس رمز وای فای مهمان ۱۲۳۴ است","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"یادداشت جدید خرید هدیه تولد","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"چای به لیست خرید اضافه کن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"پیاز از فهرست خرید حذف کن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"شکر از لیست خرید تیک بزن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"قهوه به سبد خرید اضافه کن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"به فهرست کارهای امروز مرور کد اضافه کن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"کار تمیز کردن میز در کارهای امروز انجام شد","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"تیک بزن کار تماس با حسابدار در کارهای امروز","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"کارهای روزانه را بگو","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"یادداشت ها را نشان بده لطفاً","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"به کارهای من ارسال رزومه اضافه کن","intent":"NOTES_TODO","slots":{},"split":"test"}
+{"text":"آهنگ بعدی را پخش کن","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"آهنگ بعدی","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"آهنگ قبلی را پخش کن","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"آهنگ قبلی","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"موسیقی را متوقف کن","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"آهنگ را متوقف کن","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"پخش موسیقی را متوقف کن","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"موسیقی را پخش کن","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"آهنگ را پخش کن","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"ادامه پخش موسیقی","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"ترک بعدی","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"ترک قبلی","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"آهنگ را قطع کن","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"موزیک بعدی رو پخش کن","intent":"MEDIA_CONTROL","slots":{},"split":"dev"}
+{"text":"برو آهنگ بعدی","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"موسیقی بعدی را پخش کن","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"آهنگ قبلی رو بزن","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"موسیقی قبلی را پخش کن","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"موزیک قبلی را پخش کن","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"برگرد به آهنگ قبلی","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"پاز کن موسیقی را","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"پلی کن آهنگ را","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"ادامه آهنگ را پخش کن","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"توقف پخش موسیقی","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"موسیقی را قطع کن","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"پخش موزیک را متوقف کن","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"موزیک را پخش کن لطفاً","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"ترک بعدی رو بذار","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"ترک قبلی رو بذار","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"نکست بزن","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"مکث موسیقی","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"مکث پخش","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"توقف موزیک","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"توقف موسیقی","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"توقف آهنگ","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"ادامه پخش آهنگ","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"پخش آهنگ را شروع کن","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"آهنگ بعدی را بگذار لطفاً","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"موسیقی قبلی رو بگذار","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"ادامه موسیقی","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"ادامه پخش موزیک","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"ترک بعدی را پخش کن لطفاً","intent":"MEDIA_CONTROL","slots":{},"split":"test"}
+{"text":"وای‌فای را خاموش کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"WIFI"},"split":"dev"}
+{"text":"بلوتوث را روشن کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"BLUETOOTH"},"split":"test"}
+{"text":"دیتا را روشن کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"DATA"},"split":"test"}
+{"text":"حالت هواپیما را روشن کن","intent":"OPEN_SETTINGS","slots":{"settingTarget":"AIRPLANE"},"split":"test"}
+{"text":"۱۴۰۴/۰۱/۰۱ به میلادی چندم است؟","intent":"TIME_DATE","slots":{},"split":"dev"}
+{"text":"۲۱ مارس ۲۰۲۵ به شمسی چندمه؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"چند روز تا نوروز مانده؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"سال ۱۴۰۳ کبیسه است یا ۱۴۰۴؟","intent":"TIME_DATE","slots":{},"split":"test"}

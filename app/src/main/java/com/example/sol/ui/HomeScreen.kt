@@ -82,9 +82,9 @@ import com.example.sol.voice.VoskModelStatus
 
 private val QUICK_COMMANDS = listOf(
     "امروز چندم برج است؟",
-    "چهارشنبه ساعت ۹ صبح یادآوری کن جلسه دارم",
-    "دو روز دیگه به علی پیام یادآوری بفرست",
-    "۲۰ قابلیت",
+    "تایمر ۱۰ دقیقه",
+    "۲۵ درصد ۸۰۰ چند میشه؟",
+    "فهرست قابلیت‌ها",
     "به اینترنت برو کتاب Atomic Habits را پیدا کن و با توضیحات صوتی من به حافظه و نقشت اضافه کن",
     "از حافظه در پس‌زمینه پشتیبان بگیر",
     "هر وقت می‌گم دفتر منظورم شرکت کارنو صنعت ماکیان است",
@@ -93,6 +93,7 @@ private val QUICK_COMMANDS = listOf(
 
 @Composable
 fun HomeScreen(
+    capabilitiesCount: Int,
     preferences: SolPreferences,
     batteryStatus: BatteryStatus,
     listeningState: VoiceListeningState,
@@ -281,7 +282,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = "۲۰ قابلیت و پس‌زمینه",
+                                text = "$capabilitiesCount قابلیت و پس‌زمینه",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 maxLines = 1,

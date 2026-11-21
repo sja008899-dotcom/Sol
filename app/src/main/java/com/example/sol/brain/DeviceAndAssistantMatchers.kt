@@ -148,9 +148,16 @@ internal class DeviceStatusMatcher : IntentMatcher {
         if (ctx.hasAnyToken("تنظیمات", "پس زمینه", "پایش", "شارژر", "کابل", "خرید", "قیمت")) return null
         if (ctx.hasPhrase("پس زمینه")) return null
 
-        val hit = ctx.hasAnyPhrase("وضعیت گوشی", "وضعیت دستگاه", "وضعیت باتری", "درصد باتری", "میزان شارژ", "شارژ گوشی", "شارژ دستگاه") ||
+        val hit = ctx.hasAnyPhrase(
+            "وضعیت گوشی", "وضعیت دستگاه", "وضعیت باتری", "درصد باتری",
+            "میزان شارژ", "شارژ گوشی", "شارژ دستگاه",
+            "فضای خالی", "حافظه خالی", "رم گوشی", "رم آزاد", "فضای ذخیره",
+            "زمان شارژ", "چقدر رم", "حافظه گوشی چقدره",
+        ) ||
             ctx.hasAllTokens("وضعیت", "دستگاه") ||
             ctx.hasAllTokens("وضعیت", "گوشی") ||
+            ctx.hasAllTokens("فضا", "گوشی") ||
+            ctx.hasAllTokens("رم", "آزاد") ||
             (ctx.hasAnyToken("باتری", "شارژ") && !ctx.hasToken("ساعت"))
 
         if (!hit) return null
@@ -205,20 +212,28 @@ internal class OpenSettingsMatcher : IntentMatcher {
 
     override fun match(ctx: MatchContext): MatchResult? {
         if (ctx.hasToken("رمز") || ctx.hasToken("نسخه") || ctx.hasPhrase("چه خبر")) return null
+        if (ctx.hasAnyPhrase("چراغ قوه", "چراغ‌قوه", "فلش گوشی", "فلاش گوشی")) return null
 
         val target = when {
+            ctx.hasAnyPhrase("حالت هواپیما", "حالت پرواز", "پرواز گوشی") -> "AIRPLANE"
+            ctx.hasAnyPhrase("اینترنت همراه", "داده موبایل", "داده های موبایل", "داده‌های موبایل", "دیتا موبایل", "دیتای موبایل", "دیتای گوشی") ||
+                (ctx.hasAnyToken("دیتا", "دیتای") && ctx.hasAnyToken("روشن", "خاموش", "قطع", "وصل", "باز", "تنظیمات", "فعال", "غیرفعال")) -> "DATA"
             ctx.hasAnyPhrase("تنظیمات وایفای", "تنظیمات وای فای", "تنظیمات اینترنت") ||
-                (ctx.hasAnyToken("وایفای", "wifi") && ctx.hasAnyToken("باز", "روشن", "خاموش", "تنظیمات", "وصل", "بزن")) -> "WIFI"
+                (ctx.hasAnyToken("وایفای", "wifi") && ctx.hasAnyToken("باز", "روشن", "خاموش", "تنظیمات", "وصل", "قطع", "بزن", "فعال", "غیرفعال")) -> "WIFI"
             ctx.hasAnyPhrase("تنظیمات مکان", "مکان یاب") ||
-                (ctx.hasAnyToken("لوکیشن", "gps") && ctx.hasAnyToken("باز", "روشن", "خاموش", "تنظیمات", "بزن")) -> "LOCATION"
-            ctx.hasToken("بلوتوث") && ctx.hasAnyToken("باز", "روشن", "خاموش", "تنظیمات", "بزن", "وصل") -> "BLUETOOTH"
+                (ctx.hasAnyToken("لوکیشن", "gps") && ctx.hasAnyToken("باز", "روشن", "خاموش", "تنظیمات", "بزن", "فعال", "غیرفعال")) -> "LOCATION"
+            ctx.hasToken("بلوتوث") && ctx.hasAnyToken("باز", "روشن", "خاموش", "تنظیمات", "بزن", "وصل", "قطع", "فعال", "غیرفعال") -> "BLUETOOTH"
             ctx.hasPhrase("تنظیمات صدا") -> "SOUND"
             ctx.hasPhrase("تنظیمات باتری") -> "BATTERY"
             ctx.hasToken("تنظیمات") && ctx.hasAnyToken("باز", "برو", "بزن", "گوشی") -> "WIFI"
             else -> null
         } ?: return null
 
-        val slots = mapOf("setting_target" to SlotValue.Text(target))
+        val toggleRequested = ctx.hasAnyToken("روشن", "خاموش", "وصل", "قطع", "فعال", "غیرفعال")
+        val slots = buildMap<String, SlotValue> {
+            put("setting_target", SlotValue.Text(target))
+            put("toggle_requested", SlotValue.Flag(toggleRequested))
+        }
         return MatchResult(score = 0.90f, slots = slots, evidence = listOf("settings:$target")) { c, r ->
             ParsedCommand(
                 action = action,
@@ -308,12 +323,24 @@ internal class TimeDateMatcher : IntentMatcher {
 
     override fun match(ctx: MatchContext): MatchResult? {
         if (ctx.hasAnyToken("دیوار", "مچی", "خوابیده", "گرونه", "گران", "انقضا", "انقضای", "جنگ", "ایران", "تمدن", "فاصله", "مسافت", "تعداد", "تولد", "بیمه")) return null
+        if (ctx.hasAnyPhrase("به تقویم اضافه", "در تقویم ثبت", "تو تقویم بذار", "رویداد تقویم")) return null
 
         val isTime = ctx.tokens == listOf("ساعت") ||
             ctx.hasAnyPhrase("ساعت چند است", "ساعت چنده", "ساعت چنه", "الان ساعت چنده", "الان ساعت چند است", "ساعت الان", "چه ساعتیه", "چه ساعتی است") ||
-            (ctx.hasToken("ساعت") && ctx.hasAnyToken("چند", "چنده", "بگو") && !ctx.hasAnyToken("یادآوری", "یادم", "آلارم", "بذار", "هشدار", "فاصله"))
+            (ctx.hasToken("ساعت") && ctx.hasAnyToken("چند", "چنده", "بگو") && !ctx.hasAnyToken("یادآوری", "یادم", "آلارم", "بذار", "هشدار", "فاصله", "تایمر"))
+
+        val isDateConversionOrCountdown =
+            ctx.hasAnyPhrase("به میلادی", "به شمسی", "تبدیل تاریخ", "چند روز تا", "چند روز دیگه تا", "چند روز دیگر تا", "چند روز مانده", "چند روز مونده") ||
+                (ctx.hasToken("میلادی") && ctx.hasAnyToken("شمسی", "تبدیل", "معادل", "برابر", "چنده")) ||
+                (ctx.hasAnyToken("نوروز", "یلدا") && ctx.hasAnyToken("مانده", "مونده", "روز"))
+
+        val isExplicitDateWeekday = ctx.hasAnyPhrase("چه روزی است", "چه روزی بود", "چه روزی میشه", "چندشنبه‌ست", "چندشنبه است") &&
+            (ctx.hasAnyToken("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند", "امروز") ||
+                Regex("\\b1[2-5]\\d{2}[/-]\\d{1,2}[/-]\\d{1,2}\\b").containsMatchIn(ctx.numberConvertedCleaned))
 
         val isDate = ctx.tokens == listOf("امروز") ||
+            isDateConversionOrCountdown ||
+            isExplicitDateWeekday ||
             ctx.hasAnyPhrase(
                 "تاریخ امروز", "امروز چندم", "امروز چندمه", "امروز چند", "امروز چه روزی",
                 "امروز چه روز", "امروز چیه", "امروز چه روزیه", "چندم برج", "چندم ماه", "چندم ماهه",
@@ -321,7 +348,7 @@ internal class TimeDateMatcher : IntentMatcher {
             ) ||
             ctx.hasAnyToken("چندشنبه", "چندمه", "شمسی") ||
             (ctx.hasToken("کبیسه") && !ctx.hasToken("روزهای")) ||
-            (ctx.hasToken("تاریخ") && ctx.hasAnyToken("امروز", "روز", "چندم", "شمسی", "بگو", "چیه", "چنده"))
+            (ctx.hasToken("تاریخ") && ctx.hasAnyToken("امروز", "روز", "چندم", "شمسی", "میلادی", "بگو", "چیه", "چنده"))
 
         if (!isTime && !isDate) return null
 

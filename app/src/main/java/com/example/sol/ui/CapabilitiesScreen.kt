@@ -51,7 +51,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.sol.knowledge.CapabilityCategory
-import com.example.sol.knowledge.SolCapabilitiesCatalog
 import com.example.sol.knowledge.SolCapabilityItem
 import com.example.sol.memory.BackgroundJobLogEntity
 import java.text.SimpleDateFormat
@@ -69,6 +68,7 @@ private val PERIODIC_SUPPORTED_IDS = setOf(
 
 @Composable
 fun CapabilitiesScreen(
+    capabilities: List<SolCapabilityItem>,
     enabledPeriodicJobs: Set<String>,
     backgroundLogs: List<BackgroundJobLogEntity>,
     hasNotificationPermission: Boolean,
@@ -84,14 +84,14 @@ fun CapabilitiesScreen(
     BackHandler(onBack = onBack)
 
     val formatter = remember { SimpleDateFormat("HH:mm:ss", Locale.US) }
-    val bgItems = remember {
-        SolCapabilitiesCatalog.allTwentyCapabilities.filter { it.category == CapabilityCategory.BACKGROUND }
+    val bgItems = remember(capabilities) {
+        capabilities.filter { it.category == CapabilityCategory.BACKGROUND }
     }
-    val advItems = remember {
-        SolCapabilitiesCatalog.allTwentyCapabilities.filter { it.category == CapabilityCategory.ADVANCED_LEARNING }
+    val advItems = remember(capabilities) {
+        capabilities.filter { it.category == CapabilityCategory.ADVANCED_LEARNING }
     }
-    val coreItems = remember {
-        SolCapabilitiesCatalog.allTwentyCapabilities.filter { it.category == CapabilityCategory.CORE_ASSISTANT }
+    val coreItems = remember(capabilities) {
+        capabilities.filter { it.category == CapabilityCategory.CORE_ASSISTANT }
     }
 
     Column(
@@ -132,13 +132,13 @@ fun CapabilitiesScreen(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "۲۰ قابلیت پیشرفته و پس‌زمینه Sol",
+                        text = "${capabilities.size} قابلیت واقعی و پس‌زمینه Sol",
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        text = "۱۰ اجرای پس‌زمینه • ۱ آموزش کتاب و نقش صوتی • ۹ فرمان هوشمند",
+                        text = "${bgItems.size} اجرای پس‌زمینه • ${advItems.size} آموزش کتاب و نقش صوتی • ${coreItems.size} مهارت و ابزار آفلاین",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -195,10 +195,10 @@ fun CapabilitiesScreen(
                 }
             }
 
-            // Section 1: 10 Background Execution
+            // Section 1: Background Execution
             item {
                 SectionBanner(
-                    title = "بخش ۱: ۱۰ اجرای پس‌زمینه (WorkManager و Foreground Service)",
+                    title = "بخش ۱: ${bgItems.size} اجرای پس‌زمینه (AlarmManager، WorkManager و سرویس صوتی)",
                     subtitle = "هر مورد را می‌توانید فوراً اجرا کنید یا اجرای دوره‌ای آن را روشن بگذارید.",
                 )
             }
@@ -222,11 +222,11 @@ fun CapabilitiesScreen(
                 )
             }
 
-            // Section 2: 1 Advanced Web Book + Voice Role Learning
+            // Section 2: Advanced Web Book + Voice Role Learning
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 SectionBanner(
-                    title = "بخش ۲: ۱ دستور پیشرفته — اینترنت + کتاب + یادگیری نقش صوتی",
+                    title = "بخش ۲: ${advItems.size} دستور پیشرفته — اینترنت + کتاب + یادگیری نقش صوتی",
                     subtitle = "با تأیید شما کتاب را از اینترنت یا فایل می‌گیرد و با توضیحات صوتی شما نقش جدید را در حافظه ثبت می‌کند.",
                 )
             }
@@ -275,11 +275,11 @@ fun CapabilitiesScreen(
                 }
             }
 
-            // Section 3: 9 Core Smart Assistant Capabilities
+            // Section 3: Core Smart Assistant & Offline Utility Skills
             item {
                 Spacer(modifier = Modifier.height(4.dp))
                 SectionBanner(
-                    title = "بخش ۳: ۹ قابلیت هستهٔ هوشمند، حافظه و کنترل گوشی",
+                    title = "بخش ۳: ${coreItems.size} مهارت هستهٔ هوشمند، حافظه و ابزار آفلاین",
                     subtitle = "روی هر قابلیت بزنید تا فرمان فارسی آن مستقیماً اجرا شود.",
                 )
             }

@@ -1,43 +1,36 @@
 package com.example.sol.brain
 
 import com.example.sol.calendar.JalaliCalendar
+import com.example.sol.text.PersianNumbers
 import com.example.sol.text.PersianTextNormalizer
 
-/**
- * Rule-based token/phrase matchers for Milestone M5 offline utility skills:
- * - Timer & Stopwatch (B8.1)
- * - Flashlight torch control (B8.2)
- * - Calendar Event insertion (B8.3)
- * - Safe Math Calculator (B8.4)
- * - Notes & To-Do / Shopping Lists (B8.5)
- * - Hardware Media Keys (B8.8)
- */
 internal class TimerStopwatchMatcher : IntentMatcher {
     override val id = "matcher_timer_stopwatch"
     override val action = SolAction.TIMER_STOPWATCH
     override val priority = 87
 
     override fun match(ctx: MatchContext): MatchResult? {
-        if (ctx.hasAnyToken("خرید", "قیمت", "فروش")) return null
+        if (ctx.hasAnyToken("قیمت", "خرید", "فروش")) return null
 
         val isStopwatch = ctx.hasAnyToken("کرنومتر", "کرونومتر") ||
             ctx.hasAnyPhrase("زمان سنج", "زمان‌سنج")
-        val isTimer = ctx.hasToken("تایمر") || ctx.hasAnyPhrase("شمارش معکوس", "تایم بگیر")
-
+        val isTimer = ctx.hasToken("تایمر") || ctx.hasPhrase("شمارش معکوس")
         if (!isStopwatch && !isTimer) return null
 
-        val durationSeconds = parseDurationSeconds(ctx)
         val mode = if (isStopwatch) "STOPWATCH" else "TIMER"
-        val op = when {
-            isStopwatch -> when {
+        val durationSec = if (!isStopwatch) extractDurationSeconds(ctx) else 0L
+
+        val op = if (isStopwatch) {
+            when {
                 ctx.hasAnyToken("ریست", "صفر", "مجدد") || ctx.hasPhrase("پاک کن") -> "RESET"
-                ctx.hasAnyToken("توقف", "متوقف", "نگهدار", "استاپ", "خاموش", "ببند", "قطع") -> "STOP"
+                ctx.hasAnyToken("توقف", "نگهدار", "استاپ", "خاموش", "ببند", "متوقف", "قطع") -> "STOP"
                 ctx.hasAnyToken("وضعیت", "چقدر", "چنده", "بگو", "نشان", "نشون") -> "STATUS"
                 else -> "START"
             }
-            else -> when {
-                ctx.hasAnyToken("لغو", "کنسل", "خاموش", "قطع", "حذف", "ببند") -> "CANCEL"
-                ctx.hasAnyToken("وضعیت", "چقدر", "مانده", "باقی", "چنده") && durationSeconds <= 0L -> "STATUS"
+        } else {
+            when {
+                ctx.hasAnyToken("لغو", "کنسل", "خاموش", "قطع", "حذف", "پاک", "ببند") -> "CANCEL"
+                durationSec <= 0L && ctx.hasAnyToken("وضعیت", "چقدر", "مانده", "باقی", "چنده", "بگو") -> "STATUS"
                 else -> "START"
             }
         }
@@ -46,25 +39,22 @@ internal class TimerStopwatchMatcher : IntentMatcher {
         val slots = buildMap<String, SlotValue> {
             put("timer_mode", SlotValue.Text(mode))
             put("timer_op", SlotValue.Text(op))
-            if (durationSeconds > 0L) {
-                put("duration_seconds", SlotValue.Number(durationSeconds.toDouble()))
+            if (durationSec > 0L) {
+                put("duration_seconds", SlotValue.Number(durationSec.toDouble()))
             }
-            if (!label.isNullOrBlank()) {
+            if (label.isNotBlank()) {
                 put("message", SlotValue.Text(label))
             }
         }
 
-        return MatchResult(
-            score = 0.94f,
-            slots = slots,
-            evidence = listOf("timer:$mode:$op"),
-        ) { c, r ->
+        val score = if (durationSec > 0L || isStopwatch || op != "START") 0.95f else 0.91f
+        return MatchResult(score = score, slots = slots, evidence = listOf("timer_stopwatch:$mode:$op")) { c, r ->
             ParsedCommand(
                 action = action,
                 rawText = c.rawText,
                 normalizedText = c.normalized,
-                message = label,
-                delayMinutes = (durationSeconds / 60L).coerceAtLeast(1L),
+                message = label.ifBlank { null },
+                delayMinutes = (durationSec / 60L).coerceAtLeast(1L),
                 requireConfirmation = false,
                 slots = r.slots,
                 confidence = r.score,
@@ -73,37 +63,41 @@ internal class TimerStopwatchMatcher : IntentMatcher {
         }
     }
 
-    private fun parseDurationSeconds(ctx: MatchContext): Long {
-        val normNum = ctx.numberConvertedNormalized
-        var totalSeconds = 0L
-        for (m in COMPOUND_DURATION_REGEX.findAll(normNum)) {
-            val qty = m.groupValues[1].toDoubleOrNull() ?: continue
-            val unit = m.groupValues[2]
-            val sec = when (unit) {
-                "ساعت" -> (qty * 3600.0).toLong()
-                "دقیقه", "دقیق" -> (qty * 60.0).toLong()
-                "ثانیه" -> qty.toLong()
-                else -> 0L
-            }
-            totalSeconds += sec.coerceAtLeast(0L)
-        }
-        if (totalSeconds > 0L) return totalSeconds
-
-        return when {
-            ctx.hasAnyPhrase("نیم ساعت", "نصف ساعت") -> 1800L
-            ctx.hasAnyPhrase("یک ربع", "یه ربع", "ربع ساعت") -> 900L
-            else -> 0L
-        }
-    }
-
-    private fun extractTimerLabel(cleaned: String): String? {
-        val m = TIMER_LABEL_REGEX.find(cleaned)?.groupValues?.getOrNull(1)?.trim()
-        return m?.takeIf { it.isNotBlank() }
-    }
-
     companion object {
-        private val COMPOUND_DURATION_REGEX = Regex("(\\d+(?:\\.\\d+)?)\\s*(ساعت|دقیقه|دقیق|ثانیه)")
-        private val TIMER_LABEL_REGEX = Regex("(?:برای|بابت|با نام|با عنوان)\\s+(.+)$")
+        private val DURATION_PART_REGEX = Regex("(\\d+(?:\\.\\d+)?)\\s*(ساعت|دقیقه|ثانیه)")
+
+        internal fun extractDurationSeconds(ctx: MatchContext): Long {
+            val numSource = ctx.numberConvertedCleaned
+            var totalSeconds = 0.0
+            for (m in DURATION_PART_REGEX.findAll(numSource)) {
+                val amount = m.groupValues[1].toDoubleOrNull() ?: continue
+                totalSeconds += when (m.groupValues[2]) {
+                    "ساعت" -> amount * 3600.0
+                    "دقیقه" -> amount * 60.0
+                    "ثانیه" -> amount
+                    else -> 0.0
+                }
+            }
+            if (totalSeconds <= 0.0) {
+                if (ctx.hasPhrase("نیم ساعت")) {
+                    totalSeconds = 1800.0
+                } else if (ctx.hasAnyPhrase("ربع ساعت", "یک ربع", "یه ربع")) {
+                    totalSeconds = 900.0
+                } else if (numSource.contains("و نیم") && numSource.contains("دقیقه")) {
+                    totalSeconds += 30.0
+                }
+            } else if (numSource.contains("و نیم") && numSource.contains("ساعت") && !numSource.contains("دقیقه")) {
+                totalSeconds += 1800.0
+            } else if (numSource.contains("و نیم") && numSource.contains("دقیقه") && !numSource.contains("ثانیه")) {
+                totalSeconds += 30.0
+            }
+            return totalSeconds.toLong().coerceAtLeast(0L)
+        }
+
+        private fun extractTimerLabel(cleaned: String): String {
+            val m = Regex("(?:برای|واسه)\\s+(.+?)$").find(cleaned)?.groupValues?.getOrNull(1)?.trim().orEmpty()
+            return m.replace(Regex("^(?:تایمر|کرنومتر)\\s*"), "").trim()
+        }
     }
 }
 
@@ -115,26 +109,23 @@ internal class FlashlightMatcher : IntentMatcher {
     override fun match(ctx: MatchContext): MatchResult? {
         if (ctx.hasAnyToken("خرید", "قیمت", "باتری", "مموری", "کامپیوتر")) return null
 
-        val hit = ctx.hasAnyToken("چراغقوه") ||
-            ctx.hasAnyPhrase("چراغ قوه", "فلش گوشی", "فلاش گوشی", "فلاش دوربین", "نور فلش", "چراغ گوشی")
-
+        val hit = ctx.hasAnyToken("چراغ‌قوه", "چراغقوه") ||
+            ctx.hasAnyPhrase(
+                "چراغ قوه", "فلش گوشی", "فلاش گوشی",
+                "فلاش دوربین", "نور فلش", "چراغ گوشی",
+            )
         if (!hit) return null
 
-        val explicitEnable: Boolean? = when {
-            ctx.hasAnyToken("خاموش", "ببند", "قطع", "غیرفعال", "بستن") -> false
-            ctx.hasAnyToken("روشن", "باز", "بزن", "فعال") -> true
+        val targetFlag: Boolean? = when {
+            ctx.hasAnyToken("خاموش", "ببند", "قطع", "غیرفعال") -> false
+            ctx.hasAnyToken("روشن", "باز", "بزن", "فعال", "روشنش") -> true
             else -> null
         }
 
         val slots = buildMap<String, SlotValue> {
-            explicitEnable?.let { put("torch_enabled", SlotValue.Flag(it)) }
+            targetFlag?.let { put("torch_enabled", SlotValue.Flag(it)) }
         }
-
-        return MatchResult(
-            score = 0.94f,
-            slots = slots,
-            evidence = listOf("flashlight:${explicitEnable ?: "toggle"}"),
-        ) { c, r ->
+        return MatchResult(score = 0.94f, slots = slots, evidence = listOf("flashlight")) { c, r ->
             ParsedCommand(
                 action = action,
                 rawText = c.rawText,
@@ -154,41 +145,39 @@ internal class CalendarEventMatcher : IntentMatcher {
     override val priority = 85
 
     override fun match(ctx: MatchContext): MatchResult? {
-        if (ctx.hasAnyToken("چندم", "امروز", "کبیسه", "برنامه", "اپ")) return null
+        if (ctx.hasAnyToken("خرید", "فراموش", "حذف")) return null
 
-        val hit = ctx.hasAnyPhrase(
+        val hasExplicitPhrase = ctx.hasAnyPhrase(
             "به تقویم اضافه کن",
+            "به تقویم اضافه",
             "در تقویم ثبت کن",
+            "در تقویم اضافه کن",
             "تو تقویم بذار",
             "توی تقویم بذار",
-            "در تقویم بنویس",
             "تو تقویم ثبت کن",
+            "توی تقویم ثبت کن",
             "رویداد تقویم",
-            "رویداد جدید",
             "ثبت رویداد",
             "ایجاد رویداد",
             "اضافه به تقویم",
-        ) || (
-            ctx.hasToken("تقویم") &&
-                ctx.hasAnyToken("اضافه", "ثبت", "بذار", "بگذار", "بساز", "بنویس", "ایجاد") &&
-                ctx.hasAnyToken("رویداد", "جلسه", "قرار", "ملاقات", "تولد", "مراسم", "امتحان", "سفر", "برنامه")
-            )
+        )
+        val hasCalendarPlusEvent = ctx.hasToken("تقویم") &&
+            ctx.hasAnyToken("اضافه", "ثبت", "بذار", "بگذار", "بساز", "بنویس", "ایجاد") &&
+            ctx.hasAnyToken("رویداد", "جلسه", "قرار", "ملاقات", "تولد", "مراسم", "امتحان", "سفر", "برنامه")
+        val hasEventAndCalendar = ctx.hasToken("تقویم") && ctx.hasAnyToken("رویداد", "قرار", "ملاقات")
 
-        if (!hit) return null
+        if (!hasExplicitPhrase && !hasCalendarPlusEvent && !hasEventAndCalendar) return null
 
         val title = extractEventTitle(ctx.cleaned)
         val parsedRange = JalaliCalendar.parseEventDateTimeRange(ctx.cleaned)
 
         val slots = buildMap<String, SlotValue> {
-            put("event_title", SlotValue.Text(title))
-            parsedRange?.first?.let { put("event_begin_ms", SlotValue.Number(it.toDouble())) }
+            put("message", SlotValue.Text(title))
+            parsedRange?.let { (beginMs, _) ->
+                put("event_begin_ms", SlotValue.Number(beginMs.toDouble()))
+            }
         }
-
-        return MatchResult(
-            score = 0.93f,
-            slots = slots,
-            evidence = listOf("calendar_event"),
-        ) { c, r ->
+        return MatchResult(score = 0.93f, slots = slots, evidence = listOf("calendar_event")) { c, r ->
             ParsedCommand(
                 action = action,
                 rawText = c.rawText,
@@ -202,21 +191,24 @@ internal class CalendarEventMatcher : IntentMatcher {
         }
     }
 
-    private fun extractEventTitle(cleaned: String): String {
-        val quoted = Regex("[«\"](.+?)[»\"]").find(cleaned)?.groupValues?.getOrNull(1)?.trim()
-        if (!quoted.isNullOrBlank()) return quoted
+    companion object {
+        private val STRIP_BOILERPLATE_REGEX = Regex(
+            "(?:به تقویم اضافه کن|در تقویم ثبت کن|در تقویم اضافه کن|تو تقویم بذار|توی تقویم بذار|تو تقویم ثبت کن|توی تقویم ثبت کن|به تقویم|در تقویم|توی تقویم|تو تقویم|اضافه کن|ثبت کن|بذار|بگذار|ایجاد کن|بساز|رویداد جدید|رویداد)\\s*"
+        )
+        private val STRIP_TIME_NOISE_REGEX = Regex(
+            "(?:امروز|فردا|پس‌فردا|پس فردا|ساعت\\s*[\\d۰-۹]{1,2}(?:[:٫.][\\d۰-۹]{1,2}|\\s*و\\s*نیم)?(?:\\s*(?:صبح|ظهر|عصر|شب|بعدازظهر))?|\\b1[2-5]\\d{2}[/-]\\d{1,2}[/-]\\d{1,2}\\b)"
+        )
 
-        val stripped = cleaned
-            .replace(Regex("(?:به|در|تو|توی)\\s+تقویم\\s+(?:من\\s+)?(?:اضافه کن|ثبت کن|بذار|بگذار|بنویس|بساز|ایجاد کن)"), " ")
-            .replace(Regex("(?:اضافه کن|ثبت کن|ایجاد کن)\\s+(?:به|در|تو|توی)\\s+تقویم"), " ")
-            .replace(Regex("(?:ثبت|ایجاد)\\s+رویداد(?:\\s+جدید)?"), " ")
-            .replace(Regex("رویداد(?:\\s+جدید)?"), " ")
-            .replace(Regex("\\b(?:را|رو|برام|برای من|در تقویم|به تقویم)\\b"), " ")
-            .replace(Regex("(?:امروز|فردا|پس‌فردا|پس فردا|\\d{4}[/-]\\d{1,2}[/-]\\d{1,2})"), " ")
-            .replace(Regex("ساعت\\s*\\d{1,2}(?:[:٫.]\\d{1,2})?(?:\\s*(?:صبح|ظهر|عصر|شب|بعدازظهر))?"), " ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
-        return stripped.ifBlank { "رویداد Sol" }
+        internal fun extractEventTitle(cleaned: String): String {
+            val noBoilerplate = STRIP_BOILERPLATE_REGEX.replace(cleaned, " ")
+            val noDigits = PersianTextNormalizer.cleanDisplayText(noBoilerplate)
+            val stripped = STRIP_TIME_NOISE_REGEX.replace(noDigits, " ")
+                .replace(Regex("^(?:را|رو|یک|یه)\\s+"), "")
+                .replace(Regex("\\s+(?:را|رو)$"), "")
+                .replace(Regex("\\s+"), " ")
+                .trim()
+            return stripped.ifBlank { "رویداد Sol" }
+        }
     }
 }
 
@@ -226,53 +218,37 @@ internal class CalculatorMatcher : IntentMatcher {
     override val priority = 89
 
     override fun match(ctx: MatchContext): MatchResult? {
-        if (URL_REGEX.containsMatchIn(ctx.cleaned)) return null
-        if (ctx.hasAnyPhrase("ماشین حساب")) return null
+        if (ctx.hasPhrase("ماشین حساب") && ctx.hasAnyToken("باز", "اجرا")) return null
         if (ctx.hasAnyToken(
-                "فراموش", "یادآوری", "یادم", "تماس", "زنگ", "پیام", "پیامک",
-                "تقویم", "کبیسه", "تایمر", "کرنومتر", "کرونومتر", "شمسی", "میلادی",
-                "شماره", "موبایل", "پلاک", "بیمه", "کد",
+                "فراموش", "یادآور", "یادآوری", "یادم", "آلارم", "تماس", "زنگ", "پیام", "پیامک",
+                "تقویم", "کبیسه", "تایمر", "کرنومتر", "کرونومتر", "شمسی", "میلادی", "چندشنبه", "امروز",
             )
-        ) {
+        ) return null
+        if (Regex("https?://\\S+", RegexOption.IGNORE_CASE).containsMatchIn(ctx.cleaned)) return null
+
+        val converted = ctx.numberConvertedCleaned
+        val hasDigits = DIGIT_REGEX.containsMatchIn(converted)
+        val hasSymbolicMath = SYMBOLIC_MATH_REGEX.containsMatchIn(converted)
+        val hasPersianMathPhrase = ctx.hasAnyPhrase(
+            "ضرب در", "ضربدر", "تقسیم بر", "به علاوه", "بعلاوه", "به اضافه", "به توان",
+        )
+        val hasSqrt = ctx.hasAnyToken("جذر", "رادیکال") && hasDigits
+        val hasPercentOf = ctx.hasToken("درصد") && hasDigits && !ctx.hasAnyToken("باتری", "شارژ")
+        val hasMinusWithDigits = ctx.hasToken("منهای") && hasDigits
+        val hasCalcVerbWithDigits = ctx.hasAnyPhrase("حساب کن", "محاسبه کن") &&
+            (hasDigits || ctx.hasAnyToken("جمع", "تفریق", "ضرب", "تقسیم", "درصد", "جذر"))
+
+        if (!hasSymbolicMath && !hasPersianMathPhrase && !hasSqrt && !hasPercentOf && !hasMinusWithDigits && !hasCalcVerbWithDigits) {
             return null
         }
 
-        val rawHasBinaryOp = BINARY_SYMBOL_OP_REGEX.containsMatchIn(ctx.cleaned)
-        val hasSlashDatePattern = SLASH_DATE_REGEX.containsMatchIn(ctx.cleaned) && !rawHasBinaryOp
-        if (hasSlashDatePattern && !ctx.hasAnyPhrase("حساب کن", "محاسبه کن", "تقسیم بر")) return null
-
-        val hasDigit = DIGIT_REGEX.containsMatchIn(ctx.numberConvertedCleaned)
-        val hasPersianOpPhrase = ctx.hasAnyPhrase(
-            "ضرب در", "ضربدر", "تقسیم بر", "به علاوه", "بعلاوه", "به اضافه", "به توان", "اضافه بر"
-        )
-        val hasRootKeyword = ctx.hasAnyToken("جذر", "رادیکال") && hasDigit
-        val hasPercentOfExpr = (ctx.hasToken("درصد") || ctx.cleaned.contains('%') || ctx.cleaned.contains('٪')) &&
-            hasDigit && !ctx.hasAnyToken("باتری", "شارژ", "بدن", "هوا", "اب", "آب", "اکسیژن")
-        val hasMinusWordWithDigit = ctx.hasAnyToken("منهای", "منها") && hasDigit
-        val hasCalculateVerbWithDigit = ctx.hasAnyPhrase("حساب کن", "محاسبه کن") &&
-            (hasDigit || ctx.hasAnyToken("ضرب", "تقسیم", "جمع", "تفریق", "توان", "جذر", "درصد"))
-
-        val hit = (rawHasBinaryOp && !hasSlashDatePattern) ||
-            hasPersianOpPhrase ||
-            hasRootKeyword ||
-            hasPercentOfExpr ||
-            hasMinusWordWithDigit ||
-            hasCalculateVerbWithDigit
-
-        if (!hit) return null
-
-        val expr = ctx.cleaned
-        val slots = mapOf("expression" to SlotValue.Text(expr), "message" to SlotValue.Text(expr))
-        return MatchResult(
-            score = 0.93f,
-            slots = slots,
-            evidence = listOf("calculator_expr"),
-        ) { c, r ->
+        val slots = mapOf("message" to SlotValue.Text(ctx.cleaned))
+        return MatchResult(score = 0.94f, slots = slots, evidence = listOf("calculator_expression")) { c, r ->
             ParsedCommand(
                 action = action,
                 rawText = c.rawText,
                 normalizedText = c.normalized,
-                message = expr,
+                message = c.cleaned,
                 requireConfirmation = false,
                 slots = r.slots,
                 confidence = r.score,
@@ -282,10 +258,8 @@ internal class CalculatorMatcher : IntentMatcher {
     }
 
     companion object {
-        private val URL_REGEX = Regex("https?://\\S+", RegexOption.IGNORE_CASE)
         private val DIGIT_REGEX = Regex("\\d")
-        private val BINARY_SYMBOL_OP_REGEX = Regex("\\d\\s*[+*×÷^]\\s*\\d|\\d\\s+[-/]\\s+\\d|\\(\\s*\\d")
-        private val SLASH_DATE_REGEX = Regex("\\b(?:13|14|19|20)\\d{2}/\\d{1,2}/\\d{1,2}\\b")
+        private val SYMBOLIC_MATH_REGEX = Regex("\\d\\s*(?:[+*^×÷]|\\s/\\s|\\s-\\s|\\s%\\s)\\s*\\d")
     }
 }
 
@@ -295,51 +269,60 @@ internal class NotesTodoMatcher : IntentMatcher {
     override val priority = 81
 
     override fun match(ctx: MatchContext): MatchResult? {
-        // Keep existing FORGET_MEMORY phrases routed cleanly to FORGET_MEMORY
-        if (ctx.hasPhrase("فراموش کن") || ctx.hasPhrase("از حافظه") || ctx.hasPhrase("یادداشت های حافظه")) return null
-        if (ctx.hasAnyToken("یادداشتها", "یادداشت") && ctx.hasPhrase("باز کن") && !ctx.hasAnyToken("بخوان", "بخون", "اضافه")) return null
+        // Never steal explicit memory-forget commands ("از حافظه پاک کن", "فراموش کن") or list-memory queries
+        if (ctx.hasAnyPhrase("فراموش کن", "یادت بره", "از حافظه", "در حافظه", "توی حافظه")) return null
+        if (ctx.hasAnyToken("توضیح", "یادگیری", "نقش", "نکته", "زنگ", "تماس", "پیام", "پیامک")) return null
+        if (ctx.hasAnyToken("حافظه") && ctx.hasAnyToken("بگو", "بخوان", "فهرست", "لیست")) return null
+        if (ctx.hasPhrase("یادداشت") && ctx.hasToken("باز") && !ctx.hasAnyToken("بخوان", "اضافه", "لیست")) return null
 
         val isShopping = ctx.hasAnyPhrase("لیست خرید", "فهرست خرید", "سبد خرید")
-        val isTodo = ctx.hasAnyPhrase(
-            "کارهای امروز", "کارهای روزانه", "لیست کار", "لیست کارها",
-            "فهرست کارها", "فهرست کار", "لیست انجام کار", "برنامه کارها",
-        ) || ctx.hasAnyToken("تودو", "کارهام", "کارهامو", "تودولیست")
-        val isNoteVerb = ctx.hasAnyPhrase(
-            "یادداشت کن", "یادداشت بردار", "یادداشت جدید",
-            "به یادداشت اضافه کن", "تو یادداشت بنویس", "دفترچه یادداشت",
-        ) || (ctx.hasAnyToken("یادداشت", "یادداشتها", "یادداشتهام", "یادداشتهامو") &&
-            ctx.hasAnyToken("بخوان", "بخون", "نشون", "نشان", "فهرست", "لیست", "اضافه", "ثبت", "بنویس"))
+        val isTodo = ctx.hasAnyPhrase("کارهای امروز", "فهرست کار", "لیست کار", "کارهای روزانه", "برنامه امروز", "کارهای من") ||
+            ctx.hasAnyToken("کارهام", "کارهامو", "کارها", "تودو")
+        val isExplicitNoteRead = ctx.hasAnyPhrase(
+            "یادداشت ها را بخوان", "یادداشت هام چیه", "یادداشت هامو بخون",
+            "یادداشت هام را بگو", "یادداشت ها را نشان بده", "دفترچه یادداشت",
+            "لیست یادداشت", "فهرست یادداشت",
+        )
+        val isExplicitNoteAdd = ctx.hasAnyPhrase("یادداشت کن", "یادداشت بردار", "یادداشت جدید", "به یادداشت ها اضافه کن", "توی یادداشت ها بنویس")
+        val isExplicitNoteCompleteOrDelete = (isShopping || isTodo || isExplicitNoteRead || ctx.hasPhrase("یادداشت ها")) &&
+            (ctx.hasAnyToken("تیک", "حذف", "پاک") || ctx.hasAnyPhrase("انجام شد", "خریدم", "تموم شد", "تمام شد"))
+        val isMarkTodoDone = ctx.hasAnyPhrase("انجام شد", "تیک بزن") &&
+            ctx.hasAnyToken("کارهای", "کارهام", "کارهامو", "کارها", "لیست", "فهرست", "خرید", "سبد", "یادداشت", "تودو")
 
-        if (!isShopping && !isTodo && !isNoteVerb) return null
+        if (!isShopping && !isTodo && !isExplicitNoteRead && !isExplicitNoteAdd && !isExplicitNoteCompleteOrDelete && !isMarkTodoDone) {
+            return null
+        }
+
+        // Preserve existing M3 FORGET_MEMORY golden phrases containing "یادداشت ... حذف کن / پاک کن" when there is no shopping-list cue
+        if (ctx.hasToken("یادداشت") && ctx.hasAnyToken("حذف", "پاک") && !isShopping && !isTodo) {
+            return null
+        }
 
         val kind = when {
             isShopping -> "SHOPPING"
             isTodo -> "TODO"
             else -> "NOTE"
         }
+
         val op = when {
             ctx.hasAnyToken("حذف", "پاک") -> "DELETE"
-            ctx.hasAnyPhrase("انجام شد", "تیک بزن", "تمام شد", "تکمیل شد") ||
-                (ctx.hasToken("انجام") && ctx.hasAnyToken("شده", "دادم", "بزن")) -> "DONE"
-            ctx.hasAnyToken("بخوان", "بخون", "چیه", "چیست", "چیا", "نشان", "نشون", "دارم", "نمایش", "فهرست", "لیست") &&
-                extractNoteItemBody(ctx.cleaned).isBlank() -> "LIST"
-            ctx.hasAnyPhrase("لیست را بخوان", "لیست رو بخون", "لیست را نشان بده", "چیزهایی در لیست") -> "LIST"
-            extractNoteItemBody(ctx.cleaned).isBlank() && (isShopping || isTodo) -> "LIST"
+            ctx.hasAnyPhrase("انجام شد", "تیک بزن", "خریدم", "تموم شد", "تمام شد") || ctx.hasToken("تیک") -> "DONE"
+            ctx.hasAnyToken("چیه", "چیست", "چیا", "بخوان", "بخون", "بگو", "نشان", "نشون", "نمایش", "مرور") &&
+                !ctx.hasAnyPhrase("اضافه کن", "بنویس", "بذار", "ثبت کن", "یادداشت کن", "یادداشت بردار") -> "LIST"
+            !isExplicitNoteAdd && extractNoteItemContent(ctx.cleaned).isBlank() -> "LIST"
             else -> "ADD"
         }
 
-        val content = extractNoteItemBody(ctx.cleaned)
+        val content = extractNoteItemContent(ctx.cleaned)
         val slots = buildMap<String, SlotValue> {
             put("note_kind", SlotValue.Text(kind))
             put("note_op", SlotValue.Text(op))
-            if (content.isNotBlank()) put("message", SlotValue.Text(content))
+            if (content.isNotBlank()) {
+                put("message", SlotValue.Text(content))
+            }
         }
 
-        return MatchResult(
-            score = 0.92f,
-            slots = slots,
-            evidence = listOf("notes:$kind:$op"),
-        ) { c, r ->
+        return MatchResult(score = 0.93f, slots = slots, evidence = listOf("notes_todo:$kind:$op")) { c, r ->
             ParsedCommand(
                 action = action,
                 rawText = c.rawText,
@@ -353,18 +336,21 @@ internal class NotesTodoMatcher : IntentMatcher {
         }
     }
 
-    private fun extractNoteItemBody(cleaned: String): String {
-        val afterColon = Regex("[:：]\\s*(.+)$").find(cleaned)?.groupValues?.getOrNull(1)?.trim()
-        if (!afterColon.isNullOrBlank()) return afterColon
+    companion object {
+        private val NOTE_PREFIX_REGEX = Regex(
+            "^(?:لطفاً\\s+|لطفا\\s+)?(?:به\\s+(?:لیست خرید|فهرست خرید|کارهای امروز|لیست کارها|فهرست کارها|یادداشت‌ها|یادداشت ها)\\s+اضافه کن(?:\\s+که)?|یادداشت کن(?:\\s+که)?|یادداشت بردار(?:\\s+که)?|یادداشت جدید(?:\\s*[:\\-])?|توی\\s+یادداشت‌ها\\s+بنویس(?:\\s+که)?|در\\s+لیست خرید\\s+بنویس(?:\\s+که)?|در\\s+کارهای امروز\\s+بنویس(?:\\s+که)?|تیک\\s+|حذف\\s+)\\s*"
+        )
+        private val NOTE_SUFFIX_REGEX = Regex(
+            "\\s*(?:را\\s+|رو\\s+)?(?:به\\s+لیست خرید|در\\s+لیست خرید|به\\s+کارهای امروز|به\\s+لیست کارها|به\\s+یادداشت‌ها|از\\s+لیست خرید|از\\s+کارهای امروز|از\\s+یادداشت‌ها)?\\s*(?:اضافه کن|بنویس|بذار|ثبت کن|حذف کن|پاک کن|انجام شد|تیک بزن|بخوان|بخون|بگو|نشان بده|نشون بده|چیه|چیست)\\s*$"
+        )
 
-        return cleaned
-            .replace(Regex("^(?:به|در|توی|تو)?\\s*(?:لیست خرید|فهرست خرید|سبد خرید|کارهای امروز|کارهای روزانه|لیست کارها|فهرست کارها|دفترچه یادداشت|یادداشت‌ها|یادداشت ها|یادداشت)\\s*"), "")
-            .replace(Regex("^(?:یادداشت کن|یادداشت بردار|یادداشت جدید|اضافه کن|بنویس|ثبت کن)\\s*(?:که|به)?\\s*"), "")
-            .replace(Regex("(?:را|رو)?\\s*(?:به|در|توی|تو)\\s*(?:لیست خرید|فهرست خرید|لیست کارها|کارهای امروز|یادداشت‌ها|یادداشت)\\s*(?:اضافه کن|بذار|بگذار|ثبت کن|بنویس|حذف کن|پاک کن)$"), "")
-            .replace(Regex("\\s*(?:انجام شد|تکمیل شد|تیک بزن|حذف کن|پاک کن|را بخوان|رو بخون|را نشان بده|چیه|چیست|دارم)$"), "")
-            .replace(Regex("^(?:که|رو|را|برام|برای من|لطفاً|لطفا)\\s+"), "")
-            .replace(Regex("\\s+(?:را|رو|برام|برای من)$"), "")
-            .trim()
+        internal fun extractNoteItemContent(cleaned: String): String {
+            var s = PersianTextNormalizer.cleanDisplayText(cleaned)
+            s = NOTE_PREFIX_REGEX.replace(s, "")
+            s = NOTE_SUFFIX_REGEX.replace(s, "")
+            s = s.replace(Regex("^(?:لیست خرید|فهرست خرید|کارهای امروز|لیست کارها|فهرست کارها|یادداشت‌ها|یادداشت ها)\\s*[:\\-]?\\s*"), "")
+            return s.replace(Regex("\\s+"), " ").trim()
+        }
     }
 }
 
@@ -374,30 +360,32 @@ internal class MediaControlMatcher : IntentMatcher {
     override val priority = 79
 
     override fun match(ctx: MatchContext): MatchResult? {
-        if (ctx.hasPhrase("پس زمینه") || ctx.hasPhrase("سرویس صوتی") || ctx.hasPhrase("روخوانی")) return null
-        if (ctx.hasToken("باز") && !ctx.hasAnyToken("بعدی", "قبلی", "توقف", "پاز")) return null
+        if (ctx.hasAnyPhrase("سرویس صوتی", "روخوانی", "باز کن", "مدل", "آهنگ شاد", "موسیقی کلاسیک")) return null
+        if (ctx.hasToken("اینترنت") || ctx.hasToken("دانلود")) return null
 
-        val cmd = when {
-            ctx.hasAnyPhrase("آهنگ بعدی", "موزیک بعدی", "موسیقی بعدی", "ترک بعدی", "قطعه بعدی", "پخش بعدی") ||
-                ctx.hasAnyToken("نکست", "بعدی") && ctx.hasAnyToken("آهنگ", "موزیک", "موسیقی", "ترک", "پخش") -> "NEXT"
-            ctx.hasAnyPhrase("آهنگ قبلی", "موزیک قبلی", "موسیقی قبلی", "ترک قبلی", "قطعه قبلی") ||
-                ctx.hasAnyToken("قبلی") && ctx.hasAnyToken("آهنگ", "موزیک", "موسیقی", "ترک", "پخش") -> "PREVIOUS"
-            ctx.hasAnyPhrase("توقف موسیقی", "توقف آهنگ", "توقف موزیک", "توقف پخش", "پاز کن", "موزیک رو قطع کن", "آهنگ رو قطع کن", "موسیقی رو قطع کن", "آهنگ را متوقف کن", "موزیک را متوقف کن", "موسیقی را متوقف کن", "پخش را متوقف کن") -> "PAUSE"
-            ctx.hasAnyPhrase("پخش موسیقی", "پخش آهنگ", "پخش موزیک", "آهنگ را پخش کن", "موسیقی را پخش کن", "موزیک را پخش کن", "ادامه پخش", "پلی کن") -> "PLAY"
+        val mediaOp = when {
+            ctx.hasAnyPhrase("آهنگ بعدی", "ترک بعدی", "موسیقی بعدی", "موزیک بعدی", "بعدی پخش کن", "برو آهنگ بعدی", "نکست") -> "NEXT"
+            ctx.hasAnyPhrase("آهنگ قبلی", "ترک قبلی", "موسیقی قبلی", "موزیک قبلی", "برگرد آهنگ قبلی") -> "PREVIOUS"
+            ctx.hasAnyPhrase(
+                "توقف موسیقی", "توقف آهنگ", "توقف موزیک",
+                "موسیقی را متوقف کن", "آهنگ را متوقف کن", "موسیقی را قطع کن",
+                "آهنگ را قطع کن", "پخش موسیقی را متوقف کن", "پخش را متوقف کن",
+                "پاز کن", "مکث موسیقی", "مکث پخش",
+            ) -> "PAUSE"
+            ctx.hasAnyPhrase(
+                "پخش موسیقی", "پخش آهنگ", "پخش موزیک",
+                "موسیقی را پخش کن", "آهنگ را پخش کن", "موزیک را پخش کن",
+                "ادامه پخش", "ادامه موسیقی", "ادامه آهنگ", "پلی کن",
+            ) -> "PLAY"
             else -> null
         } ?: return null
 
-        val slots = mapOf("media_cmd" to SlotValue.Text(cmd))
-        return MatchResult(
-            score = 0.91f,
-            slots = slots,
-            evidence = listOf("media:$cmd"),
-        ) { c, r ->
+        val slots = mapOf("media_op" to SlotValue.Text(mediaOp))
+        return MatchResult(score = 0.93f, slots = slots, evidence = listOf("media:$mediaOp")) { c, r ->
             ParsedCommand(
                 action = action,
                 rawText = c.rawText,
                 normalizedText = c.normalized,
-                message = cmd,
                 requireConfirmation = false,
                 slots = r.slots,
                 confidence = r.score,
