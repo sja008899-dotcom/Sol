@@ -155,7 +155,7 @@ class SolHttpClient(
         partFile: File,
         expectedBytes: Long,
         expectedSha256: String,
-        allowedHostSuffixes: Set<String> = DEFAULT_MODEL_ALLOWED_HOSTS,
+        allowedHostSuffixes: Set<String>? = DEFAULT_MODEL_ALLOWED_HOSTS,
         isCancelled: () -> Boolean = { false },
         onProgress: (percent: Int, downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
     ): File {

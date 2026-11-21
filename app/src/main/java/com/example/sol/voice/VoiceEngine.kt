@@ -42,6 +42,8 @@ class VoiceEngine(
     val voskEngine: VoskVoiceEngine = VoskVoiceEngine(context),
     private val audioManager: SolAudioManager = SolAudioManager(context),
     private val persianTts: PersianTTS? = null,
+    private val isExternalSpeaking: () -> Boolean = { false },
+    private val onStopExternalSpeech: () -> Unit = {},
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
@@ -84,13 +86,17 @@ class VoiceEngine(
         if (persianTts?.isSpeaking?.value == true) {
             persianTts.stop()
         }
+        onStopExternalSpeech()
         audioManager.abandonSpeakingFocus()
     }
 
     /**
      * Prevents automated wake-word listeners from triggering on Sol's own voice output.
      */
-    fun canStartAutomatedWakeWord(): Boolean = persianTts?.isSpeaking?.value != true
+    fun canStartAutomatedWakeWord(): Boolean =
+        persianTts?.isSpeaking?.value != true && !isExternalSpeaking()
+
+    fun consumeLastCapturedPcm16k(): FloatArray? = voskEngine.consumeLastCapturedPcm16k()
 
     fun startListening(
         preferVosk: Boolean = true,

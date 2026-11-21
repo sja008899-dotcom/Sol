@@ -2,17 +2,28 @@ package com.example.sol.brain
 
 import com.example.sol.dialogue.DialogueManager
 import com.example.sol.dialogue.DialogueResult
+import com.example.sol.speaker.SpeakerIdManager
+import com.example.sol.speaker.SpeakerVerificationOutcome
+import com.example.sol.text.PersianTextNormalizer
 
 /**
- * Thin NLU -> Dialogue -> Skill orchestrator.
- * All per-intent execution lives in [com.example.sol.brain.skills.SkillRegistry],
- * and multi-turn state, confirmations, disambiguation, and teaching live in [DialogueManager].
+ * Thin NLU -> Dialogue -> Skill orchestrator with optional N5 owner speaker gate.
+ * When N5 Speaker ID is inactive (missing model or owner enrollment), Fail-Safe mode allows normal command execution.
  */
 class CommandBrain(
     private val dialogueManager: DialogueManager,
+    private val speakerIdManager: SpeakerIdManager? = null,
 ) {
-    suspend fun process(rawInput: String): BrainExecutionResult {
-        val result = dialogueManager.handleTurn(rawInput)
+    suspend fun process(
+        rawInput: String,
+        audioPcm16k: FloatArray? = null,
+        isVoiceCommand: Boolean = audioPcm16k != null,
+    ): BrainExecutionResult {
+        val result = processDialogue(
+            rawInput = rawInput,
+            audioPcm16k = audioPcm16k,
+            isVoiceCommand = isVoiceCommand,
+        )
         return BrainExecutionResult(
             replyText = result.replyText,
             parsedCommand = result.parsedCommand,
@@ -21,7 +32,28 @@ class CommandBrain(
         )
     }
 
-    suspend fun processDialogue(rawInput: String): DialogueResult {
+    suspend fun processDialogue(
+        rawInput: String,
+        audioPcm16k: FloatArray? = null,
+        isVoiceCommand: Boolean = audioPcm16k != null,
+    ): DialogueResult {
+        if (isVoiceCommand && speakerIdManager != null && speakerIdManager.isActive) {
+            val outcome = speakerIdManager.verifyVoicePcm(audioPcm16k)
+            if (outcome is SpeakerVerificationOutcome.RejectedNonOwner) {
+                val blockedCmd = ParsedCommand(
+                    action = SolAction.UNKNOWN,
+                    rawText = rawInput,
+                    normalizedText = PersianTextNormalizer.normalizeForMatching(rawInput),
+                    requireConfirmation = true,
+                )
+                return DialogueResult(
+                    replyText = outcome.politeMessageFa,
+                    parsedCommand = blockedCmd,
+                    pendingTask = null,
+                    speakReply = true,
+                )
+            }
+        }
         return dialogueManager.handleTurn(rawInput)
     }
 }

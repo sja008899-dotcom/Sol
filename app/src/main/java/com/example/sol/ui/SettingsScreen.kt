@@ -86,6 +86,7 @@ import kotlin.math.roundToInt
 fun SettingsScreen(
     preferences: SolPreferences,
     ttsAvailability: TtsAvailability,
+    piperStatus: com.example.sol.tts.PiperTtsStatus,
     availableTtsEngines: List<TtsEngineInfo>,
     activeTtsEngineLabel: String,
     persianVoices: List<TtsVoiceInfo>,
@@ -110,6 +111,14 @@ fun SettingsScreen(
     onTestVoice: () -> Unit,
     onOpenSystemTtsSettings: () -> Unit,
     onRecheckSystemTts: () -> Unit,
+    onPickPiperFiles: () -> Unit,
+    onDeletePiperModel: () -> Unit,
+    speakerIdState: com.example.sol.speaker.SpeakerIdUiState,
+    onRecordOwnerVoice: () -> Unit,
+    onClearOwnerVoice: () -> Unit,
+    onPickSpeakerModel: () -> Unit,
+    isMicServiceRunning: Boolean,
+    onScreenOffMicToggle: (Boolean) -> Unit,
     onVoskOfflineToggle: (Boolean) -> Unit,
     onWakeWordToggle: (Boolean) -> Unit,
     onVadSilenceTimeoutChange: (Long) -> Unit,
@@ -295,6 +304,29 @@ fun SettingsScreen(
                 ) {
                     Text("بوق و لرزش کوتاه شروع/پایان شنود", style = MaterialTheme.typography.bodyMedium)
                     Switch(checked = preferences.voiceCueFeedbackEnabled, onCheckedChange = onVoiceCueFeedbackChange)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("میکروفون همیشگی با صفحه خاموش (N2)", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = if (isMicServiceRunning) {
+                                "✅ سرویس Foreground میکروفون در حال اجراست (اعلان دائمی فعال؛ مصرف باتری بالاتر)"
+                            } else {
+                                "با روشن کردن این حالت، MicForegroundService با مجوز FOREGROUND_SERVICE_MICROPHONE در پس‌زمینه گوش‌به‌زنگ می‌ماند."
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isMicServiceRunning) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = isMicServiceRunning || preferences.screenOffMicEnabled,
+                        onCheckedChange = onScreenOffMicToggle,
+                        modifier = Modifier.testTag("screen_off_mic_switch"),
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -924,6 +956,133 @@ fun SettingsScreen(
                     }
                     OutlinedButton(onClick = onOpenSystemTtsSettings) {
                         Text("تنظیمات صدای سیستم")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = "موتور خودکفای Piper ONNX (آفلاین و بی‌نیاز از موتور سیستم)",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        when (piperStatus) {
+                            is com.example.sol.tts.PiperTtsStatus.NotInstalled -> {
+                                Text(
+                                    text = "برای صدای فارسی کاملاً مستقل روی گوشی، دو فایل مدل (.onnx) و تنظیمات (.json) تأییدشده را انتخاب کنید.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            is com.example.sol.tts.PiperTtsStatus.PartialSelection -> {
+                                Text(
+                                    text = piperStatus.noteFa,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            is com.example.sol.tts.PiperTtsStatus.Ready -> {
+                                Text(
+                                    text = "✅ موتور خودکفای Piper فعال است (${piperStatus.sampleRate} Hz • ${piperStatus.sizeMb} MB) و اثر انگشت SHA-256 هر دو فایل تأیید شد.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.tertiary,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                            is com.example.sol.tts.PiperTtsStatus.Error -> {
+                                Text(
+                                    text = piperStatus.messageFa,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Button(
+                                onClick = onPickPiperFiles,
+                                modifier = Modifier.testTag("pick_piper_files_button"),
+                            ) {
+                                Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("انتخاب فایل‌های Piper (.onnx و .json)")
+                            }
+                            if (piperStatus is com.example.sol.tts.PiperTtsStatus.Ready ||
+                                piperStatus is com.example.sol.tts.PiperTtsStatus.PartialSelection
+                            ) {
+                                OutlinedButton(
+                                    onClick = onDeletePiperModel,
+                                    modifier = Modifier.testTag("delete_piper_button"),
+                                ) {
+                                    Text("حذف فایل‌های Piper")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 6b. Owner Speaker Verification (N5)
+        item {
+            SectionCard(title = "شناسایی صدای مالک (N5 — امنیت دستورات صوتی)") {
+                Text(
+                    text = speakerIdState.statusLabelFa,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (speakerIdState.isActive) {
+                        MaterialTheme.colorScheme.tertiary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    fontWeight = if (speakerIdState.isActive) FontWeight.SemiBold else FontWeight.Normal,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "نمونهٔ برداری صدای مالک با AES-256 (EncryptedFile) فقط روی گوشی نگهداری می‌شود. اگر مدل یا نمونهٔ صدا ثبت نشده باشد، N5 در حالت Fail-safe غیرفعال است.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = onRecordOwnerVoice,
+                        enabled = !speakerIdState.isRecordingOwner,
+                        modifier = Modifier.testTag("record_owner_voice_button"),
+                    ) {
+                        Icon(Icons.Default.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (speakerIdState.isRecordingOwner) "در حال ضبط…" else "ضبط صدای من")
+                    }
+                    OutlinedButton(
+                        onClick = onPickSpeakerModel,
+                        modifier = Modifier.testTag("pick_speaker_model_button"),
+                    ) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (speakerIdState.isModelInstalled) "تغییر مدل گوینده (.onnx)" else "انتخاب مدل گوینده (.onnx)")
+                    }
+                    if (speakerIdState.isOwnerEnrolled) {
+                        OutlinedButton(
+                            onClick = onClearOwnerVoice,
+                            modifier = Modifier.testTag("clear_owner_voice_button"),
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("پاک کردن صدای من")
+                        }
                     }
                 }
             }

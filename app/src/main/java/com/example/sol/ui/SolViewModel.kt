@@ -67,6 +67,10 @@ data class PendingBookFetchConfirmation(
     val runInBackground: Boolean,
 )
 
+data class PendingWebSearchConfirmation(
+    val query: String,
+)
+
 data class VoiceRoleTeachingSession(
     val book: BookKnowledgeEntity?,
     val roleNameDraft: String,
@@ -128,7 +132,14 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     val ramSnapshot: StateFlow<RamUsageSnapshot> = c.memoryOptimizer.ramSnapshot
 
     val ttsAvailability: StateFlow<TtsAvailability> = c.persianTts.availability
-    val isSpeaking: StateFlow<Boolean> = c.persianTts.isSpeaking
+    val piperStatus: StateFlow<com.example.sol.tts.PiperTtsStatus> = c.ttsManager.piperStatus
+    val speakerIdState: StateFlow<com.example.sol.speaker.SpeakerIdUiState> = c.speakerIdManager.uiState
+    val isMicServiceRunning: StateFlow<Boolean> = com.example.sol.voice.MicForegroundService.isRunning
+    val isSpeaking: StateFlow<Boolean> = combine(
+        c.persianTts.isSpeaking,
+        c.ttsManager.isPiperSpeaking,
+    ) { sys, piper -> sys || piper }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val persianVoices: StateFlow<List<TtsVoiceInfo>> = c.persianTts.persianVoices
     val availableTtsEngines: StateFlow<List<TtsEngineInfo>> = c.persianTts.availableEngines
     val activeTtsEnginePackage: StateFlow<String> = c.persianTts.activeEnginePackage
@@ -148,6 +159,12 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isFetchingBook = MutableStateFlow(false)
     val isFetchingBook: StateFlow<Boolean> = _isFetchingBook.asStateFlow()
+
+    private val _pendingWebSearch = MutableStateFlow<PendingWebSearchConfirmation?>(null)
+    val pendingWebSearch: StateFlow<PendingWebSearchConfirmation?> = _pendingWebSearch.asStateFlow()
+
+    private val _isSearchingWeb = MutableStateFlow(false)
+    val isSearchingWeb: StateFlow<Boolean> = _isSearchingWeb.asStateFlow()
 
     private val _voiceRoleSession = MutableStateFlow<VoiceRoleTeachingSession?>(null)
     val voiceRoleSession: StateFlow<VoiceRoleTeachingSession?> = _voiceRoleSession.asStateFlow()
@@ -219,6 +236,13 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val prefs = c.preferencesRepository.getSnapshot()
             c.historyRepository.enforceRetention(prefs.historyRetentionMode)
+        }
+        viewModelScope.launch {
+            com.example.sol.voice.MicForegroundService.wakeEvents.collect {
+                if (c.voiceEngine.canStartAutomatedWakeWord()) {
+                    startVoiceListening()
+                }
+            }
         }
     }
 
@@ -329,7 +353,11 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         _showCapabilitiesSheet.value = open
     }
 
-    fun submitCommand(textOverride: String? = null) {
+    fun submitCommand(
+        textOverride: String? = null,
+        isVoiceCommand: Boolean = false,
+        audioPcm16k: FloatArray? = null,
+    ) {
         val raw = (textOverride ?: _inputText.value).trim()
         if (raw.isBlank()) return
         if (textOverride == null) _inputText.value = ""
@@ -340,7 +368,11 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         appendMessage(isUser = true, text = raw)
 
         viewModelScope.launch {
-            val result = c.commandBrain.processDialogue(raw)
+            val result = c.commandBrain.processDialogue(
+                rawInput = raw,
+                audioPcm16k = audioPcm16k,
+                isVoiceCommand = isVoiceCommand,
+            )
             if (result.replyText.isNotBlank()) {
                 appendMessage(
                     isUser = false,
@@ -374,6 +406,11 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                         query = pending.bookQuery,
                         roleHint = pending.requestedRoleHint,
                         runInBackground = pending.runInBackground,
+                    )
+                }
+                is PendingSolTask.ConfirmWebSearch -> {
+                    _pendingWebSearch.value = PendingWebSearchConfirmation(
+                        query = pending.query,
                     )
                 }
                 is PendingSolTask.OpenCapabilitiesCatalog -> {
@@ -450,6 +487,11 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                                     runInBackground = nextPending.runInBackground,
                                 )
                             }
+                            is PendingSolTask.ConfirmWebSearch -> {
+                                _pendingWebSearch.value = PendingWebSearchConfirmation(
+                                    query = nextPending.query,
+                                )
+                            }
                             is PendingSolTask.OpenCapabilitiesCatalog -> {
                                 _showCapabilitiesSheet.value = true
                             }
@@ -524,6 +566,54 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissPendingBookFetch() {
         _pendingBookFetch.value = null
+    }
+
+    // --- N1 Explicit-Confirmation Web Search (DuckDuckGo HTML via Jsoup) ---
+    fun requestWebSearch(defaultQuery: String = "") {
+        _pendingWebSearch.value = PendingWebSearchConfirmation(query = defaultQuery)
+    }
+
+    fun updatePendingWebSearchQuery(query: String) {
+        _pendingWebSearch.value = _pendingWebSearch.value?.copy(query = query)
+    }
+
+    fun dismissPendingWebSearch() {
+        _pendingWebSearch.value = null
+    }
+
+    fun confirmWebSearch() {
+        val req = _pendingWebSearch.value ?: return
+        _pendingWebSearch.value = null
+        val q = req.query.trim()
+        if (q.isBlank()) return
+
+        _isSearchingWeb.value = true
+        viewModelScope.launch {
+            try {
+                val res = c.webSearchClient.search(q)
+                res.fold(
+                    onSuccess = { items ->
+                        val msg = com.example.sol.network.WebSearchClient.formatResultsFa(q, items)
+                        appendMessage(isUser = false, text = msg, actionBadge = "WEB_SEARCH")
+                        val prefs = preferences.value
+                        c.historyRepository.recordIfAllowed(
+                            userText = "جست‌وجوی وب: $q",
+                            solText = msg,
+                            intentAction = "SEARCH_WEB",
+                            retentionMode = prefs.historyRetentionMode,
+                            privateModeEnabled = prefs.privateModeEnabled,
+                        )
+                        if (prefs.autoSpeak) speakText(msg)
+                    },
+                    onFailure = { err ->
+                        val errMsg = err.message ?: "جست‌وجوی وب ناموفق بود."
+                        appendMessage(isUser = false, text = errMsg, actionBadge = "WEB_SEARCH_ERROR")
+                    }
+                )
+            } finally {
+                _isSearchingWeb.value = false
+            }
+        }
     }
 
     fun confirmInternetBookFetch(runInBackground: Boolean) {
@@ -855,7 +945,12 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
             playCue = prefs.voiceCueFeedbackEnabled,
         ) { recognizedText ->
             _inputText.value = recognizedText
-            submitCommand(recognizedText)
+            val capturedPcm = c.voiceEngine.consumeLastCapturedPcm16k()
+            submitCommand(
+                textOverride = recognizedText,
+                isVoiceCommand = true,
+                audioPcm16k = capturedPcm,
+            )
         }
     }
 
@@ -873,7 +968,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
 
     fun speakText(text: String) {
         val prefs = preferences.value
-        c.persianTts.speak(
+        c.ttsManager.speak(
             text = text,
             speechRate = prefs.speechRate,
             persona = prefs.voicePersona,
@@ -881,7 +976,50 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    fun stopSpeaking() = c.persianTts.stop()
+    fun stopSpeaking() = c.ttsManager.stop()
+
+    fun importPiperFiles(uris: List<Uri>) {
+        viewModelScope.launch {
+            c.ttsManager.importPiperUris(uris).fold(
+                onSuccess = { msg ->
+                    _statusBannerMessage.value = msg
+                },
+                onFailure = { err ->
+                    _statusBannerMessage.value = err.message ?: "انتخاب فایل‌های Piper ناموفق بود."
+                },
+            )
+        }
+    }
+
+    fun deletePiperModel() {
+        c.ttsManager.disableAndDeletePiper()
+        _statusBannerMessage.value = "فایل‌های موتور خودکفای Piper حذف شدند."
+    }
+
+    fun recordOwnerVoice() {
+        viewModelScope.launch {
+            c.voiceEngine.stopListening()
+            c.ttsManager.stop()
+            c.speakerIdManager.recordAndEnrollOwner().fold(
+                onSuccess = { msg -> _statusBannerMessage.value = msg },
+                onFailure = { err -> _statusBannerMessage.value = err.message ?: "ضبط صدای مالک ناموفق بود." },
+            )
+        }
+    }
+
+    fun clearOwnerVoice() {
+        c.speakerIdManager.clearOwnerProfile()
+        _statusBannerMessage.value = "نمونهٔ صدای مالک پاک شد (N5 غیرفعال)."
+    }
+
+    fun importSpeakerModel(uri: Uri) {
+        viewModelScope.launch {
+            c.speakerIdManager.importSpeakerModel(uri).fold(
+                onSuccess = { msg -> _statusBannerMessage.value = msg },
+                onFailure = { err -> _statusBannerMessage.value = err.message ?: "وارد کردن مدل گوینده ناموفق بود." },
+            )
+        }
+    }
 
     fun testVoiceSample() {
         val prefs = preferences.value
@@ -891,8 +1029,9 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     fun openSystemTtsSettings() = c.persianTts.openSystemTtsSettings()
 
     fun recheckSystemTts() {
+        c.ttsManager.refreshInstalledPiper()
         c.persianTts.recheckSystemVoices(preferences.value.preferredTtsEnginePackage)
-        _statusBannerMessage.value = "در حال بررسی و اتصال به موتورهای صدای نصب‌شده روی گوشی…"
+        _statusBannerMessage.value = "در حال بررسی موتورهای صدای گوشی و Piper…"
     }
 
     fun setPreferredTtsEngine(packageName: String) {
@@ -1079,6 +1218,25 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     fun setMaxVoiceListenSeconds(seconds: Int) = viewModelScope.launch { c.preferencesRepository.setMaxVoiceListenSeconds(seconds) }
     fun setWakeWordTimeoutMinutes(minutes: Int) = viewModelScope.launch { c.preferencesRepository.setWakeWordTimeoutMinutes(minutes) }
     fun setVoiceCueFeedbackEnabled(enabled: Boolean) = viewModelScope.launch { c.preferencesRepository.setVoiceCueFeedbackEnabled(enabled) }
+    fun setScreenOffMicEnabled(enabled: Boolean) = viewModelScope.launch {
+        if (enabled) {
+            val started = com.example.sol.voice.MicForegroundService.start(getApplication())
+            started.fold(
+                onSuccess = {
+                    c.preferencesRepository.setScreenOffMicEnabled(true)
+                    _statusBannerMessage.value = "میکروفون همیشگی با صفحه خاموش (Foreground Service) فعال شد."
+                },
+                onFailure = { err ->
+                    c.preferencesRepository.setScreenOffMicEnabled(false)
+                    _statusBannerMessage.value = err.message ?: "شروع سرویس میکروفون همیشگی ممکن نشد."
+                },
+            )
+        } else {
+            com.example.sol.voice.MicForegroundService.stop(getApplication())
+            c.preferencesRepository.setScreenOffMicEnabled(false)
+            _statusBannerMessage.value = "سرویس میکروفون همیشگی متوقف شد."
+        }
+    }
     fun setSlmSynthesisEnabled(enabled: Boolean) = viewModelScope.launch {
         c.preferencesRepository.setSlmSynthesisEnabled(enabled)
         if (!enabled) {
@@ -1108,12 +1266,14 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun deleteAllUserData() = viewModelScope.launch {
         c.voiceEngine.stopListening()
-        c.persianTts.stop()
+        com.example.sol.voice.MicForegroundService.stop(getApplication())
+        c.ttsManager.stop()
         c.localSlmEngine.stopGeneration()
         c.localSlmEngine.unloadFromRam("پاک‌سازی کامل داده‌های کاربر")
         c.confirmationManager.dismiss()
         c.taskManager.dismissTaskCard()
         _pendingBookFetch.value = null
+        _pendingWebSearch.value = null
         _voiceRoleSession.value = null
         _pendingBackupRequest.value = null
 
@@ -1128,6 +1288,7 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
         runCatching {
             File(getApplication<Application>().filesDir, "backups").deleteRecursively()
         }
+        c.speakerIdManager.deleteAllSpeakerData()
 
         _messages.value = listOf(
             ChatMessageItem(

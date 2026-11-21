@@ -137,6 +137,31 @@ class WebBookRoleSkill : SolSkill {
     }
 }
 
+class WebSearchSkill : SolSkill {
+    override val id = "skill_web_search"
+    override val titleFa = "جست‌وجوی وب با تأیید صریح (DuckDuckGo HTML)"
+    override val descriptionFa = "جست‌وجوی اینترنتی بدون کلید API از طریق Jsoup؛ هرگز بدون تأیید کاربر به اینترنت متصل نمی‌شود."
+    override val intents = setOf(SolAction.SEARCH_WEB)
+    override val sampleCommandsFa = listOf("جستجوی وب قیمت سکه امروز")
+    override val sensitivity = Sensitivity.CONFIRM
+    override val requiredPermissions = emptyList<String>()
+    override val category = SkillCategory.ADVANCED_LEARNING
+
+    override suspend fun execute(cmd: ParsedCommand, ctx: SkillContext): SkillResult {
+        val query = cmd.searchQuery.orEmpty().trim()
+        val reply = if (query.isBlank()) {
+            "این عملیات از اینترنت استفاده می‌کند. لطفاً عبارت مورد نظر برای جست‌وجوی وب را در کادر وارد و تأیید کنید."
+        } else {
+            "این عملیات از اینترنت استفاده می‌کند. برای جست‌وجوی «$query» در وب، لطفاً در پنجرهٔ تأیید ادامه دهید یا لغو کنید."
+        }
+        return SkillResult(
+            replyText = reply,
+            parsedCommand = cmd,
+            pendingTask = PendingSolTask.ConfirmWebSearch(query = query),
+        )
+    }
+}
+
 class TeachRoleVoiceSkill(
     private val context: Context,
     private val knowledgeRepository: KnowledgeRepository,

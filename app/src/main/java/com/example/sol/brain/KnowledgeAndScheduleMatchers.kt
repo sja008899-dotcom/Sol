@@ -72,8 +72,13 @@ internal class WebBookLearnRoleMatcher : IntentMatcher {
 
         val isVoskModelNote = ctx.hasPhrase("مدل vosk")
 
+        val isPureWebSearchPhrase = ctx.startsWithAnyPhrase(
+            "جستجوی وب", "جست‌وجوی وب", "جستجو در وب", "جست‌وجو در وب",
+            "سرچ وب", "داک داک گو", "جستجوی اینترنتی", "سرچ اینترنتی",
+        ) || ctx.hasAnyPhrase("وب را بگرد", "جستجوی وب")
+
         val isDownloadRequest = ctx.hasToken("دانلود") && !isVoskModelNote
-        val shouldTrigger = !isOpenSettingsNotDownload && !isConsultOrForget && (
+        val shouldTrigger = !isOpenSettingsNotDownload && !isConsultOrForget && !isPureWebSearchPhrase && (
             hasUrl ||
                 isDownloadRequest ||
                 (hasBookWord && (hasInternetWord || hasRoleOrVoiceLearn || hasFetchVerb)) ||
@@ -166,6 +171,73 @@ internal class WebBookLearnRoleMatcher : IntentMatcher {
             "چیز", "چیزی", "یک چیز", "یه چیز", "یه چیزی", "یک چیزی",
             "مطلب", "مطلبی", "فایل", "فایلی", "کتاب", "صفحه", "مورد",
         )
+    }
+}
+
+internal class SearchWebMatcher : IntentMatcher {
+    override val id = "matcher_search_web"
+    override val action = SolAction.SEARCH_WEB
+    override val priority = 93
+
+    override fun match(ctx: MatchContext): MatchResult? {
+        if (ctx.hasAnyToken("کتاب", "دانلود", "مقاله", "ویکیپدیا", "نقش")) return null
+        if (ctx.hasAnyPhrase("حافظه", "مخاطب")) return null
+
+        val explicitWebSearchPrefix = ctx.startsWithAnyPhrase(
+            "جستجوی وب", "جست‌وجوی وب", "جستجو در وب", "جست‌وجو در وب",
+            "سرچ وب", "جستجوی اینترنتی", "سرچ اینترنتی", "داک داک گو",
+        ) || ctx.hasAnyPhrase("وب را بگرد", "جستجوی وب", "جست‌وجوی وب", "سرچ وب", "جستجو در وب")
+
+        val genericSearchWithWeb = ctx.hasAnyPhrase("جستجو کن", "جست‌وجو کن", "سرچ کن") &&
+            !ctx.hasAnyToken("آنلاین", "گوگل", "درباره") &&
+            !ctx.hasAnyPhrase("در مورد", "راجع به", "راجب")
+
+        val browseNetPhrase = ctx.hasAnyPhrase("تو وب بگرد", "در وب بگرد", "تو اینترنت بگرد", "در اینترنت بگرد")
+
+        if (!explicitWebSearchPrefix && !genericSearchWithWeb && !browseNetPhrase) return null
+
+        val query = extractSearchQuery(ctx.cleaned).ifBlank { null }
+        val slots = buildMap<String, SlotValue> {
+            query?.let { put("search_query", SlotValue.Text(it)) }
+        }
+        val score = if (explicitWebSearchPrefix) 0.96f else 0.91f
+        return MatchResult(
+            score = score,
+            slots = slots,
+            evidence = listOf("n1_web_search"),
+        ) { c, r ->
+            ParsedCommand(
+                action = action,
+                rawText = c.rawText,
+                normalizedText = c.normalized,
+                searchQuery = query,
+                requireConfirmation = true,
+                slots = r.slots,
+                confidence = r.score,
+                matchedRuleId = id,
+            )
+        }
+    }
+
+    private fun extractSearchQuery(cleaned: String): String {
+        val stripped = cleaned
+            .replace(PREFIX_REGEX, "")
+            .replace(IN_WEB_REGEX, " ")
+            .replace(ACTION_TAIL_REGEX, "")
+            .replace(LEADING_PREPOSITION_REGEX, "")
+            .replace(TRAILING_OBJECT_REGEX, "")
+            .replace(MULTI_SPACE_REGEX, " ")
+            .trim()
+        return stripped
+    }
+
+    companion object {
+        private val PREFIX_REGEX = Regex("^(?:جست‌?وجوی\\s+وب|جست‌?وجو\\s+در\\s+وب|سرچ\\s+وب|جست‌?وجوی\\s+اینترنتی|سرچ\\s+اینترنتی|داک\\s*داک\\s*گو|در\\s+وب\\s+جست‌?وجو\\s+کن|جست‌?وجو\\s+کن|سرچ\\s+کن)\\s*(?:دربارهٔ?|در\\s+مورد|برای)?\\s*")
+        private val IN_WEB_REGEX = Regex("(?:در|تو|توی)\\s*(?:وب|اینترنت)\\s*(?:برای|دربارهٔ?|در\\s+مورد)?")
+        private val ACTION_TAIL_REGEX = Regex("(?:را|رو)?\\s*(?:در\\s+وب|تو\\s+وب|در\\s+اینترنت|تو\\s+اینترنت)?\\s*(?:جست‌?وجو\\s+کن|سرچ\\s+کن|بگرد|پیدا\\s+کن)$")
+        private val LEADING_PREPOSITION_REGEX = Regex("^(?:دربارهٔ?|در\\s+مورد|برای|موضوع)\\s+")
+        private val TRAILING_OBJECT_REGEX = Regex("\\s+(?:را|رو)$")
+        private val MULTI_SPACE_REGEX = Regex("\\s+")
     }
 }
 

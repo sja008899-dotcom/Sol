@@ -1603,3 +1603,45 @@
 {"text":"۲۱ مارس ۲۰۲۵ به شمسی چندمه؟","intent":"TIME_DATE","slots":{},"split":"test"}
 {"text":"چند روز تا نوروز مانده؟","intent":"TIME_DATE","slots":{},"split":"test"}
 {"text":"سال ۱۴۰۳ کبیسه است یا ۱۴۰۴؟","intent":"TIME_DATE","slots":{},"split":"test"}
+{"text":"جستجوی وب قیمت دلار امروز","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"در وب جستجو کن هواشناسی تهران","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"سرچ وب آموزش برنامه نویسی اندروید","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"جستجوی اینترنتی کد پستی اصفهان","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"وب را بگرد اخبار بورس امروز","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"تو وب بگرد برنامه پروازهای شیراز","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"داک داک گو راهنمای نگهداری کاکتوس","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"جستجو کن فاصله تبریز تا ارومیه","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"سرچ کن ساعت بازی امشب","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"جست‌وجو در وب فرهنگ لغت دهخدا","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"سرچ اینترنتی قوانین جدید گواهینامه","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"در اینترنت بگرد وضعیت جاده هراز","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"جستجوی وب تقویم تعطیلات رسمی","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"در وب بگرد قیمت روز خودرو","intent":"SEARCH_WEB","slots":{},"split":"dev"}
+{"text":"جستجوی وب دستور پخت قرمه سبزی","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"در وب جستجو کن ارتفاع قله دماوند","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"سرچ وب میانگین بارندگی گیلان","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"جستجوی اینترنتی نرخ طلای ۱۸ عیار","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"وب را بگرد پیش‌بینی هوای رشت","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"تو وب بگرد نقشه مترو کرج","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"داک داک گو تاریخ تأسیس دانشگاه تهران","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"جستجو کن نشانی سفارت اتریش","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"سرچ کن برنامه قطار تهران مشهد","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"جست‌وجوی وب جمعیت استان فارس","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"سرچ اینترنتی قیمت بلیط هواپیما","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"تو اینترنت بگرد شرایط وام مسکن","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"جستجو در وب نحوه کاشت زعفران","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"در وب بگرد نتایج مسابقات والیبال","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"جستجوی وب زمان اذان مغرب شیراز","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"در وب جستجو کن راهنمای مالیات مشاغل","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"سرچ وب قیمت روز سیمان","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"جستجوی اینترنتی روش تعمیر پمپ آب","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"وب را بگرد اخبار کشاورزی ایران","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"تو وب بگرد لیست نمایشگاه‌های بین‌المللی","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"داک داک گو فرمول محاسبه سود بانکی","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"جستجو کن نرخ تورم سالانه","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"سرچ کن زمان واریز یارانه","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"جست‌وجو در وب قیمت نهاده‌های دامی","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"سرچ اینترنتی شماره پشتیبانی بانک ملی","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"در اینترنت بگرد وضعیت هوای بندرعباس","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"جستجوی وب مشخصات موتور الکتریکی","intent":"SEARCH_WEB","slots":{},"split":"test"}
+{"text":"در وب بگرد آموزش پرورش قارچ","intent":"SEARCH_WEB","slots":{},"split":"test"}

@@ -381,3 +381,19 @@
 {"text":"تاریخ 1404/01/01 به میلادی چندم است","intent":"TIME_DATE"}
 {"text":"چند روز تا نوروز مانده است","intent":"TIME_DATE"}
 {"text":"بیست و یک مارس دو هزار و بیست و پنج به شمسی چندم میشه","intent":"TIME_DATE"}
+{"text":"جستجوی وب قیمت سکه","intent":"SEARCH_WEB"}
+{"text":"جستجوی وب آموزش کاتلین","intent":"SEARCH_WEB"}
+{"text":"در وب جستجو کن آب و هوای مشهد","intent":"SEARCH_WEB"}
+{"text":"تو وب بگرد اخبار فناوری","intent":"SEARCH_WEB"}
+{"text":"سرچ وب زمان اکران فیلم","intent":"SEARCH_WEB"}
+{"text":"وب را بگرد نرخ ارز","intent":"SEARCH_WEB"}
+{"text":"جستجوی اینترنتی علائم کم‌خونی","intent":"SEARCH_WEB"}
+{"text":"سرچ اینترنتی مسیر راه آهن","intent":"SEARCH_WEB"}
+{"text":"داک داک گو قوانین شطرنج","intent":"SEARCH_WEB"}
+{"text":"جستجو کن جدول لیگ برتر","intent":"SEARCH_WEB"}
+{"text":"در وب جستجو کن طرز تهیه فسنجان","intent":"SEARCH_WEB"}
+{"text":"جستجوی وب تاریخچه رشت","intent":"SEARCH_WEB"}
+{"text":"تو اینترنت بگرد ساعات کاری موزه","intent":"SEARCH_WEB"}
+{"text":"سرچ کن وضعیت ترافیک جاده چالوس","intent":"SEARCH_WEB"}
+{"text":"در وب بگرد بهترین روش آبیاری","intent":"SEARCH_WEB"}
+{"text":"جست‌وجوی وب مشخصات گوشی جدید","intent":"SEARCH_WEB"}

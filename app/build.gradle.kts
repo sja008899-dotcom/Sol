@@ -20,6 +20,10 @@ android {
     versionName = "2.0.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    ndk {
+      abiFilters += listOf("arm64-v8a")
+    }
   }
 
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
@@ -114,6 +118,8 @@ dependencies {
   implementation(libs.pdfbox.android)
   implementation(libs.jsoup)
   implementation(libs.litertlm.android)
+  implementation(libs.onnxruntime.android)
+  implementation(libs.androidx.security.crypto)
   // implementation(libs.coil.compose)
   // implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)

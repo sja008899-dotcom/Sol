@@ -213,7 +213,7 @@ fun InternetBookFetchDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = "طبق قانون امنیتی Sol، اتصال به اینترنت فقط با تأیید شما برای جست‌وجو در ویکی‌پدیا فارسی، کتابخانه‌های عمومی (Gutendex / Open Library) یا خواندن لینک وب انجام می‌شود.",
+                    text = "این عملیات از اینترنت استفاده می‌کند. طبق قانون امنیتی Sol، اتصال به اینترنت فقط با تأیید شما برای جست‌وجو در ویکی‌پدیا فارسی، کتابخانه‌های عمومی (Gutendex / Open Library) یا خواندن لینک وب انجام می‌شود.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -269,6 +269,72 @@ fun InternetBookFetchDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("لغو") }
+        },
+    )
+}
+
+@Composable
+fun WebSearchConfirmationDialog(
+    pending: PendingWebSearchConfirmation,
+    onUpdateQuery: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var query by remember(pending.query) { mutableStateOf(pending.query) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Language,
+                contentDescription = "تأیید جست‌وجوی وب",
+                tint = MaterialTheme.colorScheme.secondary,
+            )
+        },
+        title = { Text("تأیید جست‌وجوی وب") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "این عملیات از اینترنت استفاده می‌کند. بدون تأیید شما هیچ درخواستی به اینترنت ارسال نمی‌شود.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium,
+                )
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = {
+                        query = it
+                        onUpdateQuery(it)
+                    },
+                    label = { Text("عبارت جست‌وجو در وب") },
+                    placeholder = { Text("مثلاً: آموزش کاتلین آفلاین") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("web_search_query_input"),
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = query.isNotBlank(),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("confirm_web_search_button"),
+            ) {
+                Text("تأیید و جست‌وجو")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("cancel_web_search_button"),
+            ) {
+                Text("لغو")
+            }
         },
     )
 }

@@ -33,6 +33,7 @@ enum class SolAction {
     CALCULATOR,
     NOTES_TODO,
     MEDIA_CONTROL,
+    SEARCH_WEB,
     UNKNOWN,
 }
 
@@ -75,6 +76,7 @@ data class ParsedCommand(
     val delayMinutes: Long = 1L,
     val backgroundJobId: String? = null,
     val bookQuery: String? = null,
+    val searchQuery: String? = null,
     val roleName: String? = null,
     val jalaliSchedule: com.example.sol.calendar.ParsedJalaliSchedule? = null,
     val requireConfirmation: Boolean = true,
@@ -113,6 +115,10 @@ sealed interface PendingSolTask {
         val bookQuery: String,
         val requestedRoleHint: String,
         val runInBackground: Boolean,
+    ) : PendingSolTask
+
+    data class ConfirmWebSearch(
+        val query: String,
     ) : PendingSolTask
 
     data class OpenCapabilitiesCatalog(

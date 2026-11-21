@@ -115,6 +115,9 @@ fun SolAppRoot(
     val canScheduleExactAlarms by viewModel.canScheduleExactAlarms.collectAsStateWithLifecycle()
 
     val ttsAvailability by viewModel.ttsAvailability.collectAsStateWithLifecycle()
+    val piperStatus by viewModel.piperStatus.collectAsStateWithLifecycle()
+    val speakerIdState by viewModel.speakerIdState.collectAsStateWithLifecycle()
+    val isMicServiceRunning by viewModel.isMicServiceRunning.collectAsStateWithLifecycle()
     val isSpeaking by viewModel.isSpeaking.collectAsStateWithLifecycle()
     val persianVoices by viewModel.persianVoices.collectAsStateWithLifecycle()
     val activeTask by viewModel.activeTask.collectAsStateWithLifecycle()
@@ -123,6 +126,7 @@ fun SolAppRoot(
     val confirmVoiceFeedback by viewModel.confirmVoiceFeedback.collectAsStateWithLifecycle()
     val pendingBookFetch by viewModel.pendingBookFetch.collectAsStateWithLifecycle()
     val isFetchingBook by viewModel.isFetchingBook.collectAsStateWithLifecycle()
+    val pendingWebSearch by viewModel.pendingWebSearch.collectAsStateWithLifecycle()
     val voiceRoleSession by viewModel.voiceRoleSession.collectAsStateWithLifecycle()
     val showCapabilitiesSheet by viewModel.showCapabilitiesSheet.collectAsStateWithLifecycle()
     val pendingBackupRequest by viewModel.pendingBackupRequest.collectAsStateWithLifecycle()
@@ -204,6 +208,22 @@ fun SolAppRoot(
     ) { uri ->
         if (uri != null) {
             viewModel.importLocalSlmModel(uri)
+        }
+    }
+
+    val piperFilesPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris ->
+        if (uris.isNotEmpty()) {
+            viewModel.importPiperFiles(uris)
+        }
+    }
+
+    val speakerModelPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importSpeakerModel(uri)
         }
     }
 
@@ -332,6 +352,15 @@ fun SolAppRoot(
                         )
                     },
                     onDismiss = viewModel::dismissPendingBookFetch,
+                )
+            }
+
+            pendingWebSearch?.let { searchReq ->
+                WebSearchConfirmationDialog(
+                    pending = searchReq,
+                    onUpdateQuery = viewModel::updatePendingWebSearchQuery,
+                    onConfirm = viewModel::confirmWebSearch,
+                    onDismiss = viewModel::dismissPendingWebSearch,
                 )
             }
 
@@ -577,6 +606,7 @@ fun SolAppRoot(
                                     SettingsScreen(
                                         preferences = preferences,
                                         ttsAvailability = ttsAvailability,
+                                        piperStatus = piperStatus,
                                         availableTtsEngines = availableTtsEngines,
                                         activeTtsEngineLabel = activeTtsEngineLabel,
                                         persianVoices = persianVoices,
@@ -601,6 +631,30 @@ fun SolAppRoot(
                                         onTestVoice = viewModel::testVoiceSample,
                                         onOpenSystemTtsSettings = viewModel::openSystemTtsSettings,
                                         onRecheckSystemTts = viewModel::recheckSystemTts,
+                                        onPickPiperFiles = {
+                                            piperFilesPickerLauncher.launch(arrayOf("*/*"))
+                                        },
+                                        onDeletePiperModel = viewModel::deletePiperModel,
+                                        speakerIdState = speakerIdState,
+                                        onRecordOwnerVoice = {
+                                            if (hasMicPermission) {
+                                                viewModel.recordOwnerVoice()
+                                            } else {
+                                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                            }
+                                        },
+                                        onClearOwnerVoice = viewModel::clearOwnerVoice,
+                                        onPickSpeakerModel = {
+                                            speakerModelPickerLauncher.launch(arrayOf("*/*"))
+                                        },
+                                        isMicServiceRunning = isMicServiceRunning,
+                                        onScreenOffMicToggle = { enable ->
+                                            if (enable && !hasMicPermission) {
+                                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                            } else {
+                                                viewModel.setScreenOffMicEnabled(enable)
+                                            }
+                                        },
                                         onVoskOfflineToggle = viewModel::setVoskOfflineEnabled,
                                         onWakeWordToggle = viewModel::setWakeWordEnabled,
                                         onVadSilenceTimeoutChange = viewModel::setVadSilenceTimeoutMs,

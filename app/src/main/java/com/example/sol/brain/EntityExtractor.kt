@@ -449,6 +449,22 @@ class EntityExtractor {
                     matchedRuleId = matchedRuleId,
                 )
             }
+            SolAction.SEARCH_WEB -> {
+                val cleanSearch = ctx.cleaned
+                    .replace(Regex("(?:جست‌?وجوی وب|جست‌?وجو در وب|سرچ وب|جست‌?وجو کن|سرچ کن|تو وب|در وب|بگرد)"), " ")
+                    .replace(Regex("\\s+"), " ")
+                    .trim()
+                    .takeIf { it.length >= 2 }
+                ParsedCommand(
+                    action = SolAction.SEARCH_WEB,
+                    rawText = raw,
+                    normalizedText = ctx.normalized,
+                    searchQuery = cleanSearch,
+                    requireConfirmation = true,
+                    confidence = confidence,
+                    matchedRuleId = matchedRuleId,
+                )
+            }
             else -> ParsedCommand(
                 action = action,
                 rawText = raw,

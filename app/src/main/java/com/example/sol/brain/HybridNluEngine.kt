@@ -218,6 +218,7 @@ class HybridNluEngine(
             SolAction.CALCULATOR -> "ماشین‌حساب فارسی"
             SolAction.NOTES_TODO -> "یادداشت و لیست خرید / کارها"
             SolAction.MEDIA_CONTROL -> "کنترل پخش موسیقی"
+            SolAction.SEARCH_WEB -> "جست‌وجوی وب (با تأیید کاربر)"
             SolAction.UNKNOWN -> "گفت‌وگوی آزاد / پرسش عمومی"
         }
 
@@ -244,6 +245,7 @@ class HybridNluEngine(
                 listOf("ذخیره مکان", "مکان جدید") to SolAction.SAVE_LOCATION,
                 listOf("ذخیره شخص", "مخاطب جدید") to SolAction.SAVE_PERSON,
                 listOf("کتاب", "ویکی", "اینترنت", "دانلود") to SolAction.WEB_BOOK_LEARN_ROLE,
+                listOf("جستجوی وب", "جستجو در وب", "سرچ وب", "وب را بگرد") to SolAction.SEARCH_WEB,
                 listOf("نقش", "شخصیت") to SolAction.TEACH_ROLE_VOICE,
                 listOf("مشورت", "مشاوره", "طبق کتاب") to SolAction.CONSULT_ROLE_BOOK,
                 listOf("روتین") to SolAction.RUN_ROUTINE,

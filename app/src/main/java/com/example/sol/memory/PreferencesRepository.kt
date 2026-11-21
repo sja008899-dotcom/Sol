@@ -74,6 +74,8 @@ data class SolPreferences(
     val maxVoiceListenSeconds: Int = 15,
     val wakeWordTimeoutMinutes: Int = 3,
     val voiceCueFeedbackEnabled: Boolean = true,
+    // N2 Screen-off foreground microphone preference
+    val screenOffMicEnabled: Boolean = false,
 )
 
 class PreferencesRepository(private val context: Context) {
@@ -103,6 +105,7 @@ class PreferencesRepository(private val context: Context) {
         val MAX_VOICE_LISTEN_SECONDS = intPreferencesKey("max_voice_listen_seconds")
         val WAKE_WORD_TIMEOUT_MINUTES = intPreferencesKey("wake_word_timeout_minutes")
         val VOICE_CUE_FEEDBACK_ENABLED = booleanPreferencesKey("voice_cue_feedback_enabled")
+        val SCREEN_OFF_MIC_ENABLED = booleanPreferencesKey("screen_off_mic_enabled")
     }
 
     val preferences: Flow<SolPreferences> = context.solPrefsDataStore.data.map { p ->
@@ -137,6 +140,7 @@ class PreferencesRepository(private val context: Context) {
             maxVoiceListenSeconds = (p[Keys.MAX_VOICE_LISTEN_SECONDS] ?: 15).coerceIn(8, 45),
             wakeWordTimeoutMinutes = (p[Keys.WAKE_WORD_TIMEOUT_MINUTES] ?: 3).coerceIn(1, 10),
             voiceCueFeedbackEnabled = p[Keys.VOICE_CUE_FEEDBACK_ENABLED] ?: true,
+            screenOffMicEnabled = p[Keys.SCREEN_OFF_MIC_ENABLED] ?: false,
         )
     }
 
@@ -244,6 +248,10 @@ class PreferencesRepository(private val context: Context) {
         context.solPrefsDataStore.edit { it[Keys.VOICE_CUE_FEEDBACK_ENABLED] = enabled }
     }
 
+    suspend fun setScreenOffMicEnabled(enabled: Boolean) {
+        context.solPrefsDataStore.edit { it[Keys.SCREEN_OFF_MIC_ENABLED] = enabled }
+    }
+
     suspend fun resetAllPreferences() {
         context.solPrefsDataStore.edit { it.clear() }
     }
@@ -273,6 +281,7 @@ class PreferencesRepository(private val context: Context) {
             p[Keys.MAX_VOICE_LISTEN_SECONDS] = restored.maxVoiceListenSeconds.coerceIn(8, 45)
             p[Keys.WAKE_WORD_TIMEOUT_MINUTES] = restored.wakeWordTimeoutMinutes.coerceIn(1, 10)
             p[Keys.VOICE_CUE_FEEDBACK_ENABLED] = restored.voiceCueFeedbackEnabled
+            p[Keys.SCREEN_OFF_MIC_ENABLED] = restored.screenOffMicEnabled
         }
     }
 

@@ -50,7 +50,17 @@ class SolAppContainer(private val application: Application) {
 
     val audioManager by lazy { SolAudioManager(application) }
     val persianTts by lazy { PersianTTS(application, audioManager) }
-    val voiceEngine by lazy { VoiceEngine(application, audioManager = audioManager, persianTts = persianTts) }
+    val ttsManager by lazy { com.example.sol.tts.TtsManager(application, persianTts, audioManager) }
+    val speakerIdManager by lazy { com.example.sol.speaker.SpeakerIdManager(application) }
+    val voiceEngine by lazy {
+        VoiceEngine(
+            context = application,
+            audioManager = audioManager,
+            persianTts = persianTts,
+            isExternalSpeaking = { ttsManager.isPiperSpeaking.value },
+            onStopExternalSpeech = { ttsManager.stop() },
+        )
+    }
 
     val deviceController by lazy { DeviceController(application, audioManager) }
     val contactManager by lazy { ContactManager(application, personRepository) }
@@ -61,6 +71,7 @@ class SolAppContainer(private val application: Application) {
 
     // Heavy parsers, RAG, SLM, exact alarms, and crypto backups are lazy-loaded for 4GB RAM efficiency
     val bookWebFetcher by lazy { BookWebFetcher(application) }
+    val webSearchClient by lazy { com.example.sol.network.WebSearchClient() }
     val bookRagEngine by lazy { BookRagEngine(knowledgeRepository) }
     val localSlmEngine by lazy { LocalSlmEngine(application) }
     val exactAlarmScheduler by lazy { ExactAlarmScheduler(application, knowledgeRepository) }
@@ -140,6 +151,7 @@ class SolAppContainer(private val application: Application) {
                 com.example.sol.brain.skills.ReminderAlarmSkill(backgroundTaskCoordinator, exactAlarmScheduler),
                 com.example.sol.brain.skills.BackgroundControlSkill(backgroundTaskCoordinator),
                 com.example.sol.brain.skills.WebBookRoleSkill(),
+                com.example.sol.brain.skills.WebSearchSkill(),
                 com.example.sol.brain.skills.TeachRoleVoiceSkill(application, knowledgeRepository),
                 consultSkill,
                 com.example.sol.brain.skills.CallSkill(learningEngine),
@@ -179,7 +191,7 @@ class SolAppContainer(private val application: Application) {
             extractor = entityExtractor,
         )
     }
-    val commandBrain by lazy { CommandBrain(dialogueManager) }
+    val commandBrain by lazy { CommandBrain(dialogueManager, speakerIdManager) }
 
     val confirmationManager by lazy { ConfirmationManager() }
     val taskManager by lazy {

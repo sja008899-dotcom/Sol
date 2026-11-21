@@ -9,6 +9,7 @@ class IntentParser(
     private val matchers: List<IntentMatcher> = listOf(
         ShowCapabilitiesMatcher(),
         WebBookLearnRoleMatcher(),
+        SearchWebMatcher(),
         TeachRoleVoiceMatcher(),
         ConsultRoleBookMatcher(),
         CalculatorMatcher(),

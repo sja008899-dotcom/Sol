@@ -307,6 +307,9 @@ class VoskVoiceEngine(
 
                 recorder.startRecording()
                 val shortBuf = ShortArray(2048)
+                val maxCaptureSamples = SAMPLE_RATE * 4
+                val pcmRing = FloatArray(maxCaptureSamples)
+                var pcmTotalWritten = 0
                 val startedAt = System.currentTimeMillis()
                 var hasHeardSpeech = false
                 var lastVoiceActivityAt = startedAt
@@ -315,6 +318,13 @@ class VoskVoiceEngine(
                 while (isRecording.get()) {
                     val read = recorder.read(shortBuf, 0, shortBuf.size)
                     if (read <= 0) continue
+
+                    if (!isWakeWordMode) {
+                        for (i in 0 until read) {
+                            pcmRing[pcmTotalWritten % maxCaptureSamples] = shortBuf[i] / 32768f
+                            pcmTotalWritten++
+                        }
+                    }
 
                     val rmsNorm = computeNormalizedRms(shortBuf, read)
                     mainHandler.post { onRmsChanged(rmsNorm) }
@@ -338,6 +348,7 @@ class VoskVoiceEngine(
                                     break
                                 }
                             } else {
+                                saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
                                 isRecording.set(false)
                                 mainHandler.post { onFinalResult(corrected) }
                                 break
@@ -379,6 +390,7 @@ class VoskVoiceEngine(
                                 .ifBlank { lastPartialSent }
                             isRecording.set(false)
                             if (finalTxt.isNotBlank()) {
+                                saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
                                 val corrected = vocabularyBias.applyBiasCorrection(finalTxt)
                                 mainHandler.post { onFinalResult(corrected) }
                             } else {
@@ -392,6 +404,7 @@ class VoskVoiceEngine(
                                 .ifBlank { lastPartialSent }
                             isRecording.set(false)
                             if (fallbackTxt.isNotBlank()) {
+                                saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
                                 val corrected = vocabularyBias.applyBiasCorrection(fallbackTxt)
                                 mainHandler.post { onFinalResult(corrected) }
                             } else {
@@ -432,6 +445,29 @@ class VoskVoiceEngine(
                 scheduleAutoUnloadAfterIdle()
             }
         }
+    }
+
+    @Volatile
+    private var lastCapturedPcm16k: FloatArray? = null
+
+    fun consumeLastCapturedPcm16k(): FloatArray? {
+        val snap = lastCapturedPcm16k
+        lastCapturedPcm16k = null
+        return snap
+    }
+
+    private fun saveCapturedPcmFromRing(ring: FloatArray, totalWritten: Int, capacity: Int) {
+        if (totalWritten <= 0) {
+            lastCapturedPcm16k = null
+            return
+        }
+        val count = totalWritten.coerceAtMost(capacity)
+        val start = if (totalWritten > capacity) totalWritten % capacity else 0
+        val out = FloatArray(count)
+        for (i in 0 until count) {
+            out[i] = ring[(start + i) % capacity]
+        }
+        lastCapturedPcm16k = out
     }
 
     fun stopListening() {

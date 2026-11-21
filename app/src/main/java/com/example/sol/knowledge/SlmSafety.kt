@@ -144,6 +144,7 @@ object SlmIntentProposalValidator {
         SolAction.MULTI_STEP_NOTIFY,
         SolAction.FORGET_MEMORY,
         SolAction.WEB_BOOK_LEARN_ROLE,
+        SolAction.SEARCH_WEB,
     )
 
     fun parseOrNull(rawResponse: String): SlmIntentProposal? {
