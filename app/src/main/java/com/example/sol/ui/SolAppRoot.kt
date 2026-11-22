@@ -79,6 +79,7 @@ const val ROUTE_MEMORY = "memory"
 const val ROUTE_CONTACTS = "contacts"
 const val ROUTE_HISTORY = "history"
 const val ROUTE_SETTINGS = "settings"
+const val ROUTE_RELIABILITY = "reliability"
 
 private data class SolNavItem(
     val route: String,
@@ -265,6 +266,9 @@ fun SolAppRoot(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
                 chatViewModel.onAppBackgrounded()
+            } else if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshPermissions()
+                settingsViewModel.refreshReliabilityStatus()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -724,6 +728,35 @@ fun SolAppRoot(
                                         onLaunchApp = { label ->
                                             settingsViewModel.launchInstalledApp(label)
                                         },
+                                        onOpenReliability = {
+                                            settingsViewModel.refreshReliabilityStatus()
+                                            navController.navigate(ROUTE_RELIABILITY)
+                                        },
+                                    )
+                                }
+
+                                composable(ROUTE_RELIABILITY) {
+                                    val isIgnoringBattery by settingsViewModel.isIgnoringBatteryOptimizations.collectAsStateWithLifecycle()
+                                    val canExactAlarms by settingsViewModel.canScheduleExactAlarms.collectAsStateWithLifecycle()
+                                    val areNotifsEnabled by settingsViewModel.areNotificationsEnabled.collectAsStateWithLifecycle()
+                                    val ramSnapshot by settingsViewModel.ramSnapshot.collectAsStateWithLifecycle()
+                                    val storageStatus by settingsViewModel.storageStatus.collectAsStateWithLifecycle()
+                                    val recommendedModel by settingsViewModel.recommendedSlmModel.collectAsStateWithLifecycle()
+
+                                    ReliabilityScreen(
+                                        isIgnoringBatteryOptimizations = isIgnoringBattery,
+                                        canScheduleExactAlarms = canExactAlarms,
+                                        areNotificationsEnabled = areNotifsEnabled,
+                                        lastReminderDeliveredAt = preferences.lastReminderDeliveredAt,
+                                        lastReminderDeliveredTitle = preferences.lastReminderDeliveredTitle,
+                                        ramSnapshot = ramSnapshot,
+                                        storageStatus = storageStatus,
+                                        recommendedSlmModel = recommendedModel,
+                                        onOpenBatteryOptimizationSettings = { settingsViewModel.openBatteryOptimizationSettings() },
+                                        onOpenExactAlarmSettings = { settingsViewModel.requestExactAlarmPermission() },
+                                        onOpenNotificationSettings = { settingsViewModel.openNotificationSettings() },
+                                        onScheduleSelfTestReminder = settingsViewModel::scheduleOneMinuteSelfTestReminder,
+                                        onBack = { navController.popBackStack() },
                                     )
                                 }
                             }

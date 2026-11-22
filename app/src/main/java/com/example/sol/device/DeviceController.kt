@@ -11,11 +11,13 @@ import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
+import android.os.PowerManager
 import android.os.StatFs
 import android.provider.AlarmClock
 import android.provider.CalendarContract
 import android.provider.MediaStore
 import android.provider.Settings
+import androidx.core.app.NotificationManagerCompat
 import com.example.sol.memory.PersianNormalizer
 import com.example.sol.voice.AudioVolumeStatus
 import com.example.sol.voice.SolAudioManager
@@ -94,6 +96,32 @@ class SettingsController(private val context: Context) {
     }
 
     fun openBatterySettings(): Boolean = launchSettingsIntent(Intent(Intent.ACTION_POWER_USAGE_SUMMARY))
+
+    fun isIgnoringBatteryOptimizations(): Boolean {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return false
+        return runCatching { pm.isIgnoringBatteryOptimizations(context.packageName) }.getOrDefault(false)
+    }
+
+    fun openBatteryOptimizationSettings(): Boolean {
+        return launchSettingsIntent(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+    }
+
+    fun areNotificationsEnabled(): Boolean {
+        return runCatching { NotificationManagerCompat.from(context).areNotificationsEnabled() }.getOrDefault(true)
+    }
+
+    fun openNotificationSettings(): Boolean {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            }
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+            }
+        }
+        return launchSettingsIntent(intent)
+    }
 
     private fun launchSettingsIntent(intent: Intent): Boolean {
         return runCatching {

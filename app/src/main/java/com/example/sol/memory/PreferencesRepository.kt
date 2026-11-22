@@ -78,6 +78,9 @@ data class SolPreferences(
     val screenOffMicEnabled: Boolean = false,
     // N4 Continuous listening after wake-word completion
     val continuousListeningAfterWake: Boolean = false,
+    // M8 F2 Reliability diagnostics
+    val lastReminderDeliveredAt: Long = 0L,
+    val lastReminderDeliveredTitle: String = "",
 )
 
 class PreferencesRepository(private val context: Context) {
@@ -109,6 +112,8 @@ class PreferencesRepository(private val context: Context) {
         val VOICE_CUE_FEEDBACK_ENABLED = booleanPreferencesKey("voice_cue_feedback_enabled")
         val SCREEN_OFF_MIC_ENABLED = booleanPreferencesKey("screen_off_mic_enabled")
         val CONTINUOUS_LISTENING_AFTER_WAKE = booleanPreferencesKey("continuous_listening_after_wake")
+        val LAST_REMINDER_DELIVERED_AT = longPreferencesKey("last_reminder_delivered_at")
+        val LAST_REMINDER_DELIVERED_TITLE = stringPreferencesKey("last_reminder_delivered_title")
     }
 
     val preferences: Flow<SolPreferences> = context.solPrefsDataStore.data.map { p ->
@@ -145,6 +150,8 @@ class PreferencesRepository(private val context: Context) {
             voiceCueFeedbackEnabled = p[Keys.VOICE_CUE_FEEDBACK_ENABLED] ?: true,
             screenOffMicEnabled = p[Keys.SCREEN_OFF_MIC_ENABLED] ?: false,
             continuousListeningAfterWake = p[Keys.CONTINUOUS_LISTENING_AFTER_WAKE] ?: false,
+            lastReminderDeliveredAt = p[Keys.LAST_REMINDER_DELIVERED_AT] ?: 0L,
+            lastReminderDeliveredTitle = p[Keys.LAST_REMINDER_DELIVERED_TITLE] ?: "",
         )
     }
 
@@ -260,6 +267,16 @@ class PreferencesRepository(private val context: Context) {
         context.solPrefsDataStore.edit { it[Keys.CONTINUOUS_LISTENING_AFTER_WAKE] = enabled }
     }
 
+    suspend fun recordLastReminderDelivered(
+        title: String,
+        deliveredAt: Long = System.currentTimeMillis(),
+    ) {
+        context.solPrefsDataStore.edit {
+            it[Keys.LAST_REMINDER_DELIVERED_AT] = deliveredAt
+            it[Keys.LAST_REMINDER_DELIVERED_TITLE] = title.trim()
+        }
+    }
+
     suspend fun resetAllPreferences() {
         context.solPrefsDataStore.edit { it.clear() }
     }
@@ -291,6 +308,8 @@ class PreferencesRepository(private val context: Context) {
             p[Keys.VOICE_CUE_FEEDBACK_ENABLED] = restored.voiceCueFeedbackEnabled
             p[Keys.SCREEN_OFF_MIC_ENABLED] = restored.screenOffMicEnabled
             p[Keys.CONTINUOUS_LISTENING_AFTER_WAKE] = restored.continuousListeningAfterWake
+            p[Keys.LAST_REMINDER_DELIVERED_AT] = restored.lastReminderDeliveredAt
+            p[Keys.LAST_REMINDER_DELIVERED_TITLE] = restored.lastReminderDeliveredTitle
         }
     }
 

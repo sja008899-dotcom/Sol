@@ -1,0 +1,45 @@
+build:
+  maxIssues: 0
+
+config:
+  validation: true
+
+complexity:
+  active: false
+
+style:
+  active: false
+
+exceptions:
+  active: false
+
+comments:
+  active: false
+
+naming:
+  active: false
+
+performance:
+  active: true
+  ForEachOnRange:
+    active: true
+  SpreadOperator:
+    active: false
+
+potential-bugs:
+  active: true
+  CastToNullableType:
+    active: false
+  UnsafeCast:
+    active: true
+  UnreachableCode:
+    active: true
+
+coroutines:
+  active: true
+  GlobalCoroutineUsage:
+    active: false
+  RedundantSuspendModifier:
+    active: false
+  SuspendFunWithCoroutineScopeReceiver:
+    active: true

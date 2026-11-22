@@ -10,6 +10,7 @@ import android.provider.Settings
 import com.example.SolApplication
 import com.example.sol.background.SolNotificationHelper
 import com.example.sol.memory.KnowledgeRepository
+import com.example.sol.memory.PreferencesRepository
 import com.example.sol.memory.ScheduledAlarmEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,7 @@ data class RescheduleSummary(
 class ExactAlarmScheduler(
     private val context: Context,
     private val knowledgeRepository: KnowledgeRepository,
+    private val preferencesRepository: PreferencesRepository? = null,
 ) {
     private val alarmManager: AlarmManager?
         get() = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager
@@ -143,6 +145,7 @@ class ExactAlarmScheduler(
                         title = "یادآور جاافتاده: ${alarm.titleFa}",
                         body = "${contactPrefix}زمان «${alarm.jalaliLabel}» گذشت: ${alarm.messageBody}",
                     )
+                    preferencesRepository?.recordLastReminderDelivered("یادآور جاافتاده: ${alarm.titleFa}", nowMillis)
                     missedDelivered++
                 }
                 knowledgeRepository.markAlarmTriggeredById(alarm.id)
@@ -254,7 +257,8 @@ class ExactReminderReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val repo = (context.applicationContext as? SolApplication)?.container?.knowledgeRepository
+                val container = (context.applicationContext as? SolApplication)?.container
+                val repo = container?.knowledgeRepository
                 if (repo != null) {
                     if (alarmId > 0L) {
                         repo.markAlarmTriggeredById(alarmId)
@@ -268,8 +272,9 @@ class ExactReminderReceiver : BroadcastReceiver() {
                         detailFa = fullBody,
                     )
                 }
+                container?.preferencesRepository?.recordLastReminderDelivered(title)
             } finally {
-                pendingResult.finish()
+                pendingResult?.finish()
             }
         }
     }
@@ -304,7 +309,7 @@ class BootReceiver : BroadcastReceiver() {
                     fireMissedAsNotification = true,
                 )
             } finally {
-                pendingResult.finish()
+                pendingResult?.finish()
             }
         }
     }
@@ -332,7 +337,7 @@ class ExactAlarmPermissionReceiver : BroadcastReceiver() {
                     fireMissedAsNotification = true,
                 )
             } finally {
-                pendingResult.finish()
+                pendingResult?.finish()
             }
         }
     }

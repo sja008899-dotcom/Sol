@@ -7,6 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.example.SolApplication
 import com.example.sol.device.BatteryStatus
 import com.example.sol.device.InstalledAppShortcut
+import com.example.sol.device.StorageStatus
+import com.example.sol.knowledge.SlmModelCatalog
+import com.example.sol.knowledge.SlmModelSpec
 import com.example.sol.memory.BackgroundJobLogEntity
 import com.example.sol.memory.ConfirmationPolicy
 import com.example.sol.memory.DeliveryPreference
@@ -65,6 +68,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _vocabularyTermsCount = MutableStateFlow(0)
     val vocabularyTermsCount: StateFlow<Int> = _vocabularyTermsCount.asStateFlow()
 
+    private val _isIgnoringBatteryOptimizations = MutableStateFlow(
+        c.deviceController.settingsController.isIgnoringBatteryOptimizations()
+    )
+    val isIgnoringBatteryOptimizations: StateFlow<Boolean> = _isIgnoringBatteryOptimizations.asStateFlow()
+
+    private val _areNotificationsEnabled = MutableStateFlow(
+        c.deviceController.settingsController.areNotificationsEnabled()
+    )
+    val areNotificationsEnabled: StateFlow<Boolean> = _areNotificationsEnabled.asStateFlow()
+
+    private val _storageStatus = MutableStateFlow(c.deviceController.getStorageStatus())
+    val storageStatus: StateFlow<StorageStatus> = _storageStatus.asStateFlow()
+
+    private val _recommendedSlmModel = MutableStateFlow(
+        SlmModelCatalog.recommendedModelForDevice(ramSnapshot.value.totalDeviceRamMb)
+    )
+    val recommendedSlmModel: StateFlow<SlmModelSpec> = _recommendedSlmModel.asStateFlow()
+
     init {
         refreshSettingsSnapshots()
         viewModelScope.launch {
@@ -97,6 +118,38 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 privateModeEnabled = prefs.privateModeEnabled,
             )
             _launchableApps.value = c.deviceController.appLauncher.getLaunchableApps().take(12)
+            refreshReliabilityStatus()
+        }
+    }
+
+    fun refreshReliabilityStatus() {
+        c.exactAlarmScheduler.refreshExactAlarmState()
+        val ram = c.memoryOptimizer.refresh()
+        _isIgnoringBatteryOptimizations.value =
+            c.deviceController.settingsController.isIgnoringBatteryOptimizations()
+        _areNotificationsEnabled.value =
+            c.deviceController.settingsController.areNotificationsEnabled()
+        _storageStatus.value = c.deviceController.getStorageStatus()
+        _recommendedSlmModel.value = SlmModelCatalog.recommendedModelForDevice(ram.totalDeviceRamMb)
+    }
+
+    fun openBatteryOptimizationSettings(): Boolean =
+        c.deviceController.settingsController.openBatteryOptimizationSettings()
+
+    fun openNotificationSettings(): Boolean =
+        c.deviceController.settingsController.openNotificationSettings()
+
+    fun scheduleOneMinuteSelfTestReminder() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val outcome = c.exactAlarmScheduler.scheduleJalaliAlarm(
+                triggerAtMillis = System.currentTimeMillis() + 60_000L,
+                titleFa = "تست خودکار یادآور Sol",
+                messageBody = "این اعلان تأیید می‌کند که یادآور ۱ دقیقه‌ای با موفقیت تحویل داده شد.",
+                minLeadMillis = 60_000L,
+            )
+            refreshReliabilityStatus()
+            val modeText = if (outcome.isExactGranted) "دقیق (Exact Alarm)" else "تقریبی (Doze)"
+            c.uiBridge.postBanner("یادآور آزمایشی برای ${outcome.jalaliDateTimeFa} ($modeText) ثبت شد.")
         }
     }
 

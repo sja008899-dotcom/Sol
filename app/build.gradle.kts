@@ -6,6 +6,8 @@ plugins {
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
+  id("jacoco")
+  alias(libs.plugins.detekt)
 }
 
 android {
@@ -68,7 +70,24 @@ android {
     compose = true
     buildConfig = true
   }
-  testOptions { unitTests { isIncludeAndroidResources = true } }
+  testOptions {
+    unitTests {
+      isIncludeAndroidResources = true
+      all {
+        it.extensions.configure(JacocoTaskExtension::class.java) {
+          isIncludeNoLocationClasses = true
+          excludes = listOf("jdk.internal.*")
+        }
+      }
+    }
+  }
+  lint {
+    abortOnError = true
+    warningsAsErrors = false
+    checkReleaseBuilds = false
+    htmlReport = true
+    xmlReport = true
+  }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
@@ -120,6 +139,7 @@ dependencies {
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
+  testImplementation(libs.androidx.work.testing)
   testImplementation(libs.junit)
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
@@ -131,4 +151,43 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
+}
+
+jacoco {
+  toolVersion = "0.8.13"
+}
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+  dependsOn("testDebugUnitTest")
+  reports {
+    xml.required.set(true)
+    html.required.set(true)
+  }
+  val fileFilter = listOf(
+    "**/R.class",
+    "**/R$*.class",
+    "**/BuildConfig.*",
+    "**/Manifest*.*",
+    "**/*Test*.*",
+    "android/**/*.*",
+    "**/*_Impl*",
+  )
+  val kotlinDebugTree = fileTree("${layout.buildDirectory.get()}/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes") {
+    exclude(fileFilter)
+  }
+  val javaDebugTree = fileTree("${layout.buildDirectory.get()}/intermediates/javac/debug/compileDebugJavaWithJavac/classes") {
+    exclude(fileFilter)
+  }
+  sourceDirectories.setFrom(files("${project.projectDir}/src/main/java"))
+  classDirectories.setFrom(files(kotlinDebugTree, javaDebugTree))
+  executionData.setFrom(fileTree(layout.buildDirectory) {
+    include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec", "jacoco/testDebugUnitTest.exec")
+  })
+}
+
+detekt {
+  buildUponDefaultConfig = true
+  allRules = false
+  config.setFrom(files("${rootDir}/config/detekt/detekt.yml"))
+  source.setFrom(files("src/main/java"))
 }

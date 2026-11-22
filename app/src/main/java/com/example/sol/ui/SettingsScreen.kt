@@ -159,6 +159,7 @@ fun SettingsScreen(
     onOpenBluetooth: () -> Unit,
     onOpenBattery: () -> Unit,
     onLaunchApp: (String) -> Unit,
+    onOpenReliability: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var ownerDraft by remember(preferences.ownerName) { mutableStateOf(preferences.ownerName) }
@@ -180,6 +181,29 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+
+        // 0. One UI Core / Background Reliability & Self-Test
+        item(key = "settings_reliability") {
+            SectionCard(title = stringResource(R.string.settings_reliability_card_title)) {
+                Text(
+                    text = stringResource(R.string.settings_reliability_card_sub),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onOpenReliability,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .testTag("settings_reliability_button"),
+                ) {
+                    Icon(Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(stringResource(R.string.settings_reliability_btn))
+                }
+            }
         }
 
         // 1. Offline Vosk Persian ASR + Vocabulary Bias + Wake Word

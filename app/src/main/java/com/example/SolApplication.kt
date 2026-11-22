@@ -77,7 +77,7 @@ class SolAppContainer(private val application: Application) {
     val webSearchClient by lazy { com.example.sol.network.WebSearchClient() }
     val bookRagEngine by lazy { BookRagEngine(knowledgeRepository) }
     val localSlmEngine by lazy { LocalSlmEngine(application) }
-    val exactAlarmScheduler by lazy { ExactAlarmScheduler(application, knowledgeRepository) }
+    val exactAlarmScheduler by lazy { ExactAlarmScheduler(application, knowledgeRepository, preferencesRepository) }
     val timerController by lazy { com.example.sol.calendar.TimerController(application, exactAlarmScheduler, knowledgeRepository) }
     val encryptedBackupManager by lazy {
         EncryptedBackupManager(

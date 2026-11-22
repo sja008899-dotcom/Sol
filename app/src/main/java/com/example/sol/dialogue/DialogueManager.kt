@@ -301,6 +301,16 @@ class DialogueManager(
         // Keep AwaitingIntentClarification reserved for teaching intent classes
         if (currentPending is PendingDialogueState.AwaitingIntentClarification) return null
 
+        val normCorrection = PersianTextNormalizer.normalizeForMatching(correctionText)
+        val intentKeywordAction = HybridNluEngine.resolveIntentFromUserText(correctionText)
+        val isPureIntentTeaching = currentPending == null &&
+            intentKeywordAction != null &&
+            normCorrection.split(' ').filter { it.isNotBlank() }.size <= 3 &&
+            !normCorrection.split(' ').any { it in setOf("کن", "بده", "بگیر", "بفرست", "بزن", "بذار", "بگذار", "بنویس", "بگو") }
+        if (isPureIntentTeaching) {
+            return null
+        }
+
         val replaceMatch = SUBSTITUTE_CORRECTION_REGEX.find(cleanInput)
         val baseCmd: ParsedCommand? = when (currentPending) {
             is PendingDialogueState.MissingSlot -> currentPending.partialCommand
@@ -385,12 +395,6 @@ class DialogueManager(
         }
 
         // Contact / message / searchQuery slot correction on prior or pending command
-        val normCorrection = PersianTextNormalizer.normalizeForMatching(correctionText)
-        val intentKeywordAction = HybridNluEngine.resolveIntentFromUserText(correctionText)
-        val isPureIntentTeaching = currentPending == null &&
-            intentKeywordAction != null &&
-            normCorrection.split(' ').size <= 2
-
         if (!isPureIntentTeaching) {
             when (baseCmd.action) {
                 SolAction.CALL, SolAction.SEND_SMS, SolAction.MULTI_STEP_NOTIFY -> {

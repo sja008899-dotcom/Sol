@@ -89,8 +89,10 @@ object SolNotificationHelper {
             .setAutoCancel(true)
             .build()
 
-        runCatching {
+        try {
             NotificationManagerCompat.from(context).notify(notificationId, notification)
+        } catch (_: SecurityException) {
+            // Permission may be revoked on Android 13+; fail safely without crashing.
         }
     }
 }
