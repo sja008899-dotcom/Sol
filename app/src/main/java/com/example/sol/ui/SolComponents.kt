@@ -73,8 +73,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.R
 import com.example.sol.contacts.ResolvedContact
 import com.example.sol.tasks.ActiveTaskState
 import com.example.sol.tasks.CommunicationChannel
@@ -178,7 +183,7 @@ fun SolVoiceOrb(
                 isProcessing -> Icons.Default.HourglassTop
                 else -> Icons.Default.Mic
             },
-            contentDescription = if (isListening) "توقف شنود" else "صحبت با Sol",
+            contentDescription = if (isListening) stringResource(R.string.stop_listening) else stringResource(R.string.speak_with_sol),
             tint = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier.size(30.dp),
         )
@@ -206,14 +211,19 @@ fun InternetBookFetchDialog(
                 tint = MaterialTheme.colorScheme.primary,
             )
         },
-        title = { Text("تأیید اتصال اختیاری به اینترنت") },
+        title = {
+            Text(
+                text = stringResource(R.string.dialog_internet_book_title),
+                modifier = Modifier.semantics { heading() },
+            )
+        },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Text(
-                    text = "این عملیات از اینترنت استفاده می‌کند. طبق قانون امنیتی Sol، اتصال به اینترنت فقط با تأیید شما برای جست‌وجو در ویکی‌پدیا فارسی، کتابخانه‌های عمومی (Gutendex / Open Library) یا خواندن لینک وب انجام می‌شود.",
+                    text = stringResource(R.string.dialog_internet_book_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -223,8 +233,8 @@ fun InternetBookFetchDialog(
                         query = it
                         onUpdateQuery(it, roleHint)
                     },
-                    label = { Text("موضوع، نام کتاب یا لینک وب (URL)") },
-                    placeholder = { Text("مثلاً: هوش مصنوعی، Atomic Habits یا https://...") },
+                    label = { Text(stringResource(R.string.dialog_internet_book_query_label)) },
+                    placeholder = { Text(stringResource(R.string.dialog_internet_book_query_hint)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -234,28 +244,32 @@ fun InternetBookFetchDialog(
                         roleHint = it
                         onUpdateQuery(query, it)
                     },
-                    label = { Text("نقش پیشنهادی برای Sol (اختیاری)") },
-                    placeholder = { Text("مثلاً: مربی بهره‌وری و عادت‌های روزانه") },
+                    label = { Text(stringResource(R.string.dialog_internet_book_role_label)) },
+                    placeholder = { Text(stringResource(R.string.dialog_internet_book_role_hint)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { runBg = !runBg },
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .clickable { runBg = !runBg },
                 ) {
                     Checkbox(checked = runBg, onCheckedChange = { runBg = it })
-                    Text("دریافت در پس‌زمینه (WorkManager) با اعلان", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.dialog_internet_book_bg_check), style = MaterialTheme.typography.bodySmall)
                 }
                 OutlinedButton(
                     onClick = {
                         onDismiss()
                         onPickLocalFile()
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
                 ) {
                     Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("انتخاب فایل PDF / EPUB / HTML / TXT از گوشی")
+                    Text(stringResource(R.string.dialog_internet_book_pick_local))
                 }
             }
         },
@@ -263,12 +277,22 @@ fun InternetBookFetchDialog(
             Button(
                 onClick = { onConfirmFetch(runBg) },
                 enabled = query.isNotBlank(),
+                modifier = Modifier.heightIn(min = 48.dp),
             ) {
-                Text(if (runBg) "زمان‌بندی در پس‌زمینه" else "تأیید و دریافت")
+                Text(
+                    if (runBg) {
+                        stringResource(R.string.dialog_internet_book_btn_bg)
+                    } else {
+                        stringResource(R.string.dialog_internet_book_btn_fg)
+                    }
+                )
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("لغو") }
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }
@@ -287,15 +311,20 @@ fun WebSearchConfirmationDialog(
         icon = {
             Icon(
                 imageVector = Icons.Default.Language,
-                contentDescription = "تأیید جست‌وجوی وب",
+                contentDescription = stringResource(R.string.dialog_web_search_title),
                 tint = MaterialTheme.colorScheme.secondary,
             )
         },
-        title = { Text("تأیید جست‌وجوی وب") },
+        title = {
+            Text(
+                text = stringResource(R.string.dialog_web_search_title),
+                modifier = Modifier.semantics { heading() },
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "این عملیات از اینترنت استفاده می‌کند. بدون تأیید شما هیچ درخواستی به اینترنت ارسال نمی‌شود.",
+                    text = stringResource(R.string.dialog_web_search_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = FontWeight.Medium,
@@ -306,8 +335,8 @@ fun WebSearchConfirmationDialog(
                         query = it
                         onUpdateQuery(it)
                     },
-                    label = { Text("عبارت جست‌وجو در وب") },
-                    placeholder = { Text("مثلاً: آموزش کاتلین آفلاین") },
+                    label = { Text(stringResource(R.string.dialog_web_search_label)) },
+                    placeholder = { Text(stringResource(R.string.dialog_web_search_hint)) },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -323,7 +352,7 @@ fun WebSearchConfirmationDialog(
                     .heightIn(min = 48.dp)
                     .testTag("confirm_web_search_button"),
             ) {
-                Text("تأیید و جست‌وجو")
+                Text(stringResource(R.string.dialog_web_search_confirm))
             }
         },
         dismissButton = {
@@ -333,7 +362,7 @@ fun WebSearchConfirmationDialog(
                     .heightIn(min = 48.dp)
                     .testTag("cancel_web_search_button"),
             ) {
-                Text("لغو")
+                Text(stringResource(R.string.action_cancel))
             }
         },
     )
@@ -357,7 +386,12 @@ fun VoiceRoleTeachingDialog(
                 tint = MaterialTheme.colorScheme.secondary,
             )
         },
-        title = { Text("آموزش نقش و حافظه با صدای شما") },
+        title = {
+            Text(
+                text = stringResource(R.string.dialog_voice_role_title),
+                modifier = Modifier.semantics { heading() },
+            )
+        },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
@@ -370,12 +404,12 @@ fun VoiceRoleTeachingDialog(
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
                             Text(
-                                text = "کتاب ذخیره‌شده: ${b.title}",
+                                text = stringResource(R.string.dialog_voice_role_book_fmt, b.title),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                             Text(
-                                text = "نویسنده: ${b.author}",
+                                text = stringResource(R.string.dialog_voice_role_author_fmt, b.author),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                             Text(
@@ -390,7 +424,7 @@ fun VoiceRoleTeachingDialog(
                 OutlinedTextField(
                     value = session.roleNameDraft,
                     onValueChange = { onUpdateDraft(it, session.voiceExplanationDraft) },
-                    label = { Text("نام نقش جدید Sol") },
+                    label = { Text(stringResource(R.string.dialog_voice_role_name_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -411,7 +445,9 @@ fun VoiceRoleTeachingDialog(
                             MaterialTheme.colorScheme.onPrimaryContainer
                         },
                     ),
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp),
                 ) {
                     Icon(
                         imageVector = if (session.isListeningForExplanation) Icons.Default.Stop else Icons.Default.Mic,
@@ -420,9 +456,9 @@ fun VoiceRoleTeachingDialog(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         if (session.isListeningForExplanation) {
-                            "در حال شنود توضیح صوتی شما… (توقف)"
+                            stringResource(R.string.dialog_voice_role_listening)
                         } else {
-                            "بیان توضیح صوتی شما درباره کتاب و نقش"
+                            stringResource(R.string.dialog_voice_role_start)
                         }
                     )
                 }
@@ -430,20 +466,26 @@ fun VoiceRoleTeachingDialog(
                 OutlinedTextField(
                     value = session.voiceExplanationDraft,
                     onValueChange = { onUpdateDraft(session.roleNameDraft, it) },
-                    label = { Text("توضیحات صوتی / متنی شما برای Sol") },
-                    placeholder = { Text("مثلاً: بر اساس این کتاب، هر روز صبح برنامه کاری من را اولویت‌بندی کن…") },
+                    label = { Text(stringResource(R.string.dialog_voice_role_notes_label)) },
+                    placeholder = { Text(stringResource(R.string.dialog_voice_role_notes_hint)) },
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {
-            Button(onClick = onSave) {
-                Text("ذخیره در حافظه و فعال‌سازی نقش")
+            Button(
+                onClick = onSave,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Text(stringResource(R.string.dialog_voice_role_save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("بستن") }
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.action_close)) }
         },
     )
 }
@@ -471,12 +513,16 @@ fun ActiveTaskProgressCard(
                     text = task.titleFa,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.semantics { heading() },
                 )
                 if (task.isComplete) {
-                    IconButton(onClick = onDismiss) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(48.dp),
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "بستن گزارش مراحل",
+                            contentDescription = stringResource(R.string.cd_dismiss_task_report),
                         )
                     }
                 }
@@ -541,19 +587,22 @@ fun CommunicationConfirmationDialog(
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
 ) {
+    val talkbackDialogDesc = stringResource(R.string.dialog_comm_talkback_desc)
     AlertDialog(
         onDismissRequest = onCancel,
+        modifier = Modifier.semantics { contentDescription = talkbackDialogDesc },
         icon = {
             Icon(
                 imageVector = Icons.Default.Security,
-                contentDescription = "تأیید امنیتی Sol",
+                contentDescription = stringResource(R.string.cd_security_confirm),
                 tint = MaterialTheme.colorScheme.secondary,
             )
         },
         title = {
             Text(
-                text = "تأیید عملیات ارتباطی",
+                text = stringResource(R.string.dialog_comm_title),
                 style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.semantics { heading() },
             )
         },
         text = {
@@ -572,6 +621,7 @@ fun CommunicationConfirmationDialog(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = 48.dp)
                         .clickable {
                             if (isListeningVoiceConfirm) onStopVoiceConfirm() else onStartVoiceConfirm()
                         }
@@ -583,7 +633,7 @@ fun CommunicationConfirmationDialog(
                     ) {
                         Icon(
                             imageVector = if (isListeningVoiceConfirm) Icons.Default.Stop else Icons.Default.Mic,
-                            contentDescription = "تأیید صوتی",
+                            contentDescription = stringResource(R.string.cd_voice_confirm),
                             tint = if (isListeningVoiceConfirm) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp),
                         )
@@ -591,9 +641,9 @@ fun CommunicationConfirmationDialog(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (isListeningVoiceConfirm) {
-                                    "در حال شنود: بگویید «تأیید» یا «لغو»…"
+                                    stringResource(R.string.dialog_comm_voice_listening)
                                 } else {
-                                    "تأیید یا لغو صوتی (برای گفتن «تأیید» / «لغو» بزنید)"
+                                    stringResource(R.string.dialog_comm_voice_prompt)
                                 },
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
@@ -615,7 +665,7 @@ fun CommunicationConfirmationDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "مخاطب انتخاب‌شده:",
+                            text = stringResource(R.string.dialog_comm_selected_contact),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -626,7 +676,7 @@ fun CommunicationConfirmationDialog(
                         )
                         if (confirmation.selectedContact.relation.isNotBlank()) {
                             Text(
-                                text = "نسبت: ${confirmation.selectedContact.relation}",
+                                text = stringResource(R.string.dialog_comm_relation_fmt, confirmation.selectedContact.relation),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
@@ -635,7 +685,7 @@ fun CommunicationConfirmationDialog(
 
                 if (confirmation.candidateContacts.size > 1) {
                     Text(
-                        text = "چند مخاطب پیدا شد؛ در صورت نیاز تغییر دهید:",
+                        text = stringResource(R.string.dialog_comm_multi_candidates),
                         style = MaterialTheme.typography.labelMedium,
                     )
                     confirmation.candidateContacts.take(4).forEach { candidate ->
@@ -652,13 +702,13 @@ fun CommunicationConfirmationDialog(
                         selected = confirmation.channel == CommunicationChannel.CALL,
                         onClick = { onSelectChannel(CommunicationChannel.CALL) },
                         leadingIcon = { Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                        label = { Text("شماره‌گیر تماس") },
+                        label = { Text(stringResource(R.string.dialog_comm_channel_dialer)) },
                     )
                     FilterChip(
                         selected = confirmation.channel == CommunicationChannel.SMS,
                         onClick = { onSelectChannel(CommunicationChannel.SMS) },
                         leadingIcon = { Icon(Icons.Default.Sms, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                        label = { Text("پیامک متنی") },
+                        label = { Text(stringResource(R.string.dialog_comm_channel_sms)) },
                     )
                 }
 
@@ -666,7 +716,7 @@ fun CommunicationConfirmationDialog(
                     OutlinedTextField(
                         value = confirmation.messageBody,
                         onValueChange = onMessageChange,
-                        label = { Text("متن پیام با معرفی شفاف Sol") },
+                        label = { Text(stringResource(R.string.dialog_comm_sms_label)) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("confirm_sms_body_input"),
@@ -695,7 +745,7 @@ fun CommunicationConfirmationDialog(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "موقعیت فعلی تأییدشده: ${confirmation.confirmedCurrentLocation}",
+                            text = stringResource(R.string.home_confirmed_location_fmt, confirmation.confirmedCurrentLocation),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.tertiary,
                         )
@@ -706,21 +756,31 @@ fun CommunicationConfirmationDialog(
         confirmButton = {
             Button(
                 onClick = onConfirm,
-                modifier = Modifier.testTag("confirm_communication_button"),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("confirm_communication_button"),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
             ) {
-                Text(if (confirmation.channel == CommunicationChannel.CALL) "تأیید و باز کردن شماره‌گیر" else "تأیید و ارسال در پیامک")
+                Text(
+                    if (confirmation.channel == CommunicationChannel.CALL) {
+                        stringResource(R.string.dialog_comm_btn_call)
+                    } else {
+                        stringResource(R.string.dialog_comm_btn_sms)
+                    }
+                )
             }
         },
         dismissButton = {
             OutlinedButton(
                 onClick = onCancel,
-                modifier = Modifier.testTag("cancel_communication_button"),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("cancel_communication_button"),
             ) {
-                Text("لغو")
+                Text(stringResource(R.string.action_cancel))
             }
         },
     )
@@ -758,20 +818,21 @@ fun BackupPasswordDialog(
         },
         title = {
             Text(
-                if (mode == BackupDialogMode.EXPORT) {
-                    "رمزگذاری فایل پشتیبان (.solbackup)"
+                text = if (mode == BackupDialogMode.EXPORT) {
+                    stringResource(R.string.dialog_backup_export_title)
                 } else {
-                    "رمزگشایی و بازیابی (.solbackup)"
-                }
+                    stringResource(R.string.dialog_backup_import_title)
+                },
+                modifier = Modifier.semantics { heading() },
             )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     text = if (mode == BackupDialogMode.EXPORT) {
-                        "کل حافظه، مترادف‌ها، مخاطبین، کتاب‌ها (همراه بخش‌های BM25)، نقش‌ها و تنظیمات به‌صورت جریانی با PBKDF2-600k و AES-256-GCM (فرمت V3) رمزنگاری می‌شوند."
+                        stringResource(R.string.dialog_backup_export_body)
                     } else {
-                        "رمز فایل پشتیبان را وارد کنید تا داده‌های رمزدار پس از اعتبارسنجی کامل روی این گوشی بازیابی شوند."
+                        stringResource(R.string.dialog_backup_import_body)
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -782,9 +843,9 @@ fun BackupPasswordDialog(
                     label = {
                         Text(
                             if (mode == BackupDialogMode.EXPORT) {
-                                "رمز عبور پشتیبان (حداقل ۸ کاراکتر)"
+                                stringResource(R.string.dialog_backup_pw_export_label)
                             } else {
-                                "رمز عبور پشتیبان"
+                                stringResource(R.string.dialog_backup_pw_import_label)
                             }
                         )
                     },
@@ -812,7 +873,7 @@ fun BackupPasswordDialog(
                             .clickable { replaceExisting = !replaceExisting },
                     ) {
                         Checkbox(checked = replaceExisting, onCheckedChange = { replaceExisting = it })
-                        Text("جایگزینی کامل به جای ادغام با حافظه فعلی", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.dialog_backup_replace_check), style = MaterialTheme.typography.bodySmall)
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -823,7 +884,7 @@ fun BackupPasswordDialog(
                     ) {
                         Checkbox(checked = restoreConfirmed, onCheckedChange = { restoreConfirmed = it })
                         Text(
-                            "تأیید می‌کنم فایل پشتیبان در حافظه Sol بازیابی شود",
+                            stringResource(R.string.dialog_backup_confirm_check),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium,
                         )
@@ -835,13 +896,24 @@ fun BackupPasswordDialog(
             Button(
                 onClick = { onConfirm(password, replaceExisting) },
                 enabled = password.length >= minLength && restoreConfirmed,
-                modifier = Modifier.testTag("confirm_backup_password_button"),
+                modifier = Modifier
+                    .heightIn(min = 48.dp)
+                    .testTag("confirm_backup_password_button"),
             ) {
-                Text(if (mode == BackupDialogMode.EXPORT) "رمزنگاری و ذخیره" else "رمزگشایی و بازیابی")
+                Text(
+                    if (mode == BackupDialogMode.EXPORT) {
+                        stringResource(R.string.dialog_backup_btn_export)
+                    } else {
+                        stringResource(R.string.dialog_backup_btn_import)
+                    }
+                )
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("لغو") }
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) { Text(stringResource(R.string.action_cancel)) }
         },
     )
 }
@@ -856,26 +928,34 @@ fun ConfirmCurrentLocationDialog(
     var locationText by remember(currentLocation) { mutableStateOf(currentLocation) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("تأیید موقعیت فعلی") },
+        title = {
+            Text(
+                text = stringResource(R.string.dialog_location_title),
+                modifier = Modifier.semantics { heading() },
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "موقعیت فعلی فقط با تأیید دستی شما ثبت می‌شود و با مکان‌های ذخیره‌شده اشتباه گرفته نمی‌شود.",
+                    text = stringResource(R.string.dialog_location_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
                     value = locationText,
                     onValueChange = { locationText = it },
-                    label = { Text("الان کجا هستید؟") },
-                    placeholder = { Text("مثلاً: شرکت کارنو صنعت ماکیان") },
+                    label = { Text(stringResource(R.string.dialog_location_label)) },
+                    placeholder = { Text(stringResource(R.string.dialog_location_hint)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
                 if (savedLocationSuggestions.isNotEmpty()) {
-                    Text("مکان‌های ذخیره‌شده:", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.dialog_location_saved), style = MaterialTheme.typography.labelMedium)
                     savedLocationSuggestions.take(4).forEach { suggestion ->
-                        TextButton(onClick = { locationText = suggestion }) {
+                        TextButton(
+                            onClick = { locationText = suggestion },
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) {
                             Text(suggestion)
                         }
                     }
@@ -883,24 +963,33 @@ fun ConfirmCurrentLocationDialog(
             }
         },
         confirmButton = {
-            Button(onClick = {
-                onSave(locationText)
-                onDismiss()
-            }) {
-                Text("ثبت موقعیت فعلی")
+            Button(
+                onClick = {
+                    onSave(locationText)
+                    onDismiss()
+                },
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Text(stringResource(R.string.dialog_location_save))
             }
         },
         dismissButton = {
             Row {
                 if (currentLocation.isNotBlank()) {
-                    TextButton(onClick = {
-                        onSave("")
-                        onDismiss()
-                    }) {
-                        Text("پاک کردن")
+                    TextButton(
+                        onClick = {
+                            onSave("")
+                            onDismiss()
+                        },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Text(stringResource(R.string.action_clear))
                     }
                 }
-                TextButton(onClick = onDismiss) { Text("بستن") }
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.action_close)) }
             }
         },
     )
@@ -945,7 +1034,7 @@ fun ChatBubbleCard(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = if (isUser) "شما" else "Sol",
+                        text = if (isUser) stringResource(R.string.speaker_user_label) else stringResource(R.string.speaker_sol_label),
                         style = MaterialTheme.typography.labelMedium,
                         color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
@@ -957,7 +1046,7 @@ fun ChatBubbleCard(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                                contentDescription = "پخش صوتی پاسخ Sol",
+                                contentDescription = stringResource(R.string.cd_speak_sol_reply),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(18.dp),
                             )

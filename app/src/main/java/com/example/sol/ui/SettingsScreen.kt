@@ -57,9 +57,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.R
 import com.example.sol.device.BatteryStatus
 import com.example.sol.device.InstalledAppShortcut
 import com.example.sol.knowledge.SlmModelCatalog
@@ -119,6 +124,7 @@ fun SettingsScreen(
     onPickSpeakerModel: () -> Unit,
     isMicServiceRunning: Boolean,
     onScreenOffMicToggle: (Boolean) -> Unit,
+    onContinuousListeningToggle: (Boolean) -> Unit,
     onVoskOfflineToggle: (Boolean) -> Unit,
     onWakeWordToggle: (Boolean) -> Unit,
     onVadSilenceTimeoutChange: (Long) -> Unit,
@@ -162,21 +168,22 @@ fun SettingsScreen(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item {
+        item(key = "settings_header") {
             Text(
-                text = "تنظیمات Sol v2 و بهینه‌سازی گوشی",
+                text = stringResource(R.string.settings_title),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = "گفتار آفلاین Vosk، تقویم شمسی و AlarmManager، هوش BM25، ویجت و نوار بالا، پشتیبان رمزدار و مدیریت ۴ گیگابایت RAM",
+                text = stringResource(R.string.settings_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
         // 1. Offline Vosk Persian ASR + Vocabulary Bias + Wake Word
-        item {
+        item(key = "settings_vosk") {
             SectionCard(title = "۱. گفتار ۱۰۰٪ آفلاین فارسی (Vosk + کلمه بیدارباش Sol)") {
                 when (voskModelStatus) {
                     is VoskModelStatus.NotInstalled -> {
@@ -328,6 +335,25 @@ fun SettingsScreen(
                         modifier = Modifier.testTag("screen_off_mic_switch"),
                     )
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("شنود پیوسته پس از بیدارباش (N4)", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "پس از اجرای هر فرمان صوتی و پایان پاسخ Sol، گوش‌دادن به واژه «Sol» خودکار ادامه می‌یابد (با دکمه توقف قطع می‌شود).",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = preferences.continuousListeningAfterWake,
+                        onCheckedChange = onContinuousListeningToggle,
+                        modifier = Modifier.testTag("continuous_listening_switch"),
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -363,7 +389,7 @@ fun SettingsScreen(
         }
 
         // 2. Quick Access: Widget, Quick Settings Tile, Exact Jalali Alarms
-        item {
+        item(key = "settings_quick_access") {
             SectionCard(title = "۲. ویجت صفحه اصلی، دکمه نوار بالا و یادآورهای دقیق شمسی") {
                 Text(
                     text = "• ویجت صفحه اصلی: نمایش «موقعیت فعلی تأییدشده»، «نقش فعال» و تاریخ شمسی به همراه دکمهٔ مستقیم میکروفون از لانچر گوشی.\n• دکمه نوار اعلان بالای گوشی (Quick Settings Tile): از هر برنامه‌ای که هستید با کشیدن نوار بالا مستقیم با Sol صحبت کنید.",
@@ -435,7 +461,10 @@ fun SettingsScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                IconButton(onClick = { onCancelScheduledAlarm(alarm) }) {
+                                IconButton(
+                                    onClick = { onCancelScheduledAlarm(alarm) },
+                                    modifier = Modifier.size(48.dp),
+                                ) {
                                     Icon(
                                         Icons.Default.Delete,
                                         contentDescription = "لغو یادآور",
@@ -450,7 +479,7 @@ fun SettingsScreen(
         }
 
         // 3. Phase 3: Offline Neural LLM (LiteRT-LM) + BM25 RAG
-        item {
+        item(key = "settings_slm") {
             SectionCard(title = "۳. هوش زبانی آفلاین روی گوشی (فاز ۳: LiteRT-LM + BM25)") {
                 Text(
                     text = "بخش‌های نمایه‌شدهٔ کتاب‌ها (PDF / EPUB / وب / متن) در Room: $bookChunkCount بخش آمادهٔ جست‌وجوی BM25",
@@ -743,7 +772,7 @@ fun SettingsScreen(
         }
 
         // 4. Encrypted Portable Backup (.solbackup) & 4GB RAM Optimization
-        item {
+        item(key = "settings_backup_ram") {
             SectionCard(title = "۴. پشتیبان‌گیری رمزنگاری‌شده (.solbackup) و مدیریت ۴GB RAM") {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -801,7 +830,7 @@ fun SettingsScreen(
         }
 
         // 5. Owner Name & Theme
-        item {
+        item(key = "settings_identity_theme") {
             SectionCard(title = "هویت شما و ظاهر برنامه") {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -814,8 +843,11 @@ fun SettingsScreen(
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
-                    Button(onClick = { onOwnerNameChange(ownerDraft) }) {
-                        Text("ثبت")
+                    Button(
+                        onClick = { onOwnerNameChange(ownerDraft) },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Text(stringResource(R.string.action_register))
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
@@ -831,7 +863,7 @@ fun SettingsScreen(
         }
 
         // 6. Voice & Speech Engine Settings (Phone System TTS / SherpaTTS)
-        item {
+        item(key = "settings_tts_piper") {
             SectionCard(title = "صدای Sol و اتصال به موتور گفتار گوشی (SherpaTTS / سیستم)") {
                 val engineSuffix = if (activeTtsEngineLabel.isNotBlank()) " — موتور فعال: $activeTtsEngineLabel" else ""
                 Text(
@@ -1034,7 +1066,7 @@ fun SettingsScreen(
         }
 
         // 6b. Owner Speaker Verification (N5)
-        item {
+        item(key = "settings_speaker_id") {
             SectionCard(title = "شناسایی صدای مالک (N5 — امنیت دستورات صوتی)") {
                 Text(
                     text = speakerIdState.statusLabelFa,
@@ -1089,7 +1121,7 @@ fun SettingsScreen(
         }
 
         // 7. Invocation, Delivery & Confirmation Policy
-        item {
+        item(key = "settings_policies") {
             SectionCard(title = "نحوه فراخوانی، ارسال پیام و سطح اختیار") {
                 Text("چگونه صدایش کنی:", style = MaterialTheme.typography.labelMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1129,7 +1161,7 @@ fun SettingsScreen(
         }
 
         // 8. Device Controller
-        item {
+        item(key = "settings_device_controller") {
             SectionCard(title = "کنترل امکانات مجاز گوشی (Device Controller)") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1143,7 +1175,10 @@ fun SettingsScreen(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
-                val volPct = ((volumeStatus.mediaCurrent.toFloat() / volumeStatus.mediaMax.toFloat()) * 100f).roundToInt()
+                val volPct = remember(volumeStatus.mediaCurrent, volumeStatus.mediaMax) {
+                    val max = volumeStatus.mediaMax.coerceAtLeast(1)
+                    ((volumeStatus.mediaCurrent.toFloat() / max.toFloat()) * 100f).roundToInt()
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1212,7 +1247,7 @@ fun SettingsScreen(
         }
 
         // 9. Security & Privacy Audit (7 Rules)
-        item {
+        item(key = "settings_security_audit") {
             SectionCard(title = "قوانین امنیتی و حریم خصوصی Sol") {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     securityAudit.forEach { item ->
@@ -1265,6 +1300,7 @@ private fun SectionCard(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
             )
             Spacer(modifier = Modifier.height(10.dp))
             content()

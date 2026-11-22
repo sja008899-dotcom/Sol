@@ -76,6 +76,8 @@ data class SolPreferences(
     val voiceCueFeedbackEnabled: Boolean = true,
     // N2 Screen-off foreground microphone preference
     val screenOffMicEnabled: Boolean = false,
+    // N4 Continuous listening after wake-word completion
+    val continuousListeningAfterWake: Boolean = false,
 )
 
 class PreferencesRepository(private val context: Context) {
@@ -106,6 +108,7 @@ class PreferencesRepository(private val context: Context) {
         val WAKE_WORD_TIMEOUT_MINUTES = intPreferencesKey("wake_word_timeout_minutes")
         val VOICE_CUE_FEEDBACK_ENABLED = booleanPreferencesKey("voice_cue_feedback_enabled")
         val SCREEN_OFF_MIC_ENABLED = booleanPreferencesKey("screen_off_mic_enabled")
+        val CONTINUOUS_LISTENING_AFTER_WAKE = booleanPreferencesKey("continuous_listening_after_wake")
     }
 
     val preferences: Flow<SolPreferences> = context.solPrefsDataStore.data.map { p ->
@@ -141,6 +144,7 @@ class PreferencesRepository(private val context: Context) {
             wakeWordTimeoutMinutes = (p[Keys.WAKE_WORD_TIMEOUT_MINUTES] ?: 3).coerceIn(1, 10),
             voiceCueFeedbackEnabled = p[Keys.VOICE_CUE_FEEDBACK_ENABLED] ?: true,
             screenOffMicEnabled = p[Keys.SCREEN_OFF_MIC_ENABLED] ?: false,
+            continuousListeningAfterWake = p[Keys.CONTINUOUS_LISTENING_AFTER_WAKE] ?: false,
         )
     }
 
@@ -252,6 +256,10 @@ class PreferencesRepository(private val context: Context) {
         context.solPrefsDataStore.edit { it[Keys.SCREEN_OFF_MIC_ENABLED] = enabled }
     }
 
+    suspend fun setContinuousListeningAfterWake(enabled: Boolean) {
+        context.solPrefsDataStore.edit { it[Keys.CONTINUOUS_LISTENING_AFTER_WAKE] = enabled }
+    }
+
     suspend fun resetAllPreferences() {
         context.solPrefsDataStore.edit { it.clear() }
     }
@@ -282,6 +290,7 @@ class PreferencesRepository(private val context: Context) {
             p[Keys.WAKE_WORD_TIMEOUT_MINUTES] = restored.wakeWordTimeoutMinutes.coerceIn(1, 10)
             p[Keys.VOICE_CUE_FEEDBACK_ENABLED] = restored.voiceCueFeedbackEnabled
             p[Keys.SCREEN_OFF_MIC_ENABLED] = restored.screenOffMicEnabled
+            p[Keys.CONTINUOUS_LISTENING_AFTER_WAKE] = restored.continuousListeningAfterWake
         }
     }
 

@@ -45,8 +45,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.R
@@ -93,27 +97,28 @@ fun CapabilitiesScreen(
     val coreItems = remember(capabilities) {
         capabilities.filter { it.category == CapabilityCategory.CORE_ASSISTANT }
     }
+    val visibleLogs = remember(backgroundLogs) { backgroundLogs.take(15) }
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
     ) {
-        // Top Header with sleek hero artwork
+        // Top Header with sleek hero artwork (heightIn scales safely with fontScale >= 1.3)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(144.dp),
+                .heightIn(min = 144.dp),
         ) {
             Image(
                 painter = painterResource(id = R.drawable.img_sol_hero_banner_1795044139786),
-                contentDescription = "بنر قابلیت‌های Sol",
+                contentDescription = stringResource(R.string.capabilities_banner_cd),
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.matchParentSize(),
             )
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
@@ -125,28 +130,38 @@ fun CapabilitiesScreen(
             )
             Row(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .align(Alignment.BottomStart)
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.Bottom,
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "${capabilities.size} قابلیت واقعی و پس‌زمینه Sol",
+                        text = stringResource(R.string.capabilities_title_fmt, capabilities.size),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
+                        modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        text = "${bgItems.size} اجرای پس‌زمینه • ${advItems.size} آموزش کتاب و نقش صوتی • ${coreItems.size} مهارت و ابزار آفلاین",
+                        text = stringResource(
+                            R.string.capabilities_subtitle_fmt,
+                            bgItems.size,
+                            advItems.size,
+                            coreItems.size,
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
-                IconButton(onClick = onBack) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(48.dp),
+                ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "بازگشت",
+                        contentDescription = stringResource(R.string.action_back),
                         tint = MaterialTheme.colorScheme.onSurface,
                     )
                 }
@@ -159,7 +174,7 @@ fun CapabilitiesScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (!hasNotificationPermission) {
-                item {
+                item(key = "notif_permission_prompt") {
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
@@ -183,12 +198,15 @@ fun CapabilitiesScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "برای نمایش اعلان‌های پس‌زمینه مجوز اعلان را فعال کنید.",
+                                    text = stringResource(R.string.capabilities_notif_prompt),
                                     style = MaterialTheme.typography.bodySmall,
                                 )
                             }
-                            Button(onClick = onRequestNotificationPermission) {
-                                Text("فعال‌سازی")
+                            Button(
+                                onClick = onRequestNotificationPermission,
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) {
+                                Text(stringResource(R.string.action_enable))
                             }
                         }
                     }
@@ -196,7 +214,7 @@ fun CapabilitiesScreen(
             }
 
             // Section 1: Background Execution
-            item {
+            item(key = "section_banner_bg") {
                 SectionBanner(
                     title = "بخش ۱: ${bgItems.size} اجرای پس‌زمینه (AlarmManager، WorkManager و سرویس صوتی)",
                     subtitle = "هر مورد را می‌توانید فوراً اجرا کنید یا اجرای دوره‌ای آن را روشن بگذارید.",
@@ -223,7 +241,7 @@ fun CapabilitiesScreen(
             }
 
             // Section 2: Advanced Web Book + Voice Role Learning
-            item {
+            item(key = "section_banner_adv") {
                 Spacer(modifier = Modifier.height(4.dp))
                 SectionBanner(
                     title = "بخش ۲: ${advItems.size} دستور پیشرفته — اینترنت + کتاب + یادگیری نقش صوتی",
@@ -276,7 +294,7 @@ fun CapabilitiesScreen(
             }
 
             // Section 3: Core Smart Assistant & Offline Utility Skills
-            item {
+            item(key = "section_banner_core") {
                 Spacer(modifier = Modifier.height(4.dp))
                 SectionBanner(
                     title = "بخش ۳: ${coreItems.size} مهارت هستهٔ هوشمند، حافظه و ابزار آفلاین",
@@ -294,7 +312,7 @@ fun CapabilitiesScreen(
             }
 
             // Background Execution Live Logs
-            item {
+            item(key = "section_header_logs") {
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -302,28 +320,32 @@ fun CapabilitiesScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "گزارش زندهٔ کارهای پس‌زمینه",
+                        text = stringResource(R.string.capabilities_logs_header),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.semantics { heading() },
                     )
-                    if (backgroundLogs.isNotEmpty()) {
-                        TextButton(onClick = onClearBackgroundLogs) {
+                    if (visibleLogs.isNotEmpty()) {
+                        TextButton(
+                            onClick = onClearBackgroundLogs,
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) {
                             Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text("پاکسازی")
+                            Text(stringResource(R.string.action_cleanup))
                         }
                     }
                 }
             }
-            if (backgroundLogs.isEmpty()) {
-                item {
+            if (visibleLogs.isEmpty()) {
+                item(key = "logs_empty") {
                     Text(
-                        text = "هنوز کار پس‌زمینه‌ای اجرا نشده است؛ یکی از گزینه‌های بالا را امتحان کنید.",
+                        text = stringResource(R.string.capabilities_logs_empty),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             } else {
-                items(backgroundLogs.take(15), key = { it.id }) { log ->
+                items(visibleLogs, key = { it.id }) { log ->
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         shape = RoundedCornerShape(12.dp),
@@ -368,6 +390,7 @@ private fun SectionBanner(title: String, subtitle: String) {
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.secondary,
             fontWeight = FontWeight.Bold,
+            modifier = Modifier.semantics { heading() },
         )
         Text(
             text = subtitle,
@@ -419,13 +442,19 @@ private fun BackgroundCapabilityCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onRunNow) {
+                FilledTonalButton(
+                    onClick = onRunNow,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("اجرای فوری")
+                    Text(stringResource(R.string.capabilities_run_now))
                 }
-                OutlinedButton(onClick = onTryVoiceCommand) {
-                    Text("فرمان صوتی/متنی")
+                OutlinedButton(
+                    onClick = onTryVoiceCommand,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
+                    Text(stringResource(R.string.capabilities_try_command))
                 }
             }
         }
@@ -469,10 +498,13 @@ private fun CoreCapabilityCard(
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
-            FilledTonalButton(onClick = onRunSample) {
+            FilledTonalButton(
+                onClick = onRunSample,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
                 Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("امتحان")
+                Text(stringResource(R.string.action_try))
             }
         }
     }

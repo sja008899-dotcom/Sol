@@ -1,8 +1,11 @@
 package com.example
 
 import android.app.Application
+import android.os.StrictMode
 import com.example.sol.background.BackgroundTaskCoordinator
 import com.example.sol.background.SolNotificationHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.example.sol.brain.CommandBrain
 import com.example.sol.brain.EntityExtractor
 import com.example.sol.brain.IntentParser
@@ -209,6 +212,24 @@ class SolAppContainer(private val application: Application) {
 
     val permissionManager by lazy { PermissionManager(application) }
     val privacyManager by lazy { PrivacyManager(permissionManager) }
+    val uiBridge by lazy { com.example.sol.ui.vm.SolUiBridge() }
+
+    suspend fun refreshVocabularyBias(): Int = withContext(Dispatchers.IO) {
+        val terms = buildList {
+            memoryRepository.getAllOnce().forEach { m ->
+                add(m.keyText.removePrefix("alias:"))
+                add(m.valueText)
+            }
+            personRepository.getAllOnce().forEach { p -> add(p.name) }
+            locationRepository.getAllOnce().forEach { l ->
+                add(l.alias)
+                add(l.fullName)
+            }
+            knowledgeRepository.getAllBooksOnce().forEach { b -> add(b.title) }
+        }
+        voiceEngine.updateVocabularyBias(terms)
+        voiceEngine.voskEngine.vocabularyBias.currentTermsCount()
+    }
 }
 
 class SolApplication : Application() {
@@ -217,6 +238,22 @@ class SolApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.DEBUG) {
+            StrictMode.setThreadPolicy(
+                StrictMode.ThreadPolicy.Builder()
+                    .detectAll()
+                    .penaltyLog()
+                    .build()
+            )
+            StrictMode.setVmPolicy(
+                StrictMode.VmPolicy.Builder()
+                    .detectLeakedSqlLiteObjects()
+                    .detectLeakedClosableObjects()
+                    .detectActivityLeaks()
+                    .penaltyLog()
+                    .build()
+            )
+        }
         SolNotificationHelper.ensureChannels(this)
         container = SolAppContainer(this)
     }

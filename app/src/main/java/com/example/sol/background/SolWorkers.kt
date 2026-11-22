@@ -189,8 +189,9 @@ class BookFetchWorker(
                         sourceUrl = book.sourceUrl,
                     )
                 )
-                app.container.bookRagEngine.indexBookContent(bookId, book.title, book.fullText)
-                val msg = "کتاب «${book.title}» اثر ${book.author} ذخیره و برای جست‌وجوی BM25 نمایه‌سازی شد."
+                val outcome = app.container.bookRagEngine.indexBookContentWithNotice(bookId, book.title, book.fullText)
+                val noticeSuffix = if (outcome.wasTruncated) "\n${outcome.userNoticeFa}" else ""
+                val msg = "کتاب «${book.title}» اثر ${book.author} ذخیره و به ${outcome.chunksCount} بخش برای جست‌وجوی BM25 نمایه‌سازی شد.$noticeSuffix"
                 SolNotificationHelper.postNotification(
                     context = applicationContext,
                     channelId = SolNotificationHelper.CHANNEL_BACKGROUND,

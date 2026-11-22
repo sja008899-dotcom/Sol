@@ -18,11 +18,12 @@ import com.example.BuildConfig
         SolRoleEntity::class,
         BackgroundJobLogEntity::class,
         BookChunkEntity::class,
+        BookChunkFtsEntity::class,
         ScheduledAlarmEntity::class,
         UserUtteranceExampleEntity::class,
         NoteTodoEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class MemoryDatabase : RoomDatabase() {
@@ -208,7 +209,35 @@ abstract class MemoryDatabase : RoomDatabase() {
             }
         }
 
-        internal val ALL_MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+        internal val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE VIRTUAL TABLE IF NOT EXISTS `book_chunks_fts` USING FTS4(`bookTitle` TEXT NOT NULL, `contentText` TEXT NOT NULL, `normalizedTokens` TEXT NOT NULL, content=`book_chunks`)"
+                )
+                db.execSQL(
+                    "CREATE TRIGGER IF NOT EXISTS `room_fts_content_sync_book_chunks_fts_BEFORE_UPDATE` BEFORE UPDATE ON `book_chunks` BEGIN DELETE FROM `book_chunks_fts` WHERE `docid`=OLD.`rowid`; END"
+                )
+                db.execSQL(
+                    "CREATE TRIGGER IF NOT EXISTS `room_fts_content_sync_book_chunks_fts_BEFORE_DELETE` BEFORE DELETE ON `book_chunks` BEGIN DELETE FROM `book_chunks_fts` WHERE `docid`=OLD.`rowid`; END"
+                )
+                db.execSQL(
+                    "CREATE TRIGGER IF NOT EXISTS `room_fts_content_sync_book_chunks_fts_AFTER_UPDATE` AFTER UPDATE ON `book_chunks` BEGIN INSERT INTO `book_chunks_fts`(`docid`, `bookTitle`, `contentText`, `normalizedTokens`) VALUES (NEW.`rowid`, NEW.`bookTitle`, NEW.`contentText`, NEW.`normalizedTokens`); END"
+                )
+                db.execSQL(
+                    "CREATE TRIGGER IF NOT EXISTS `room_fts_content_sync_book_chunks_fts_AFTER_INSERT` AFTER INSERT ON `book_chunks` BEGIN INSERT INTO `book_chunks_fts`(`docid`, `bookTitle`, `contentText`, `normalizedTokens`) VALUES (NEW.`rowid`, NEW.`bookTitle`, NEW.`contentText`, NEW.`normalizedTokens`); END"
+                )
+                db.execSQL("INSERT INTO `book_chunks_fts`(`book_chunks_fts`) VALUES('rebuild')")
+            }
+        }
+
+        internal val ALL_MIGRATIONS = arrayOf(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+        )
 
         internal fun buildDatabase(
             context: Context,

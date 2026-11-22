@@ -1,16 +1,80 @@
 package com.example.sol.brain
 
 import com.example.sol.memory.LocationRepository
+import com.example.sol.memory.MemoryFactEntity
 import com.example.sol.memory.MemoryRepository
 import com.example.sol.memory.PersianNormalizer
 import com.example.sol.memory.PersonEntity
 import com.example.sol.memory.PersonRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class LearningEngine(
     private val memoryRepository: MemoryRepository,
     private val personRepository: PersonRepository,
     private val locationRepository: LocationRepository,
+    scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) {
+    private data class CachedAlias(
+        val rawAlias: String,
+        val normalizedAlias: String,
+        val meaning: String,
+    )
+
+    @Volatile
+    private var cachedAliases: List<CachedAlias>? = null
+
+    @Volatile
+    private var cachedPersons: List<Pair<PersonEntity, String>>? = null
+
+    init {
+        scope.launch {
+            memoryRepository.allMemories.collectLatest { items ->
+                cachedAliases = buildAliasCache(items)
+            }
+        }
+        scope.launch {
+            personRepository.allPersons.collectLatest { persons ->
+                cachedPersons = buildPersonCache(persons)
+            }
+        }
+    }
+
+    fun invalidateCache() {
+        cachedAliases = null
+        cachedPersons = null
+    }
+
+    private fun buildAliasCache(items: List<MemoryFactEntity>): List<CachedAlias> =
+        items.asSequence()
+            .filter { it.kind == "alias" }
+            .mapNotNull { item ->
+                val raw = item.keyText.removePrefix("alias:").trim()
+                val norm = PersianNormalizer.normalize(raw)
+                if (raw.isBlank() || norm.isBlank()) null
+                else CachedAlias(rawAlias = raw, normalizedAlias = norm, meaning = item.valueText)
+            }
+            .sortedByDescending { it.rawAlias.length }
+            .toList()
+
+    private fun buildPersonCache(persons: List<PersonEntity>): List<Pair<PersonEntity, String>> =
+        persons.map { person ->
+            person to PersianNormalizer.normalize(person.name)
+        }
+
+    private suspend fun getAliasesCached(): List<CachedAlias> {
+        cachedAliases?.let { return it }
+        return buildAliasCache(memoryRepository.getAllOnce()).also { cachedAliases = it }
+    }
+
+    private suspend fun getPersonsCached(): List<Pair<PersonEntity, String>> {
+        cachedPersons?.let { return it }
+        return buildPersonCache(personRepository.getAllOnce()).also { cachedPersons = it }
+    }
+
     suspend fun teachAlias(alias: String, meaning: String): String {
         val cleanAlias = alias.trim()
         val cleanMeaning = meaning.trim()
@@ -24,6 +88,7 @@ class LearningEngine(
         if (norm in setOf("دفتر", "شرکت", "خانه", "خونه", "منزل", "کارگاه", "مغازه")) {
             locationRepository.saveLocation(alias = cleanAlias, fullName = cleanMeaning)
         }
+        cachedAliases = buildAliasCache(memoryRepository.getAllOnce())
         return "یاد گرفتم. از این به بعد هر وقت بگویی «$cleanAlias»، منظورم «$cleanMeaning» است."
     }
 
@@ -42,6 +107,7 @@ class LearningEngine(
             phone = phone,
             relation = relation,
         )
+        cachedPersons = buildPersonCache(personRepository.getAllOnce())
         val relLabel = if (relation.isNotBlank()) " ($relation)" else ""
         return "اطلاعات $name$relLabel با شماره $phone در حافظهٔ اشخاص Sol ذخیره شد."
     }
@@ -53,7 +119,10 @@ class LearningEngine(
 
     suspend fun forget(target: String): String {
         val deletedAlias = memoryRepository.forgetByKey("alias:$target")
-        if (deletedAlias) return "قانون «$target» از حافظه حذف شد."
+        if (deletedAlias) {
+            cachedAliases = null
+            return "قانون «$target» از حافظه حذف شد."
+        }
         val all = memoryRepository.getAllOnce()
         val normTarget = PersianNormalizer.normalize(target)
         val match = all.firstOrNull {
@@ -61,6 +130,7 @@ class LearningEngine(
                 PersianNormalizer.normalize(it.keyText).contains(normTarget)
         }
         return if (match != null && memoryRepository.forgetById(match.id)) {
+            cachedAliases = null
             "مورد «${match.valueText}» از حافظه حذف شد."
         } else {
             "این عبارت را در حافظه پیدا نکردم."
@@ -69,22 +139,22 @@ class LearningEngine(
 
     suspend fun findMatchingPersonHint(normQuery: String): PersonEntity? {
         if (normQuery.isBlank()) return null
-        val persons = personRepository.getAllOnce()
-        return persons.firstOrNull { p ->
-            val pNorm = PersianNormalizer.normalize(p.name)
+        val persons = getPersonsCached()
+        return persons.firstOrNull { (_, pNorm) ->
             pNorm.length >= 2 && normQuery.contains(pNorm)
-        }
+        }?.first
     }
 
     suspend fun resolveAliasesInText(input: String): Pair<String, List<Pair<String, String>>> {
-        val all = memoryRepository.getAllOnce().filter { it.kind == "alias" }
+        val aliases = getAliasesCached()
+        if (aliases.isEmpty()) return input to emptyList()
+        val normInput = PersianNormalizer.normalize(input)
         var resolved = input
         val matched = mutableListOf<Pair<String, String>>()
-        for (item in all) {
-            val alias = item.keyText.removePrefix("alias:")
-            if (alias.isNotBlank() && PersianNormalizer.normalize(input).contains(PersianNormalizer.normalize(alias))) {
-                matched.add(alias to item.valueText)
-                resolved = resolved.replace(alias, item.valueText)
+        for (entry in aliases) {
+            if (normInput.contains(entry.normalizedAlias)) {
+                matched.add(entry.rawAlias to entry.meaning)
+                resolved = resolved.replace(entry.rawAlias, entry.meaning)
             }
         }
         return resolved to matched

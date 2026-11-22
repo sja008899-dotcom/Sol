@@ -49,9 +49,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.R
 import com.example.sol.brain.HybridNluEngine
 import com.example.sol.brain.SolAction
 import com.example.sol.memory.BookKnowledgeEntity
@@ -89,7 +94,12 @@ fun MemoryScreen(
     modifier: Modifier = Modifier,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("قوانین و نکات", "اشخاص", "مکان‌ها", "کتاب‌ها و نقش‌ها")
+    val tabs = listOf(
+        stringResource(R.string.memory_tab_rules),
+        stringResource(R.string.memory_tab_persons),
+        stringResource(R.string.memory_tab_locations),
+        stringResource(R.string.memory_tab_books),
+    )
 
     var showAddDialog by remember { mutableStateOf(false) }
     var editingMemory by remember { mutableStateOf<MemoryFactEntity?>(null) }
@@ -107,7 +117,7 @@ fun MemoryScreen(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ) {
-                Icon(Icons.Default.Add, contentDescription = "افزودن به حافظه")
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_add_memory))
             }
         },
     ) { innerPadding ->
@@ -118,12 +128,13 @@ fun MemoryScreen(
         ) {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 Text(
-                    text = "حافظهٔ شخصی Sol",
+                    text = stringResource(R.string.memory_title),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.semantics { heading() },
                 )
                 Text(
-                    text = "تمام اطلاعات، کتاب‌ها و نقش‌های صوتی محلی هستند و هر زمان قابل مشاهده و حذف‌اند.",
+                    text = stringResource(R.string.memory_subtitle),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -144,8 +155,8 @@ fun MemoryScreen(
                     if (memories.isEmpty() && userExamples.isEmpty()) {
                         EmptyMemoryState(
                             icon = Icons.Default.Psychology,
-                            title = "هنوز قانونی یا نکته‌ای ذخیره نشده",
-                            subtitle = "دکمه + را بزنید یا بگویید: «هر وقت می‌گم دفتر منظورم شرکت ... است»",
+                            title = stringResource(R.string.memory_empty_rules_title),
+                            subtitle = stringResource(R.string.memory_empty_rules_sub),
                         )
                     } else {
                         LazyColumn(
@@ -153,11 +164,12 @@ fun MemoryScreen(
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             if (userExamples.isNotEmpty()) {
-                                item {
+                                item(key = "header_user_examples") {
                                     Text(
-                                        text = "عبارت‌های آموخته‌شدهٔ فرمان‌ها (کلیک «فراموش کن» برای حذف):",
+                                        text = stringResource(R.string.memory_user_examples_header),
                                         style = MaterialTheme.typography.titleSmall,
                                         color = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.semantics { heading() },
                                     )
                                 }
                                 items(userExamples, key = { "uex_${it.id}" }) { ex ->
@@ -178,7 +190,7 @@ fun MemoryScreen(
                                         ) {
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = "آموزش نیت: $actionLabel",
+                                                    text = stringResource(R.string.memory_user_example_intent_fmt, actionLabel),
                                                     style = MaterialTheme.typography.labelMedium,
                                                     color = MaterialTheme.colorScheme.secondary,
                                                 )
@@ -190,9 +202,11 @@ fun MemoryScreen(
                                             }
                                             OutlinedButton(
                                                 onClick = { onDeleteUserExample(ex.id) },
-                                                modifier = Modifier.testTag("forget_user_example_${ex.id}"),
+                                                modifier = Modifier
+                                                    .heightIn(min = 48.dp)
+                                                    .testTag("forget_user_example_${ex.id}"),
                                             ) {
-                                                Text("فراموش کن")
+                                                Text(stringResource(R.string.action_forget))
                                             }
                                         }
                                     }
@@ -216,11 +230,11 @@ fun MemoryScreen(
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 text = if (isAlias) {
-                                                    "مترادف: «${item.keyText.removePrefix("alias:")}»"
+                                                    stringResource(R.string.memory_kind_alias_fmt, item.keyText.removePrefix("alias:"))
                                                 } else if (item.kind == "instruction") {
-                                                    "دستورالعمل نقش"
+                                                    stringResource(R.string.memory_kind_instruction)
                                                 } else {
-                                                    "نکتهٔ شخصی"
+                                                    stringResource(R.string.memory_kind_fact)
                                                 },
                                                 style = MaterialTheme.typography.labelMedium,
                                                 color = if (isAlias) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary,
@@ -231,13 +245,19 @@ fun MemoryScreen(
                                                 style = MaterialTheme.typography.bodyLarge,
                                             )
                                         }
-                                        IconButton(onClick = { editingMemory = item }) {
-                                            Icon(Icons.Default.Edit, contentDescription = "ویرایش")
+                                        IconButton(
+                                            onClick = { editingMemory = item },
+                                            modifier = Modifier.size(48.dp),
+                                        ) {
+                                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.action_edit))
                                         }
-                                        IconButton(onClick = { onDeleteMemory(item.id) }) {
+                                        IconButton(
+                                            onClick = { onDeleteMemory(item.id) },
+                                            modifier = Modifier.size(48.dp),
+                                        ) {
                                             Icon(
                                                 Icons.Default.Delete,
-                                                contentDescription = "حذف",
+                                                contentDescription = stringResource(R.string.action_delete),
                                                 tint = MaterialTheme.colorScheme.error,
                                             )
                                         }
@@ -252,8 +272,8 @@ fun MemoryScreen(
                     if (persons.isEmpty()) {
                         EmptyMemoryState(
                             icon = Icons.Default.Person,
-                            title = "شخصی در حافظهٔ Sol ثبت نشده",
-                            subtitle = "می‌توانید اشخاص، شماره و نحوهٔ معرفی Sol را اینجا اضافه کنید.",
+                            title = stringResource(R.string.memory_empty_persons_title),
+                            subtitle = stringResource(R.string.memory_empty_persons_sub),
                         )
                     } else {
                         LazyColumn(
@@ -281,26 +301,32 @@ fun MemoryScreen(
                                             )
                                             if (person.phone.isNotBlank()) {
                                                 Text(
-                                                    text = "شماره: ${person.phone}",
+                                                    text = stringResource(R.string.memory_person_phone_fmt, person.phone),
                                                     style = MaterialTheme.typography.bodyMedium,
                                                     color = MaterialTheme.colorScheme.primary,
                                                 )
                                             }
                                             if (person.callScriptNote.isNotBlank()) {
                                                 Text(
-                                                    text = "دستور ویژه تماس: ${person.callScriptNote}",
+                                                    text = stringResource(R.string.memory_person_script_fmt, person.callScriptNote),
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 )
                                             }
                                         }
-                                        IconButton(onClick = { editingPerson = person }) {
-                                            Icon(Icons.Default.Edit, contentDescription = "ویرایش شخص")
+                                        IconButton(
+                                            onClick = { editingPerson = person },
+                                            modifier = Modifier.size(48.dp),
+                                        ) {
+                                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.cd_edit_person))
                                         }
-                                        IconButton(onClick = { onDeletePerson(person.id) }) {
+                                        IconButton(
+                                            onClick = { onDeletePerson(person.id) },
+                                            modifier = Modifier.size(48.dp),
+                                        ) {
                                             Icon(
                                                 Icons.Default.Delete,
-                                                contentDescription = "حذف شخص",
+                                                contentDescription = stringResource(R.string.cd_delete_person),
                                                 tint = MaterialTheme.colorScheme.error,
                                             )
                                         }
@@ -316,7 +342,7 @@ fun MemoryScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        item {
+                        item(key = "header_confirmed_location") {
                             Card(
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.4f),
@@ -336,11 +362,11 @@ fun MemoryScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column {
                                         Text(
-                                            text = "موقعیت فعلی تأییدشده (جدا از مکان‌های ذخیره‌شده):",
+                                            text = stringResource(R.string.memory_location_current_header),
                                             style = MaterialTheme.typography.labelMedium,
                                         )
                                         Text(
-                                            text = confirmedCurrentLocation.ifBlank { "هنوز ثبت نشده است" },
+                                            text = confirmedCurrentLocation.ifBlank { stringResource(R.string.memory_location_not_set) },
                                             style = MaterialTheme.typography.titleMedium,
                                         )
                                     }
@@ -349,11 +375,11 @@ fun MemoryScreen(
                         }
 
                         if (locations.isEmpty()) {
-                            item {
+                            item(key = "empty_locations") {
                                 EmptyMemoryState(
                                     icon = Icons.Default.LocationOn,
-                                    title = "مکانی ذخیره نشده است",
-                                    subtitle = "دکمه + را بزنید تا مکان‌هایی مثل شرکت یا خانه را ثبت کنید.",
+                                    title = stringResource(R.string.memory_empty_locations_title),
+                                    subtitle = stringResource(R.string.memory_empty_locations_sub),
                                 )
                             }
                         } else {
@@ -383,13 +409,19 @@ fun MemoryScreen(
                                                 )
                                             }
                                         }
-                                        IconButton(onClick = { editingLocation = loc }) {
-                                            Icon(Icons.Default.Edit, contentDescription = "ویرایش مکان")
+                                        IconButton(
+                                            onClick = { editingLocation = loc },
+                                            modifier = Modifier.size(48.dp),
+                                        ) {
+                                            Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.cd_edit_location))
                                         }
-                                        IconButton(onClick = { onDeleteLocation(loc.id) }) {
+                                        IconButton(
+                                            onClick = { onDeleteLocation(loc.id) },
+                                            modifier = Modifier.size(48.dp),
+                                        ) {
                                             Icon(
                                                 Icons.Default.Delete,
-                                                contentDescription = "حذف مکان",
+                                                contentDescription = stringResource(R.string.cd_delete_location),
                                                 tint = MaterialTheme.colorScheme.error,
                                             )
                                         }
@@ -405,23 +437,26 @@ fun MemoryScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        item {
+                        item(key = "header_book_studio_btn") {
                             Button(
                                 onClick = onOpenBookRoleStudio,
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp),
                             ) {
                                 Icon(Icons.Default.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("دریافت کتاب از اینترنت یا فایل و آموزش نقش صوتی")
+                                Text(stringResource(R.string.memory_book_studio_btn))
                             }
                         }
 
                         if (roles.isNotEmpty()) {
-                            item {
+                            item(key = "header_roles_section") {
                                 Text(
-                                    text = "نقش‌های آموخته‌شده Sol:",
+                                    text = stringResource(R.string.memory_roles_header),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.semantics { heading() },
                                 )
                             }
                             items(roles, key = { "role_${it.id}" }) { role ->
@@ -447,17 +482,20 @@ fun MemoryScreen(
                                                 checked = role.isActive,
                                                 onCheckedChange = { onToggleRoleActive(role, it) },
                                             )
-                                            IconButton(onClick = { onDeleteRole(role.id) }) {
+                                            IconButton(
+                                                onClick = { onDeleteRole(role.id) },
+                                                modifier = Modifier.size(48.dp),
+                                            ) {
                                                 Icon(
                                                     Icons.Default.Delete,
-                                                    contentDescription = "حذف نقش",
+                                                    contentDescription = stringResource(R.string.cd_delete_role),
                                                     tint = MaterialTheme.colorScheme.error,
                                                 )
                                             }
                                         }
                                         if (role.linkedBookTitle.isNotBlank()) {
                                             Text(
-                                                text = "مبتنی بر کتاب: ${role.linkedBookTitle}",
+                                                text = stringResource(R.string.memory_role_book_fmt, role.linkedBookTitle),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = MaterialTheme.colorScheme.tertiary,
                                             )
@@ -472,19 +510,20 @@ fun MemoryScreen(
                         }
 
                         if (books.isEmpty() && roles.isEmpty()) {
-                            item {
+                            item(key = "empty_books_roles") {
                                 EmptyMemoryState(
                                     icon = Icons.Default.MenuBook,
-                                    title = "هنوز کتاب یا نقشی آموزش داده نشده",
-                                    subtitle = "دکمه بالا را بزنید تا Sol کتابی را پیدا کند و با توضیحات صوتی شما به حافظه و نقشش اضافه کند.",
+                                    title = stringResource(R.string.memory_empty_books_title),
+                                    subtitle = stringResource(R.string.memory_empty_books_sub),
                                 )
                             }
                         } else if (books.isNotEmpty()) {
-                            item {
+                            item(key = "header_books_section") {
                                 Text(
-                                    text = "کتاب‌های ذخیره‌شده:",
+                                    text = stringResource(R.string.memory_books_header),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.semantics { heading() },
                                 )
                             }
                             items(books, key = { "book_${it.id}" }) { book ->
@@ -512,15 +551,22 @@ fun MemoryScreen(
                                                     color = MaterialTheme.colorScheme.secondary,
                                                 )
                                             }
-                                            IconButton(onClick = {
-                                                onSpeakBook("${book.title}. ${book.summaryText}")
-                                            }) {
-                                                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "روخوانی خلاصه کتاب")
+                                            IconButton(
+                                                onClick = { onSpeakBook("${book.title}. ${book.summaryText}") },
+                                                modifier = Modifier.size(48.dp),
+                                            ) {
+                                                Icon(
+                                                    Icons.AutoMirrored.Filled.VolumeUp,
+                                                    contentDescription = stringResource(R.string.cd_speak_book_summary),
+                                                )
                                             }
-                                            IconButton(onClick = { onDeleteBook(book.id) }) {
+                                            IconButton(
+                                                onClick = { onDeleteBook(book.id) },
+                                                modifier = Modifier.size(48.dp),
+                                            ) {
                                                 Icon(
                                                     Icons.Default.Delete,
-                                                    contentDescription = "حذف کتاب",
+                                                    contentDescription = stringResource(R.string.cd_delete_book),
                                                     tint = MaterialTheme.colorScheme.error,
                                                 )
                                             }
@@ -539,10 +585,13 @@ fun MemoryScreen(
                                             )
                                         }
                                         Spacer(modifier = Modifier.height(8.dp))
-                                        OutlinedButton(onClick = { onTeachVoiceForBook(book) }) {
+                                        OutlinedButton(
+                                            onClick = { onTeachVoiceForBook(book) },
+                                            modifier = Modifier.heightIn(min = 48.dp),
+                                        ) {
                                             Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
-                                            Text("افزودن توضیح صوتی / نقش جدید")
+                                            Text(stringResource(R.string.memory_book_add_voice_note))
                                         }
                                     }
                                 }
@@ -578,23 +627,34 @@ fun MemoryScreen(
         var text by remember(item.id) { mutableStateOf(item.valueText) }
         AlertDialog(
             onDismissRequest = { editingMemory = null },
-            title = { Text("ویرایش حافظه") },
+            title = {
+                Text(
+                    text = stringResource(R.string.memory_edit_title),
+                    modifier = Modifier.semantics { heading() },
+                )
+            },
             text = {
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
-                    label = { Text("مقدار ذخیره‌شده") },
+                    label = { Text(stringResource(R.string.memory_edit_label)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             },
             confirmButton = {
-                Button(onClick = {
-                    onUpdateMemory(item, text)
-                    editingMemory = null
-                }) { Text("ذخیره") }
+                Button(
+                    onClick = {
+                        onUpdateMemory(item, text)
+                        editingMemory = null
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.action_save)) }
             },
             dismissButton = {
-                TextButton(onClick = { editingMemory = null }) { Text("لغو") }
+                TextButton(
+                    onClick = { editingMemory = null },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.action_cancel)) }
             },
         )
     }

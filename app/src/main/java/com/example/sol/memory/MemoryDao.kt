@@ -121,12 +121,44 @@ interface MemoryDao {
     @Query("DELETE FROM background_logs")
     suspend fun clearBackgroundLogs()
 
-    // --- Book Chunks (BM25 Offline RAG) ---
+    // --- Book Chunks (FTS4 + BM25 Offline RAG) ---
     @Query("SELECT * FROM book_chunks ORDER BY bookId ASC, chunkIndex ASC")
     suspend fun getAllBookChunksOnce(): List<BookChunkEntity>
 
+    @Query("SELECT DISTINCT bookId FROM book_chunks")
+    suspend fun getIndexedBookIdsOnce(): List<Long>
+
+    @Query("SELECT COUNT(*) FROM book_chunks")
+    suspend fun getChunkCountOnce(): Int
+
     @Query("SELECT * FROM book_chunks WHERE bookId = :bookId ORDER BY chunkIndex ASC")
     suspend fun getChunksForBookOnce(bookId: Long): List<BookChunkEntity>
+
+    @Query(
+        """
+        SELECT book_chunks.* FROM book_chunks
+        JOIN book_chunks_fts ON book_chunks.id = book_chunks_fts.rowid
+        WHERE book_chunks_fts MATCH :ftsQuery
+        LIMIT :limit
+        """
+    )
+    suspend fun searchBookChunksFts(ftsQuery: String, limit: Int = 24): List<BookChunkEntity>
+
+    @Query(
+        """
+        SELECT * FROM book_chunks
+        WHERE normalizedTokens LIKE '%' || :term || '%' OR contentText LIKE '%' || :term || '%' OR bookTitle LIKE '%' || :term || '%'
+        ORDER BY id DESC
+        LIMIT :limit
+        """
+    )
+    suspend fun searchBookChunksLikeFallback(term: String, limit: Int = 16): List<BookChunkEntity>
+
+    @Query("SELECT * FROM book_chunks WHERE bookTitle = :bookTitle ORDER BY chunkIndex ASC LIMIT :limit")
+    suspend fun getChunksForBookTitleLimit(bookTitle: String, limit: Int = 12): List<BookChunkEntity>
+
+    @Query("SELECT * FROM book_chunks ORDER BY id DESC LIMIT :limit")
+    suspend fun getRecentChunksLimit(limit: Int = 12): List<BookChunkEntity>
 
     @Query("SELECT COUNT(*) FROM book_chunks")
     fun observeChunkCount(): Flow<Int>

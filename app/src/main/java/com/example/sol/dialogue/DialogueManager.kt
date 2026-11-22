@@ -35,6 +35,9 @@ class DialogueManager(
     @Volatile
     private var lastSolReply: String = ""
 
+    @Volatile
+    private var lastExecutedCommand: ParsedCommand? = null
+
     fun currentPendingState(): PendingDialogueState? = pendingState
 
     fun getRecentTurns(): List<DialogueTurn> = recentTurns.toList()
@@ -47,6 +50,7 @@ class DialogueManager(
         recentTurns.clear()
         pendingState = null
         lastSolReply = ""
+        lastExecutedCommand = null
     }
 
     suspend fun handleTurn(rawInput: String): DialogueResult {
@@ -65,10 +69,14 @@ class DialogueManager(
             )
         }
 
-        // 2. Explicit intent teaching correction ("نه، منظورم ... بود")
-        val teachingCorrection = parseTeachingCorrection(cleanInput, normInput)
-        if (teachingCorrection != null) {
-            return handleTeachingCorrection(rawInput, normInput, teachingCorrection)
+        // 2. Mid-conversation slot/utterance correction OR intent teaching correction ("نه، منظورم ... بود" / "اشتباه گفتم ...")
+        val correctionPayload = parseTeachingCorrection(cleanInput, normInput)
+        if (correctionPayload != null) {
+            val midCorrection = tryMidConversationSlotCorrection(rawInput, cleanInput, normInput, correctionPayload)
+            if (midCorrection != null) {
+                return midCorrection
+            }
+            return handleTeachingCorrection(rawInput, normInput, correctionPayload)
         }
 
         // 3. Cancellation check ("نه / بیخیال / لغو")
@@ -159,8 +167,22 @@ class DialogueManager(
             }
         }
 
-        // 5. Fresh NLU turn with Confidence Gate
-        return when (val decision = hybridNlu.evaluate(rawInput)) {
+        // 5. N4 Multi-command extraction from a single compound utterance (when no pending dialogue blocks it)
+        val multiResult = tryExecuteCompoundCommands(rawInput, cleanInput)
+        if (multiResult != null) {
+            return multiResult
+        }
+
+        // 6. Fresh NLU turn with Confidence Gate
+        return executeSingleDecision(rawInput, normInput, hybridNlu.evaluate(rawInput))
+    }
+
+    private suspend fun executeSingleDecision(
+        rawInput: String,
+        normInput: String,
+        decision: NluDecision,
+    ): DialogueResult {
+        return when (decision) {
             is NluDecision.ClarifyTopTwo -> {
                 val labelsPrompt = buildString {
                     append("مطمئن نیستم دقیقاً کدام کار را می‌خواهید؛ لطفاً انتخاب کنید:\n")
@@ -207,6 +229,197 @@ class DialogueManager(
                 )
             }
         }
+    }
+
+    private suspend fun tryExecuteCompoundCommands(
+        rawInput: String,
+        cleanInput: String,
+    ): DialogueResult? {
+        val clauses = splitCompoundCommands(cleanInput)
+        if (clauses.size < 2) return null
+
+        // Do not shatter utterances that natively represent a single compound action (M1-M6)
+        val wholeDecision = hybridNlu.evaluate(cleanInput)
+        if (wholeDecision is NluDecision.Execute) {
+            val act = wholeDecision.command.action
+            if (act == SolAction.MULTI_STEP_NOTIFY || act == SolAction.WEB_BOOK_LEARN_ROLE || act == SolAction.CALCULATOR) {
+                return null
+            }
+        }
+
+        // Verify at least 2 clauses independently evaluate cleanly to actionable non-UNKNOWN intents
+        val subDecisions = clauses.map { clause -> clause to hybridNlu.evaluate(clause) }
+        val validCount = subDecisions.count { (_, d) ->
+            d is NluDecision.Execute && d.command.action != SolAction.UNKNOWN
+        }
+        if (validCount < 2) return null
+
+        val collectedReplies = ArrayList<String>(clauses.size)
+        var lastResult: DialogueResult? = null
+        var gatedPendingTask: PendingSolTask? = null
+        var gatedChoices: List<DialogueUiChoice> = emptyList()
+
+        for ((idx, pair) in subDecisions.withIndex()) {
+            val (clause, dec) = pair
+            if (dec !is NluDecision.Execute || dec.command.action == SolAction.UNKNOWN) continue
+            val normClause = PersianTextNormalizer.normalizeForMatching(clause)
+            val res = executeSingleDecision(clause, normClause, dec)
+            lastResult = res
+            val stepLabel = toPersianDigit(idx + 1)
+            if (res.replyText.isNotBlank()) {
+                collectedReplies.add("$stepLabel) ${res.replyText}")
+            }
+            if (pendingState != null || res.pendingTask != null) {
+                gatedPendingTask = res.pendingTask
+                gatedChoices = res.actionChoices
+                if (idx < subDecisions.lastIndex) {
+                    collectedReplies.add("⏸ پیش از ادامهٔ فرمان‌های بعدی، لطفاً این مورد را تأیید یا تکمیل کنید.")
+                }
+                break
+            }
+        }
+
+        val finalRes = lastResult ?: return null
+        val combinedReply = collectedReplies.joinToString("\n")
+        if (combinedReply.isNotBlank()) {
+            lastSolReply = combinedReply
+        }
+        return finalRes.copy(
+            replyText = combinedReply,
+            pendingTask = gatedPendingTask,
+            actionChoices = gatedChoices,
+        )
+    }
+
+    private suspend fun tryMidConversationSlotCorrection(
+        rawInput: String,
+        cleanInput: String,
+        normInput: String,
+        correctionText: String,
+    ): DialogueResult? {
+        val currentPending = pendingState
+        // Keep AwaitingIntentClarification reserved for teaching intent classes
+        if (currentPending is PendingDialogueState.AwaitingIntentClarification) return null
+
+        val replaceMatch = SUBSTITUTE_CORRECTION_REGEX.find(cleanInput)
+        val baseCmd: ParsedCommand? = when (currentPending) {
+            is PendingDialogueState.MissingSlot -> currentPending.partialCommand
+            is PendingDialogueState.AwaitingConfirmation -> currentPending.command
+            is PendingDialogueState.AwaitingContactChoice -> currentPending.partialCommand
+            null -> lastExecutedCommand
+            else -> null
+        }
+
+        // If user says "اشتباه گفتم چراغ قوه رو خاموش کن" (a full replacement command)
+        val standaloneDecision = hybridNlu.evaluate(correctionText)
+        if (standaloneDecision is NluDecision.Execute &&
+            standaloneDecision.command.action != SolAction.UNKNOWN &&
+            standaloneDecision.confidence == com.example.sol.brain.ConfidenceLevel.HIGH &&
+            replaceMatch == null
+        ) {
+            pendingState = null
+            val res = proceedAfterSlotsReady(standaloneDecision.command)
+            return res.copy(replyText = "اصلاح شد ⟵ ${res.replyText}")
+        }
+
+        if (baseCmd == null) return null
+
+        // Substitution syntax: "به جای X بگو Y"
+        if (replaceMatch != null) {
+            val oldPart = replaceMatch.groupValues[1].trim()
+            val newPart = replaceMatch.groupValues[2].trim()
+            if (oldPart.isNotBlank() && newPart.isNotBlank()) {
+                val rewrittenRaw = baseCmd.rawText.replace(oldPart, newPart)
+                pendingState = null
+                val reDec = hybridNlu.evaluate(rewrittenRaw)
+                if (reDec is NluDecision.Execute && reDec.command.action != SolAction.UNKNOWN) {
+                    val res = proceedAfterSlotsReady(reDec.command)
+                    return res.copy(replyText = "اصلاح شد ⟵ ${res.replyText}")
+                }
+                val patched = baseCmd.copy(
+                    contact = if (baseCmd.contact?.contains(oldPart) == true) newPart else baseCmd.contact,
+                    message = if (baseCmd.message?.contains(oldPart) == true) baseCmd.message.replace(oldPart, newPart) else baseCmd.message,
+                    searchQuery = if (baseCmd.searchQuery?.contains(oldPart) == true) baseCmd.searchQuery.replace(oldPart, newPart) else baseCmd.searchQuery,
+                    rawText = rewrittenRaw,
+                )
+                val res = proceedAfterSlotsReady(patched)
+                return res.copy(replyText = "اصلاح شد ⟵ ${res.replyText}")
+            }
+        }
+
+        // Time / date slot correction on a prior or pending schedule/timer command
+        if (baseCmd.action == SolAction.SCHEDULE_REMINDER ||
+            baseCmd.action == SolAction.CREATE_CALENDAR_EVENT ||
+            baseCmd.action == SolAction.TIMER_STOPWATCH
+        ) {
+            val parsedSlot = JalaliCalendar.parseDateTimeSlot(correctionText)
+                ?: JalaliCalendar.parsePersianDateTimeCommand("یادآوری کن $correctionText ${baseCmd.message.orEmpty()}")
+            if (parsedSlot != null) {
+                pendingState = null
+                val msg = baseCmd.message?.takeIf { it.isNotBlank() } ?: parsedSlot.reminderMessage
+                val updated = baseCmd.copy(
+                    jalaliSchedule = parsedSlot.copy(reminderMessage = msg),
+                    message = msg,
+                    hasExplicitTimeSlot = true,
+                    rawText = "${baseCmd.rawText} [اصلاح: $correctionText]",
+                )
+                val res = proceedAfterSlotsReady(updated)
+                return res.copy(replyText = "اصلاح زمان انجام شد ⟵ ${res.replyText}")
+            }
+            val spokenMin = PersianNumbers.parseSpokenDurationMinutes(correctionText)
+                ?: Regex("(\\d+)\\s*(?:دقیقه|ساعت)").find(PersianNumbers.replaceWordNumbersWithDigits(correctionText))?.let { m ->
+                    val q = m.groupValues[1].toLongOrNull() ?: 1L
+                    if (correctionText.contains("ساعت")) q * 60L else q
+                }
+            if (spokenMin != null) {
+                pendingState = null
+                val updated = baseCmd.copy(
+                    delayMinutes = spokenMin.coerceAtLeast(1L),
+                    jalaliSchedule = null,
+                    hasExplicitTimeSlot = true,
+                    rawText = "${baseCmd.rawText} [اصلاح: $correctionText]",
+                )
+                val res = proceedAfterSlotsReady(updated)
+                return res.copy(replyText = "اصلاح زمان انجام شد ⟵ ${res.replyText}")
+            }
+        }
+
+        // Contact / message / searchQuery slot correction on prior or pending command
+        val normCorrection = PersianTextNormalizer.normalizeForMatching(correctionText)
+        val intentKeywordAction = HybridNluEngine.resolveIntentFromUserText(correctionText)
+        val isPureIntentTeaching = currentPending == null &&
+            intentKeywordAction != null &&
+            normCorrection.split(' ').size <= 2
+
+        if (!isPureIntentTeaching) {
+            when (baseCmd.action) {
+                SolAction.CALL, SolAction.SEND_SMS, SolAction.MULTI_STEP_NOTIFY -> {
+                    pendingState = null
+                    val updated = if (correctionText.startsWith("متن") || correctionText.startsWith("پیام")) {
+                        val cleanedBody = correctionText.replace(Regex("^(?:متن(?:ش)?|پیام(?:ش)?)(?:\\s+(?:بشه|باشه|رو بگو|بگو|بنویس))?\\s*"), "").trim()
+                        baseCmd.copy(message = cleanedBody.ifBlank { correctionText })
+                    } else {
+                        val phoneRes = extractor.extractValidatedPhone(correctionText)
+                        val cleanTarget = correctionText.replace(Regex("^(?:به|با|برای)\\s+"), "").trim()
+                        baseCmd.copy(
+                            contact = phoneRes?.takeIf { it.isValid }?.e164 ?: cleanTarget,
+                            phone = phoneRes?.takeIf { it.isValid }?.e164 ?: baseCmd.phone,
+                        )
+                    }
+                    val res = proceedAfterSlotsReady(updated)
+                    return res.copy(replyText = "اصلاح شد ⟵ ${res.replyText}")
+                }
+                SolAction.SEARCH_WEB -> {
+                    pendingState = null
+                    val updated = baseCmd.copy(searchQuery = correctionText.trim())
+                    val res = proceedAfterSlotsReady(updated)
+                    return res.copy(replyText = "اصلاح شد ⟵ ${res.replyText}")
+                }
+                else -> Unit
+            }
+        }
+
+        return null
     }
 
     /**
@@ -663,6 +876,9 @@ class DialogueManager(
         if (replyText.isNotBlank()) {
             lastSolReply = replyText
         }
+        if (command.action != SolAction.UNKNOWN) {
+            lastExecutedCommand = command
+        }
         return DialogueResult(
             replyText = replyText,
             parsedCommand = command,
@@ -717,13 +933,27 @@ class DialogueManager(
     }
 
     private fun parseTeachingCorrection(clean: String, norm: String): String? {
-        val m = Regex("(?:نه[,،]?\\s*)?(?:منظورم|قصدم|میخواستم)\\s+(.+?)(?:\\s+(?:بود|هست|است))?$").find(clean)
+        val m = CORRECTION_EXTRACT_REGEX.find(clean)
         val extracted = m?.groupValues?.getOrNull(1)?.trim()
         if (!extracted.isNullOrBlank()) return extracted
-        if (norm.startsWith("منظورم ") || norm.startsWith("نه منظورم ")) {
-            return norm.removePrefix("نه ").removePrefix("منظورم ").removeSuffix(" بود").trim().takeIf { it.isNotBlank() }
+        if (norm.startsWith("منظورم ") || norm.startsWith("نه منظورم ") || norm.startsWith("اشتباه گفتم ")) {
+            return norm
+                .removePrefix("نه ")
+                .removePrefix("اشتباه گفتم ")
+                .removePrefix("منظورم ")
+                .removeSuffix(" بود")
+                .trim()
+                .takeIf { it.isNotBlank() }
         }
         return null
+    }
+
+    internal fun splitCompoundCommands(cleanInput: String): List<String> {
+        if (cleanInput.isBlank()) return emptyList()
+        return COMPOUND_SPLIT_REGEX.split(cleanInput)
+            .map { it.trim().trim('،', ',', '.', '؛', ';') }
+            .filter { it.length >= 3 }
+            .take(4)
     }
 
     private fun isRepeatPhrase(norm: String): Boolean {
@@ -806,5 +1036,14 @@ class DialogueManager(
 
     companion object {
         const val MAX_TURNS = 5
+        private val CORRECTION_EXTRACT_REGEX = Regex(
+            "(?:نه[,،]?\\s*)?(?:ببخشید\\s+)?(?:اشتباه گفتم|اشتباه شد|منظورم|قصدم|میخواستم|اصلاح کن|عوض کن)[:،\\s]+(.+?)(?:\\s+(?:بود|هست|است|بذار|بگذار|باشه))?$"
+        )
+        private val SUBSTITUTE_CORRECTION_REGEX = Regex(
+            "به\\s*جای\\s+(.+?)\\s+(?:بگو|بذار|بگذار|بنویس|انتخاب کن)\\s+(.+)$"
+        )
+        private val COMPOUND_SPLIT_REGEX = Regex(
+            "(?:\\s*[؛;]\\s*|\\s+(?:و\\s+)?(?:بعدش|سپس)\\s+|\\s+و\\s+بعد\\s+(?!نتیجه)|\\s+و\\s+(?=(?:یادآور|یادآوری|یادم بنداز|آلارم|چراغ|فلاش|تایمر|کرنومتر|کرونومتر|صدای|ولوم|وای\\s*فای|وایفای|بلوتوث|دیتا|تنظیمات|برنامه|یادداشت|لیست|موزیک|موسیقی|ماشین|حافظه|جستجوی|سرچ|با\\s+.+?\\s+تماس|به\\s+.+?\\s+پیام)))"
+        )
     }
 }

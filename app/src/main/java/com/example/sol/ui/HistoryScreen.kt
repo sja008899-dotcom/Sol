@@ -44,9 +44,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.R
 import com.example.sol.memory.HistoryEntity
 import com.example.sol.memory.HistoryRetentionMode
 import java.text.SimpleDateFormat
@@ -73,11 +78,14 @@ fun HistoryScreen(
     if (showWipeConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showWipeConfirmDialog = false },
-            title = { Text("پاک‌کردن کامل داده‌های Sol") },
-            text = {
+            title = {
                 Text(
-                    "آیا مطمئن هستید؟ تمامی حافظه‌ها، مخاطبین ذخیره‌شده در Sol، مکان‌ها، کتاب‌ها، نقش‌ها، یادآورها، سوابق و تنظیمات برنامه به صورت دائمی پاک می‌شوند."
+                    text = stringResource(R.string.history_wipe_dialog_title),
+                    modifier = Modifier.semantics { heading() },
                 )
+            },
+            text = {
+                Text(stringResource(R.string.history_wipe_dialog_body))
             },
             confirmButton = {
                 TextButton(
@@ -85,14 +93,19 @@ fun HistoryScreen(
                         showWipeConfirmDialog = false
                         onDeleteAllData()
                     },
-                    modifier = Modifier.testTag("confirm_delete_everything_button"),
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("confirm_delete_everything_button"),
                 ) {
-                    Text("بله، همه‌چیز پاک شود", color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.history_wipe_dialog_confirm), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showWipeConfirmDialog = false }) {
-                    Text("انصراف")
+                TextButton(
+                    onClick = { showWipeConfirmDialog = false },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
+                    Text(stringResource(R.string.action_dismiss))
                 }
             },
         )
@@ -108,18 +121,22 @@ fun HistoryScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "سوابق و حریم خصوصی",
+                    text = stringResource(R.string.history_title),
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.semantics { heading() },
                 )
                 Text(
-                    text = "گزارش فرمان‌ها، حالت خصوصی و سیاست نگهداری",
+                    text = stringResource(R.string.history_subtitle),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (history.isNotEmpty()) {
-                TextButton(onClick = onClearAll) {
+                TextButton(
+                    onClick = onClearAll,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) {
                     Icon(
                         imageVector = Icons.Default.DeleteSweep,
                         contentDescription = null,
@@ -127,7 +144,7 @@ fun HistoryScreen(
                         modifier = Modifier.size(18.dp),
                     )
                     Text(
-                        text = "پاک کردن سوابق",
+                        text = stringResource(R.string.history_clear_all),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.labelMedium,
                     )
@@ -166,12 +183,12 @@ fun HistoryScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "حالت خصوصی (بدون ثبت سابقه)",
+                                text = stringResource(R.string.history_private_title),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                text = "در این حالت فرمان‌ها و پاسخ‌ها در جدول سوابق ذخیره نمی‌شوند.",
+                                text = stringResource(R.string.history_private_sub),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -185,7 +202,7 @@ fun HistoryScreen(
                 }
 
                 Text(
-                    text = "سیاست نگهداری خودکار سوابق:",
+                    text = stringResource(R.string.history_retention_label),
                     style = MaterialTheme.typography.labelMedium,
                 )
                 FlowRow(
@@ -210,6 +227,7 @@ fun HistoryScreen(
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = 48.dp)
                         .testTag("delete_everything_button"),
                 ) {
                     Icon(
@@ -218,7 +236,7 @@ fun HistoryScreen(
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("پاک‌کردن یک‌ضرب همه‌چیز و داده‌های Sol")
+                    Text(stringResource(R.string.history_wipe_all_btn))
                 }
             }
         }
@@ -242,9 +260,9 @@ fun HistoryScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = if (privateModeEnabled) {
-                        "حالت خصوصی فعال است — سابقه‌ای ثبت نمی‌شود"
+                        stringResource(R.string.history_empty_private)
                     } else {
-                        "هنوز سابقه‌ای ثبت نشده است"
+                        stringResource(R.string.history_empty_normal)
                     },
                     style = MaterialTheme.typography.titleMedium,
                 )
@@ -284,17 +302,23 @@ fun HistoryScreen(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
-                                    IconButton(onClick = { onSpeakText(entry.solText) }) {
+                                    IconButton(
+                                        onClick = { onSpeakText(entry.solText) },
+                                        modifier = Modifier.size(48.dp),
+                                    ) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                                            contentDescription = "پخش صوتی",
+                                            contentDescription = stringResource(R.string.cd_speak_audio),
                                             modifier = Modifier.size(18.dp),
                                         )
                                     }
-                                    IconButton(onClick = { onDeleteItem(entry.id) }) {
+                                    IconButton(
+                                        onClick = { onDeleteItem(entry.id) },
+                                        modifier = Modifier.size(48.dp),
+                                    ) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
-                                            contentDescription = "حذف سابقه",
+                                            contentDescription = stringResource(R.string.cd_delete_history_item),
                                             tint = MaterialTheme.colorScheme.error,
                                             modifier = Modifier.size(18.dp),
                                         )

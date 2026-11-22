@@ -20,6 +20,12 @@ data class RagConsultationResult(
     val activeRole: SolRoleEntity?,
 )
 
+data class BookIndexOutcome(
+    val chunksCount: Int,
+    val wasTruncated: Boolean,
+    val userNoticeFa: String,
+)
+
 class BookRagEngine(
     private val knowledgeRepository: KnowledgeRepository,
 ) {
@@ -30,12 +36,8 @@ class BookRagEngine(
         "the", "and", "of", "to", "in", "a", "is", "it", "for", "on", "that", "with", "as",
     )
 
-    // Lightweight in-memory IDF cache evicted on onTrimMemory for 4GB RAM devices
-    @Volatile
-    private var cachedChunks: List<BookChunkEntity>? = null
-
     fun evictCache() {
-        cachedChunks = null
+        // Retrieval now streams directly through Room FTS4 without holding book_chunks in RAM.
     }
 
     fun tokenize(text: String): List<String> {
@@ -48,19 +50,42 @@ class BookRagEngine(
             .toList()
     }
 
+    fun buildFtsMatchQuery(tokens: List<String>): String {
+        val sanitized = tokens
+            .map { token ->
+                token.replace(Regex("[^\\p{L}\\p{N}_]"), "").trim()
+            }
+            .filter { it.length >= 2 }
+            .distinct()
+            .take(8)
+        if (sanitized.isEmpty()) return ""
+        return sanitized.joinToString(" OR ") { "$it*" }
+    }
+
     fun chunkText(
         bookId: Long,
         bookTitle: String,
         fullText: String,
         maxChars: Int = 480,
         overlapChars: Int = 80,
-    ): List<BookChunkEntity> {
-        val cleaned = fullText
+    ): List<BookChunkEntity> = chunkTextWithCap(bookId, bookTitle, fullText, maxChars, overlapChars).first
+
+    private fun chunkTextWithCap(
+        bookId: Long,
+        bookTitle: String,
+        fullText: String,
+        maxChars: Int = 480,
+        overlapChars: Int = 80,
+    ): Pair<List<BookChunkEntity>, Boolean> {
+        val rawCleaned = fullText
             .replace("\r\n", "\n")
             .replace(Regex("[ \\t]+"), " ")
             .replace(Regex("\\n{3,}"), "\n\n")
             .trim()
-        if (cleaned.isBlank()) return emptyList()
+        if (rawCleaned.isBlank()) return emptyList<BookChunkEntity>() to false
+
+        var truncated = rawCleaned.length > MAX_BOOK_CHARS
+        val cleaned = if (truncated) rawCleaned.take(MAX_BOOK_CHARS) else rawCleaned
 
         val result = mutableListOf<BookChunkEntity>()
         var start = 0
@@ -68,7 +93,7 @@ class BookRagEngine(
         val safeMax = maxChars.coerceAtLeast(180)
         val safeOverlap = overlapChars.coerceIn(0, safeMax / 3)
 
-        while (start < cleaned.length && index < 600) {
+        while (start < cleaned.length && index < MAX_CHUNKS_PER_BOOK) {
             var end = (start + safeMax).coerceAtMost(cleaned.length)
             if (end < cleaned.length) {
                 val sentenceBreak = cleaned.lastIndexOfAny(charArrayOf('.', '؟', '!', '۔', '\n'), end)
@@ -97,24 +122,37 @@ class BookRagEngine(
             val nextStart = (end - safeOverlap).coerceAtLeast(start + 1)
             start = nextStart
         }
-        return result
-    }
-
-    suspend fun indexBookContent(bookId: Long, bookTitle: String, fullText: String): Int {
-        val chunks = chunkText(bookId, bookTitle, fullText)
-        knowledgeRepository.replaceChunksForBook(bookId, chunks)
-        cachedChunks = null
-        return chunks.size
-    }
-
-    suspend fun ensureChunksIndexed(books: List<BookKnowledgeEntity>): List<BookChunkEntity> {
-        val existing = cachedChunks ?: knowledgeRepository.getAllChunksOnce().also {
-            cachedChunks = it
+        if (start < cleaned.length && index >= MAX_CHUNKS_PER_BOOK) {
+            truncated = true
         }
-        if (books.isEmpty()) return existing
+        return result to truncated
+    }
 
-        val existingBookIds = existing.map { it.bookId }.toSet()
-        var addedAny = false
+    suspend fun indexBookContentWithNotice(
+        bookId: Long,
+        bookTitle: String,
+        fullText: String,
+    ): BookIndexOutcome {
+        val (chunks, wasTruncated) = chunkTextWithCap(bookId, bookTitle, fullText)
+        knowledgeRepository.replaceChunksForBook(bookId, chunks)
+        val notice = if (wasTruncated) {
+            "⚠️ متن این منبع طولانی بود؛ برای حفظ سرعت و RAM گوشی ۴ گیگابایتی، تا سقف $MAX_CHUNKS_PER_BOOK بخش (${MAX_BOOK_CHARS / 1000} هزار نویسه) نمایه‌سازی شد."
+        } else {
+            ""
+        }
+        return BookIndexOutcome(
+            chunksCount = chunks.size,
+            wasTruncated = wasTruncated,
+            userNoticeFa = notice,
+        )
+    }
+
+    suspend fun indexBookContent(bookId: Long, bookTitle: String, fullText: String): Int =
+        indexBookContentWithNotice(bookId, bookTitle, fullText).chunksCount
+
+    suspend fun ensureMissingBookChunksIndexed(books: List<BookKnowledgeEntity>) {
+        if (books.isEmpty()) return
+        val existingBookIds = knowledgeRepository.getIndexedBookIdsOnce()
         for (book in books) {
             if (book.id !in existingBookIds) {
                 val combined = buildString {
@@ -124,18 +162,51 @@ class BookRagEngine(
                         append(book.voiceNotes)
                     }
                 }
-                val chunks = chunkText(book.id, book.title, combined)
+                val (chunks, _) = chunkTextWithCap(book.id, book.title, combined)
                 if (chunks.isNotEmpty()) {
                     knowledgeRepository.replaceChunksForBook(book.id, chunks)
-                    addedAny = true
                 }
             }
         }
-        return if (addedAny) {
-            knowledgeRepository.getAllChunksOnce().also { cachedChunks = it }
-        } else {
-            existing
+    }
+
+    suspend fun fetchTopCandidateChunks(
+        query: String,
+        preferredBookTitle: String = "",
+        limit: Int = 24,
+    ): List<BookChunkEntity> {
+        val queryTokens = tokenize(query).distinct()
+        val ftsQuery = buildFtsMatchQuery(queryTokens)
+        val candidates = LinkedHashMap<Long, BookChunkEntity>()
+
+        if (ftsQuery.isNotBlank()) {
+            val ftsHits = runCatching {
+                knowledgeRepository.searchBookChunksFts(ftsQuery, limit = limit)
+            }.getOrDefault(emptyList())
+            ftsHits.forEach { candidates[it.id] = it }
         }
+
+        // Bounded LIKE fallback if FTS4 returns few/no rows (e.g., morphological prefix/suffix differences)
+        if (candidates.size < 6) {
+            for (term in queryTokens.take(3)) {
+                val fallbackHits = runCatching {
+                    knowledgeRepository.searchBookChunksLikeFallback(term, limit = 8)
+                }.getOrDefault(emptyList())
+                fallbackHits.forEach { candidates.putIfAbsent(it.id, it) }
+                if (candidates.size >= limit) break
+            }
+        }
+
+        if (candidates.isEmpty() && preferredBookTitle.isNotBlank()) {
+            knowledgeRepository.getChunksForBookTitleLimit(preferredBookTitle, limit = 8)
+                .forEach { candidates.putIfAbsent(it.id, it) }
+        }
+        if (candidates.isEmpty()) {
+            knowledgeRepository.getRecentChunksLimit(limit = 8)
+                .forEach { candidates.putIfAbsent(it.id, it) }
+        }
+
+        return candidates.values.take(limit)
     }
 
     fun rankChunksBm25(
@@ -219,13 +290,14 @@ class BookRagEngine(
             )
         }
 
-        val chunks = ensureChunksIndexed(books)
+        ensureMissingBookChunksIndexed(books)
         val normQuery = PersianNormalizer.normalize(query)
         val explicitBook = books.firstOrNull {
             normQuery.contains(PersianNormalizer.normalize(it.title))
         }
         val preferredTitle = explicitBook?.title ?: activeRole?.linkedBookTitle.orEmpty()
-        val ranked = rankChunksBm25(query, chunks, preferredTitle, topK = 3)
+        val candidateChunks = fetchTopCandidateChunks(query, preferredTitle, limit = FTS_CANDIDATE_LIMIT)
+        val ranked = rankChunksBm25(query, candidateChunks, preferredTitle, topK = 3)
 
         val referencedBook = explicitBook
             ?: ranked.firstOrNull()?.let { hit -> books.firstOrNull { it.id == hit.chunk.bookId } }
@@ -241,7 +313,7 @@ class BookRagEngine(
             }
 
             if (ranked.isNotEmpty()) {
-                append("🔎 نتایج جست‌وجوی مستقیم از کتاب‌ها (BM25):\n")
+                append("🔎 نتایج جست‌وجوی مستقیم از کتاب‌ها (FTS4 + BM25):\n")
                 ranked.forEachIndexed { idx, hit ->
                     val scoreStr = String.format(java.util.Locale.US, "%.2f", hit.score)
                     append("${idx + 1}) از «${hit.chunk.bookTitle}» [بخش ${hit.chunk.chunkIndex + 1} • امتیاز $scoreStr]:\n")
@@ -266,5 +338,11 @@ class BookRagEngine(
             referencedBook = referencedBook,
             activeRole = activeRole,
         )
+    }
+
+    companion object {
+        const val MAX_BOOK_CHARS = 350_000
+        const val MAX_CHUNKS_PER_BOOK = 300
+        private const val FTS_CANDIDATE_LIMIT = 24
     }
 }

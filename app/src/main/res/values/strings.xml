@@ -7,10 +7,220 @@
     <string name="nav_history">سوابق</string>
     <string name="nav_settings">تنظیمات</string>
     <string name="command_hint">فرمانت را به فارسی بنویس یا بگو…</string>
+    <string name="command_input_placeholder">فرمانت را به فارسی بنویس…</string>
     <string name="send_command">ارسال فرمان</string>
     <string name="speak_with_sol">صحبت با Sol</string>
     <string name="stop_listening">توقف شنود</string>
     <string name="offline_badge">کاملاً آفلاین • بدون اینترنت</string>
     <string name="qs_tile_label">صحبت با Sol</string>
     <string name="widget_description">دسترسی سریع به میکروفون Sol، موقعیت فعلی تأییدشده و نقش فعال</string>
+
+    <!-- Common Actions & Labels -->
+    <string name="action_cancel">لغو</string>
+    <string name="action_dismiss">انصراف</string>
+    <string name="action_close">بستن</string>
+    <string name="action_save">ذخیره</string>
+    <string name="action_edit">ویرایش</string>
+    <string name="action_delete">حذف</string>
+    <string name="action_confirm">تأیید</string>
+    <string name="action_back">بازگشت</string>
+    <string name="action_try">امتحان</string>
+    <string name="action_register">ثبت</string>
+    <string name="action_clear">پاک کردن</string>
+    <string name="action_cleanup">پاکسازی</string>
+    <string name="action_forget">فراموش کن</string>
+    <string name="action_grant_permission">مجوز</string>
+    <string name="action_enable">فعال‌سازی</string>
+    <string name="action_retry">تلاش مجدد</string>
+    <string name="speaker_user_label">شما</string>
+    <string name="speaker_sol_label">Sol</string>
+    <string name="cd_mic_button">دکمه میکروفون</string>
+    <string name="cd_battery_status">باتری</string>
+    <string name="cd_current_location">موقعیت فعلی</string>
+    <string name="cd_speak_sol_reply">پخش صوتی پاسخ Sol</string>
+    <string name="cd_speak_audio">پخش صوتی</string>
+    <string name="cd_wake_word">بیدارباش صوتی Sol</string>
+    <string name="cd_private_mode_active">حالت خصوصی فعال</string>
+    <string name="cd_security_confirm">تأیید امنیتی Sol</string>
+    <string name="cd_voice_confirm">تأیید صوتی</string>
+
+    <!-- Permissions & Snackbars -->
+    <string name="mic_permission_denied_msg">مجوز میکروفون رد شد؛ می‌توانید فرمان را تایپ کنید.</string>
+    <string name="contacts_permission_denied_msg">دسترسی به مخاطبین داده نشد؛ مخاطبین حافظه Sol همچنان فعال هستند.</string>
+
+    <!-- Home Screen -->
+    <string name="home_brand_title">S O L  v2</string>
+    <string name="home_default_subtitle">دستیار شخصی فارسی • آفلاین و مستقل</string>
+    <string name="home_active_role_fmt">نقش فعال: %1$s</string>
+    <string name="home_hero_art_cd">پس‌زمینه هنری Sol</string>
+    <string name="home_capabilities_button_fmt">%1$d قابلیت و پس‌زمینه</string>
+    <string name="home_book_role_button">کتاب (PDF/EPUB) و نقش</string>
+    <string name="home_confirmed_location_fmt">موقعیت فعلی تأییدشده: %1$s</string>
+    <string name="home_unconfirmed_location">موقعیت فعلی ثبت‌نشده (برای تأیید دستی بزنید)</string>
+    <string name="home_wake_waiting">منتظر «Sol»…</string>
+    <string name="home_wake_idle">بیدارباش «Sol»</string>
+    <string name="home_wake_fg_only">فقط در اپ باز</string>
+    <string name="home_stop_cancel_listening">توقف / لغو شنود</string>
+    <string name="home_backend_vosk">Vosk ۱۰۰٪ آفلاین</string>
+    <string name="home_backend_system">گفتار سیستم</string>
+    <string name="home_listening_prompt_fmt">در حال شنیدن فارسی (%1$s)…</string>
+    <string name="home_wake_armed_fmt">گوش‌به‌زنگ «Sol» فقط هنگام باز بودن برنامه • توقف خودکار پس از %1$d دقیقه سکوت</string>
+    <string name="home_processing_speech">در حال پردازش گفتار…</string>
+    <string name="home_sol_speaking">Sol در حال صحبت است…</string>
+    <string name="home_voice_idle_fmt">موتور صوتی: %1$s • برای فرمان صوتی دایره را لمس کنید</string>
+    <string name="home_stop_sound">توقف صدا</string>
+    <string name="home_tts_missing_guide">صدای فارسی نصب نیست؛ برای پاسخ صوتی در تنظیمات صدای گوشی SherpaTTS یا داده فارسی را فعال کنید.</string>
+    <string name="home_sound_settings">تنظیمات صدا</string>
+    <string name="home_online_asr_warning">تشخیص گفتار سیستم (ممکن است از اینترنت استفاده کند — برای ۱۰۰٪ آفلاین Vosk را نصب کنید)</string>
+    <string name="home_private_mode_badge">حالت خصوصی</string>
+    <string name="home_slm_writing">هوش آفلاین در حال نگارش پاسخ…</string>
+    <string name="home_slm_stop">توقف تولید</string>
+    <string name="home_slm_ready_fmt">SLM آماده (%1$s)</string>
+    <string name="home_slm_new_chat">گفت‌وگوی تازه</string>
+
+    <!-- Dialogs (SolComponents) -->
+    <string name="dialog_internet_book_title">تأیید اتصال اختیاری به اینترنت</string>
+    <string name="dialog_internet_book_body">این عملیات از اینترنت استفاده می‌کند. طبق قانون امنیتی Sol، اتصال به اینترنت فقط با تأیید شما برای جست‌وجو در ویکی‌پدیا فارسی، کتابخانه‌های عمومی (Gutendex / Open Library) یا خواندن لینک وب انجام می‌شود.</string>
+    <string name="dialog_internet_book_query_label">موضوع، نام کتاب یا لینک وب (URL)</string>
+    <string name="dialog_internet_book_query_hint">مثلاً: هوش مصنوعی، Atomic Habits یا https://...</string>
+    <string name="dialog_internet_book_role_label">نقش پیشنهادی برای Sol (اختیاری)</string>
+    <string name="dialog_internet_book_role_hint">مثلاً: مربی بهره‌وری و عادت‌های روزانه</string>
+    <string name="dialog_internet_book_bg_check">دریافت در پس‌زمینه (WorkManager) با اعلان</string>
+    <string name="dialog_internet_book_pick_local">انتخاب فایل PDF / EPUB / HTML / TXT از گوشی</string>
+    <string name="dialog_internet_book_btn_bg">زمان‌بندی در پس‌زمینه</string>
+    <string name="dialog_internet_book_btn_fg">تأیید و دریافت</string>
+
+    <string name="dialog_web_search_title">تأیید جست‌وجوی وب</string>
+    <string name="dialog_web_search_body">این عملیات از اینترنت استفاده می‌کند. بدون تأیید شما هیچ درخواستی به اینترنت ارسال نمی‌شود.</string>
+    <string name="dialog_web_search_label">عبارت جست‌وجو در وب</string>
+    <string name="dialog_web_search_hint">مثلاً: آموزش کاتلین آفلاین</string>
+    <string name="dialog_web_search_confirm">تأیید و جست‌وجو</string>
+
+    <string name="dialog_voice_role_title">آموزش نقش و حافظه با صدای شما</string>
+    <string name="dialog_voice_role_book_fmt">کتاب ذخیره‌شده: %1$s</string>
+    <string name="dialog_voice_role_author_fmt">نویسنده: %1$s</string>
+    <string name="dialog_voice_role_name_label">نام نقش جدید Sol</string>
+    <string name="dialog_voice_role_listening">در حال شنود توضیح صوتی شما… (توقف)</string>
+    <string name="dialog_voice_role_start">بیان توضیح صوتی شما درباره کتاب و نقش</string>
+    <string name="dialog_voice_role_notes_label">توضیحات صوتی / متنی شما برای Sol</string>
+    <string name="dialog_voice_role_notes_hint">مثلاً: بر اساس این کتاب، هر روز صبح برنامه کاری من را اولویت‌بندی کن…</string>
+    <string name="dialog_voice_role_save">ذخیره در حافظه و فعال‌سازی نقش</string>
+
+    <string name="dialog_comm_title">تأیید عملیات ارتباطی</string>
+    <string name="dialog_comm_talkback_desc">پنجره تأیید تماس یا پیامک؛ بدون لمس دکمه تأیید هیچ تماسی برقرار نمی‌شود.</string>
+    <string name="dialog_comm_voice_listening">در حال شنود: بگویید «تأیید» یا «لغو»…</string>
+    <string name="dialog_comm_voice_prompt">تأیید یا لغو صوتی (برای گفتن «تأیید» / «لغو» بزنید)</string>
+    <string name="dialog_comm_selected_contact">مخاطب انتخاب‌شده:</string>
+    <string name="dialog_comm_relation_fmt">نسبت: %1$s</string>
+    <string name="dialog_comm_multi_candidates">چند مخاطب پیدا شد؛ در صورت نیاز تغییر دهید:</string>
+    <string name="dialog_comm_channel_dialer">شماره‌گیر تماس</string>
+    <string name="dialog_comm_channel_sms">پیامک متنی</string>
+    <string name="dialog_comm_sms_label">متن پیام با معرفی شفاف Sol</string>
+    <string name="dialog_comm_btn_call">تأیید و باز کردن شماره‌گیر</string>
+    <string name="dialog_comm_btn_sms">تأیید و ارسال در پیامک</string>
+    <string name="cd_dismiss_task_report">بستن گزارش مراحل</string>
+
+    <string name="dialog_backup_export_title">رمزگذاری فایل پشتیبان (.solbackup)</string>
+    <string name="dialog_backup_import_title">رمزگشایی و بازیابی (.solbackup)</string>
+    <string name="dialog_backup_export_body">کل حافظه، مترادف‌ها، مخاطبین، کتاب‌ها (همراه بخش‌های BM25)، نقش‌ها و تنظیمات به‌صورت جریانی با PBKDF2-600k و AES-256-GCM (فرمت V3) رمزنگاری می‌شوند.</string>
+    <string name="dialog_backup_import_body">رمز فایل پشتیبان را وارد کنید تا داده‌های رمزدار پس از اعتبارسنجی کامل روی این گوشی بازیابی شوند.</string>
+    <string name="dialog_backup_pw_export_label">رمز عبور پشتیبان (حداقل ۸ کاراکتر)</string>
+    <string name="dialog_backup_pw_import_label">رمز عبور پشتیبان</string>
+    <string name="dialog_backup_replace_check">جایگزینی کامل به جای ادغام با حافظه فعلی</string>
+    <string name="dialog_backup_confirm_check">تأیید می‌کنم فایل پشتیبان در حافظه Sol بازیابی شود</string>
+    <string name="dialog_backup_btn_export">رمزنگاری و ذخیره</string>
+    <string name="dialog_backup_btn_import">رمزگشایی و بازیابی</string>
+
+    <string name="dialog_location_title">تأیید موقعیت فعلی</string>
+    <string name="dialog_location_body">موقعیت فعلی فقط با تأیید دستی شما ثبت می‌شود و با مکان‌های ذخیره‌شده اشتباه گرفته نمی‌شود.</string>
+    <string name="dialog_location_label">الان کجا هستید؟</string>
+    <string name="dialog_location_hint">مثلاً: شرکت کارنو صنعت ماکیان</string>
+    <string name="dialog_location_saved">مکان‌های ذخیره‌شده:</string>
+    <string name="dialog_location_save">ثبت موقعیت فعلی</string>
+
+    <!-- Memory Screen -->
+    <string name="memory_title">حافظهٔ شخصی Sol</string>
+    <string name="memory_subtitle">تمام اطلاعات، کتاب‌ها و نقش‌های صوتی محلی هستند و هر زمان قابل مشاهده و حذف‌اند.</string>
+    <string name="cd_add_memory">افزودن به حافظه</string>
+    <string name="memory_tab_rules">قوانین و نکات</string>
+    <string name="memory_tab_persons">اشخاص</string>
+    <string name="memory_tab_locations">مکان‌ها</string>
+    <string name="memory_tab_books">کتاب‌ها و نقش‌ها</string>
+    <string name="memory_empty_rules_title">هنوز قانونی یا نکته‌ای ذخیره نشده</string>
+    <string name="memory_empty_rules_sub">دکمه + را بزنید یا بگویید: «هر وقت می‌گم دفتر منظورم شرکت ... است»</string>
+    <string name="memory_user_examples_header">عبارت‌های آموخته‌شدهٔ فرمان‌ها (کلیک «فراموش کن» برای حذف):</string>
+    <string name="memory_user_example_intent_fmt">آموزش نیت: %1$s</string>
+    <string name="memory_kind_alias_fmt">مترادف: «%1$s»</string>
+    <string name="memory_kind_instruction">دستورالعمل نقش</string>
+    <string name="memory_kind_fact">نکتهٔ شخصی</string>
+    <string name="memory_empty_persons_title">شخصی در حافظهٔ Sol ثبت نشده</string>
+    <string name="memory_empty_persons_sub">می‌توانید اشخاص، شماره و نحوهٔ معرفی Sol را اینجا اضافه کنید.</string>
+    <string name="memory_person_phone_fmt">شماره: %1$s</string>
+    <string name="memory_person_script_fmt">دستور ویژه تماس: %1$s</string>
+    <string name="cd_edit_person">ویرایش شخص</string>
+    <string name="cd_delete_person">حذف شخص</string>
+    <string name="memory_location_current_header">موقعیت فعلی تأییدشده (جدا از مکان‌های ذخیره‌شده):</string>
+    <string name="memory_location_not_set">هنوز ثبت نشده است</string>
+    <string name="memory_empty_locations_title">مکانی ذخیره نشده است</string>
+    <string name="memory_empty_locations_sub">دکمه + را بزنید تا مکان‌هایی مثل شرکت یا خانه را ثبت کنید.</string>
+    <string name="cd_edit_location">ویرایش مکان</string>
+    <string name="cd_delete_location">حذف مکان</string>
+    <string name="memory_book_studio_btn">دریافت کتاب از اینترنت یا فایل و آموزش نقش صوتی</string>
+    <string name="memory_roles_header">نقش‌های آموخته‌شده Sol:</string>
+    <string name="cd_delete_role">حذف نقش</string>
+    <string name="memory_role_book_fmt">مبتنی بر کتاب: %1$s</string>
+    <string name="memory_empty_books_title">هنوز کتاب یا نقشی آموزش داده نشده</string>
+    <string name="memory_empty_books_sub">دکمه بالا را بزنید تا Sol کتابی را پیدا کند و با توضیحات صوتی شما به حافظه و نقشش اضافه کند.</string>
+    <string name="memory_books_header">کتاب‌های ذخیره‌شده:</string>
+    <string name="cd_speak_book_summary">روخوانی خلاصه کتاب</string>
+    <string name="cd_delete_book">حذف کتاب</string>
+    <string name="memory_book_add_voice_note">افزودن توضیح صوتی / نقش جدید</string>
+    <string name="memory_edit_title">ویرایش حافظه</string>
+    <string name="memory_edit_label">مقدار ذخیره‌شده</string>
+
+    <!-- Contacts Screen -->
+    <string name="contacts_title">مدیریت مخاطبین</string>
+    <string name="contacts_subtitle">تماس و پیامک فقط پس از نمایش شماره و تأیید شما اجرا می‌شود.</string>
+    <string name="contacts_perm_card_title">دسترسی به دفترچه تلفن گوشی</string>
+    <string name="contacts_perm_card_sub">برای جست‌وجوی مخاطبین گوشی اجازه دسترسی بدهید؛ یا اشخاص را در حافظه Sol ثبت کنید.</string>
+    <string name="contacts_search_hint">جست‌وجوی نام یا شماره…</string>
+    <string name="contacts_empty">مخاطبی پیدا نشد</string>
+    <string name="contacts_no_phone">بدون شماره</string>
+    <string name="cd_save_contact_memory">ذخیره در حافظه Sol</string>
+    <string name="cd_sms_with_confirm">پیامک با تأیید</string>
+    <string name="cd_call_with_confirm">تماس با تأیید</string>
+
+    <!-- History Screen -->
+    <string name="history_title">سوابق و حریم خصوصی</string>
+    <string name="history_subtitle">گزارش فرمان‌ها، حالت خصوصی و سیاست نگهداری</string>
+    <string name="history_clear_all">پاک کردن سوابق</string>
+    <string name="history_private_title">حالت خصوصی (بدون ثبت سابقه)</string>
+    <string name="history_private_sub">در این حالت فرمان‌ها و پاسخ‌ها در جدول سوابق ذخیره نمی‌شوند.</string>
+    <string name="history_retention_label">سیاست نگهداری خودکار سوابق:</string>
+    <string name="history_wipe_all_btn">پاک‌کردن یک‌ضرب همه‌چیز و داده‌های Sol</string>
+    <string name="history_wipe_dialog_title">پاک‌کردن کامل داده‌های Sol</string>
+    <string name="history_wipe_dialog_body">آیا مطمئن هستید؟ تمامی حافظه‌ها، مخاطبین ذخیره‌شده در Sol، مکان‌ها، کتاب‌ها، نقش‌ها، یادآورها، سوابق و تنظیمات برنامه به صورت دائمی پاک می‌شوند.</string>
+    <string name="history_wipe_dialog_confirm">بله، همه‌چیز پاک شود</string>
+    <string name="history_empty_private">حالت خصوصی فعال است — سابقه‌ای ثبت نمی‌شود</string>
+    <string name="history_empty_normal">هنوز سابقه‌ای ثبت نشده است</string>
+    <string name="cd_delete_history_item">حذف سابقه</string>
+
+    <!-- Capabilities Screen -->
+    <string name="capabilities_banner_cd">بنر قابلیت‌های Sol</string>
+    <string name="capabilities_title_fmt">%1$d قابلیت واقعی و پس‌زمینه Sol</string>
+    <string name="capabilities_subtitle_fmt">%1$d اجرای پس‌زمینه • %2$d آموزش کتاب و نقش صوتی • %3$d مهارت و ابزار آفلاین</string>
+    <string name="capabilities_notif_prompt">برای نمایش اعلان‌های پس‌زمینه مجوز اعلان را فعال کنید.</string>
+    <string name="capabilities_logs_header">گزارش زندهٔ کارهای پس‌زمینه</string>
+    <string name="capabilities_logs_empty">هنوز کار پس‌زمینه‌ای اجرا نشده است؛ یکی از گزینه‌های بالا را امتحان کنید.</string>
+    <string name="capabilities_run_now">اجرای فوری</string>
+    <string name="capabilities_try_command">فرمان صوتی/متنی</string>
+
+    <!-- Settings & Reliability Navigation -->
+    <string name="settings_title">تنظیمات Sol v2 و بهینه‌سازی گوشی</string>
+    <string name="settings_subtitle">گفتار آفلاین Vosk، تقویم شمسی و AlarmManager، هوش BM25، ویجت و نوار بالا، پشتیبان رمزدار و مدیریت ۴ گیگابایت RAM</string>
+    <string name="settings_reliability_btn">بررسی پایداری، باتری سامسونگ و تست یادآور</string>
+    <string name="settings_reliability_card_title">پایداری پس‌زمینه و راهنمای One UI Core (سامسونگ)</string>
+    <string name="settings_reliability_card_sub">بررسی بهینه‌سازی باتری، مجوز هشدار دقیق، آخرین یادآور تحویل‌داده‌شده، وضعیت RAM/فضای دیسک و تست ۱ دقیقه‌ای.</string>
+    <string name="reliability_title">پایداری پس‌زمینه و بهینه‌سازی دستگاه</string>
+    <string name="reliability_subtitle">تضمین اجرای دقیق یادآورها و کنترل حافظه روی گوشی‌های ۴ گیگابایتی اندروید ۱۲+</string>
 </resources>

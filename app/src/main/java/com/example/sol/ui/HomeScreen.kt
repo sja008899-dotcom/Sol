@@ -7,12 +7,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -67,6 +70,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -96,6 +102,7 @@ private val QUICK_COMMANDS = listOf(
     "وضعیت شرکت را به علی اطلاع بده و بعد نتیجه را به من گزارش کن",
 )
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HomeScreen(
     capabilitiesCount: Int,
@@ -156,10 +163,13 @@ fun HomeScreen(
         }
     }
 
+    val activeRoleLabel = remember(activeRoles) { activeRoles.firstOrNull()?.roleName }
+    val savedLocationSuggestions = remember(savedLocations) { savedLocations.map { it.fullName } }
+
     if (showLocationDialog) {
         ConfirmCurrentLocationDialog(
             currentLocation = preferences.confirmedCurrentLocation,
-            savedLocationSuggestions = savedLocations.map { it.fullName },
+            savedLocationSuggestions = savedLocationSuggestions,
             onSave = onConfirmCurrentLocation,
             onDismiss = { showLocationDialog = false },
         )
@@ -186,7 +196,7 @@ fun HomeScreen(
         ) {
             Image(
                 painter = painterResource(id = R.drawable.img_sol_hero_banner_1795044139786),
-                contentDescription = "پس‌زمینه هنری Sol",
+                contentDescription = stringResource(R.string.home_hero_art_cd),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.matchParentSize(),
             )
@@ -208,23 +218,24 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .padding(14.dp),
             ) {
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.padding(end = 8.dp)) {
                         Text(
-                            text = "S O L  v2",
+                            text = stringResource(R.string.home_brand_title),
                             style = MaterialTheme.typography.displaySmall,
                             color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.semantics { heading() },
                         )
                         Text(
-                            text = activeRoles.firstOrNull()?.let { "نقش فعال: ${it.roleName}" }
-                                ?: "دستیار شخصی فارسی • آفلاین و مستقل",
+                            text = activeRoleLabel?.let { stringResource(R.string.home_active_role_fmt, it) }
+                                ?: stringResource(R.string.home_default_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -263,7 +274,7 @@ fun HomeScreen(
                                     } else {
                                         Icons.Default.BatteryStd
                                     },
-                                    contentDescription = "باتری",
+                                    contentDescription = stringResource(R.string.cd_battery_status),
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(13.dp),
                                 )
@@ -285,6 +296,7 @@ fun HomeScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1f)
+                            .heightIn(min = 48.dp)
                             .clickable(onClick = onOpenCapabilities)
                             .testTag("open_capabilities_button"),
                     ) {
@@ -301,10 +313,10 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = "$capabilitiesCount قابلیت و پس‌زمینه",
+                                text = stringResource(R.string.home_capabilities_button_fmt, capabilitiesCount),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
@@ -315,6 +327,7 @@ fun HomeScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1f)
+                            .heightIn(min = 48.dp)
                             .clickable(onClick = onOpenBookRoleStudio)
                             .testTag("open_book_role_button"),
                     ) {
@@ -331,10 +344,10 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = "کتاب (PDF/EPUB) و نقش",
+                                text = stringResource(R.string.home_book_role_button),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
@@ -349,11 +362,12 @@ fun HomeScreen(
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .heightIn(min = 48.dp)
                         .clickable { showLocationDialog = true }
                         .testTag("current_location_pill"),
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
@@ -363,7 +377,7 @@ fun HomeScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.LocationOn,
-                                contentDescription = "موقعیت فعلی",
+                                contentDescription = stringResource(R.string.cd_current_location),
                                 tint = if (preferences.confirmedCurrentLocation.isNotBlank()) {
                                     MaterialTheme.colorScheme.tertiary
                                 } else {
@@ -374,17 +388,17 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = if (preferences.confirmedCurrentLocation.isNotBlank()) {
-                                    "موقعیت فعلی تأییدشده: ${preferences.confirmedCurrentLocation}"
+                                    stringResource(R.string.home_confirmed_location_fmt, preferences.confirmedCurrentLocation)
                                 } else {
-                                    "موقعیت فعلی ثبت‌نشده (برای تأیید دستی بزنید)"
+                                    stringResource(R.string.home_unconfirmed_location)
                                 },
                                 style = MaterialTheme.typography.bodySmall,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
                         Text(
-                            text = "ویرایش",
+                            text = stringResource(R.string.action_edit),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
@@ -426,6 +440,7 @@ fun HomeScreen(
                         shape = RoundedCornerShape(16.dp),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         modifier = Modifier
+                            .heightIn(min = 48.dp)
                             .clickable(onClick = onWakeWordClick)
                             .testTag("wake_word_button"),
                     ) {
@@ -435,7 +450,7 @@ fun HomeScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Hearing,
-                                contentDescription = "بیدارباش صوتی Sol",
+                                contentDescription = stringResource(R.string.cd_wake_word),
                                 tint = if (listeningState is VoiceListeningState.WakeWordArmed) {
                                     MaterialTheme.colorScheme.tertiary
                                 } else {
@@ -446,14 +461,14 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = if (listeningState is VoiceListeningState.WakeWordArmed) {
-                                    "منتظر «Sol»…"
+                                    stringResource(R.string.home_wake_waiting)
                                 } else {
-                                    "بیدارباش «Sol»"
+                                    stringResource(R.string.home_wake_idle)
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                             )
                             Text(
-                                text = "فقط در اپ باز",
+                                text = stringResource(R.string.home_wake_fg_only),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -469,33 +484,35 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(6.dp))
                 FilledTonalButton(
                     onClick = onStopVoiceListening,
-                    modifier = Modifier.testTag("stop_voice_button"),
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("stop_voice_button"),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Stop,
-                        contentDescription = "توقف شنود",
+                        contentDescription = stringResource(R.string.stop_listening),
                         modifier = Modifier.size(16.dp),
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("توقف / لغو شنود", style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.home_stop_cancel_listening), style = MaterialTheme.typography.labelMedium)
                 }
             }
 
             val backendLabel = if (activeAsrBackend == ActiveAsrBackend.VOSK_OFFLINE) {
-                "Vosk ۱۰۰٪ آفلاین"
+                stringResource(R.string.home_backend_vosk)
             } else {
-                "گفتار سیستم"
+                stringResource(R.string.home_backend_system)
             }
             val voiceStatusText = when (listeningState) {
                 is VoiceListeningState.Listening ->
-                    if (partialSpeechText.isNotBlank()) "«$partialSpeechText»" else "در حال شنیدن فارسی ($backendLabel)…"
+                    if (partialSpeechText.isNotBlank()) "«$partialSpeechText»" else stringResource(R.string.home_listening_prompt_fmt, backendLabel)
                 is VoiceListeningState.WakeWordArmed ->
-                    "گوش‌به‌زنگ «Sol» فقط هنگام باز بودن برنامه • توقف خودکار پس از ${preferences.wakeWordTimeoutMinutes} دقیقه سکوت"
-                is VoiceListeningState.Processing -> "در حال پردازش گفتار…"
+                    stringResource(R.string.home_wake_armed_fmt, preferences.wakeWordTimeoutMinutes)
+                is VoiceListeningState.Processing -> stringResource(R.string.home_processing_speech)
                 is VoiceListeningState.Error -> listeningState.messageFa
                 VoiceListeningState.Idle -> when {
-                    isSpeaking -> "Sol در حال صحبت است…"
-                    else -> "موتور صوتی: $backendLabel • برای فرمان صوتی دایره را لمس کنید"
+                    isSpeaking -> stringResource(R.string.home_sol_speaking)
+                    else -> stringResource(R.string.home_voice_idle_fmt, backendLabel)
                 }
             }
 
@@ -523,29 +540,37 @@ fun HomeScreen(
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     },
-                    maxLines = if (listeningState is VoiceListeningState.Error) 1 else 2,
+                    maxLines = if (listeningState is VoiceListeningState.Error) 2 else 3,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (listeningState is VoiceListeningState.Error) {
                     TextButton(
                         onClick = { onVoiceErrorAction(listeningState.action) },
-                        modifier = Modifier.testTag("voice_error_action_button"),
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("voice_error_action_button"),
                     ) {
                         Text(listeningState.action.labelFa, style = MaterialTheme.typography.labelSmall)
                     }
-                    TextButton(onClick = onClearVoiceError) {
-                        Text("بستن", style = MaterialTheme.typography.labelSmall)
+                    TextButton(
+                        onClick = onClearVoiceError,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Text(stringResource(R.string.action_close), style = MaterialTheme.typography.labelSmall)
                     }
                 }
                 if (isSpeaking) {
-                    TextButton(onClick = onStopSpeaking) {
+                    TextButton(
+                        onClick = onStopSpeaking,
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
                         Icon(
                             imageVector = Icons.Default.VolumeOff,
-                            contentDescription = "توقف صدا",
+                            contentDescription = stringResource(R.string.home_stop_sound),
                             modifier = Modifier.size(16.dp),
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("توقف صدا", style = MaterialTheme.typography.labelSmall)
+                        Text(stringResource(R.string.home_stop_sound), style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -578,27 +603,30 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "صدای فارسی نصب نیست؛ برای پاسخ صوتی در تنظیمات صدای گوشی SherpaTTS یا داده فارسی را فعال کنید.",
+                                text = stringResource(R.string.home_tts_missing_guide),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                maxLines = 2,
+                                maxLines = 3,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        TextButton(onClick = onOpenSystemTtsSettings) {
-                            Text("تنظیمات صدا", style = MaterialTheme.typography.labelSmall)
+                        TextButton(
+                            onClick = onOpenSystemTtsSettings,
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) {
+                            Text(stringResource(R.string.home_sound_settings), style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
             }
 
             if (activeAsrBackend == ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER || preferences.privateModeEnabled) {
-                Row(
+                FlowRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     if (activeAsrBackend == ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER) {
                         Surface(
@@ -607,10 +635,10 @@ fun HomeScreen(
                             modifier = Modifier.testTag("online_asr_badge"),
                         ) {
                             Text(
-                                text = "تشخیص گفتار سیستم (ممکن است از اینترنت استفاده کند — برای ۱۰۰٪ آفلاین Vosk را نصب کنید)",
+                                text = stringResource(R.string.home_online_asr_warning),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer,
-                                maxLines = 1,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             )
@@ -628,13 +656,13 @@ fun HomeScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.VisibilityOff,
-                                    contentDescription = "حالت خصوصی فعال",
+                                    contentDescription = stringResource(R.string.cd_private_mode_active),
                                     tint = MaterialTheme.colorScheme.onTertiaryContainer,
                                     modifier = Modifier.size(13.dp),
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "حالت خصوصی",
+                                    text = stringResource(R.string.home_private_mode_badge),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                                 )
@@ -652,26 +680,31 @@ fun HomeScreen(
                 ) {
                     if (isSlmGenerating) {
                         Text(
-                            text = "هوش آفلاین در حال نگارش پاسخ…",
+                            text = stringResource(R.string.home_slm_writing),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
                         )
                         TextButton(
                             onClick = onStopSlmGeneration,
-                            modifier = Modifier.testTag("stop_slm_button"),
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .testTag("stop_slm_button"),
                         ) {
                             Icon(Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(15.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("توقف تولید", style = MaterialTheme.typography.labelSmall)
+                            Text(stringResource(R.string.home_slm_stop), style = MaterialTheme.typography.labelSmall)
                         }
                     } else if (slmRuntimeState is SlmRuntimeState.Ready) {
                         Text(
-                            text = "SLM آماده (${slmRuntimeState.activeBackend.name})",
+                            text = stringResource(R.string.home_slm_ready_fmt, slmRuntimeState.activeBackend.name),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.tertiary,
                         )
-                        TextButton(onClick = onResetSlmConversation) {
-                            Text("گفت‌وگوی تازه", style = MaterialTheme.typography.labelSmall)
+                        TextButton(
+                            onClick = onResetSlmConversation,
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) {
+                            Text(stringResource(R.string.home_slm_new_chat), style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }
@@ -683,9 +716,10 @@ fun HomeScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(QUICK_COMMANDS) { sample ->
+            items(QUICK_COMMANDS, key = { it }) { sample ->
                 AssistChip(
                     onClick = { onQuickCommand(sample) },
+                    modifier = Modifier.heightIn(min = 48.dp),
                     label = {
                         Text(
                             text = sample,
@@ -745,7 +779,7 @@ fun HomeScreen(
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = onInputChange,
-                    placeholder = { Text("فرمانت را به فارسی بنویس…") },
+                    placeholder = { Text(stringResource(R.string.command_input_placeholder)) },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("command_input"),
@@ -780,7 +814,7 @@ fun HomeScreen(
                         } else {
                             Icons.Default.Mic
                         },
-                        contentDescription = "دکمه میکروفون",
+                        contentDescription = stringResource(R.string.cd_mic_button),
                     )
                 }
 
@@ -794,7 +828,7 @@ fun HomeScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "ارسال فرمان",
+                        contentDescription = stringResource(R.string.send_command),
                     )
                 }
             }

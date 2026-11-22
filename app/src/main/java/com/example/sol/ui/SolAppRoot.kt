@@ -43,21 +43,32 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.R
 import com.example.sol.calendar.JalaliCalendar
 import com.example.sol.tasks.CommunicationChannel
+import com.example.sol.ui.vm.BackupViewModel
+import com.example.sol.ui.vm.ChatViewModel
+import com.example.sol.ui.vm.ContactsViewModel
+import com.example.sol.ui.vm.HistoryViewModel
+import com.example.sol.ui.vm.MemoryViewModel
+import com.example.sol.ui.vm.SettingsViewModel
+import com.example.sol.ui.vm.SlmViewModel
 import com.example.sol.voice.VoiceErrorAction
 import com.example.sol.voice.VoiceListeningState
 import com.example.ui.theme.SolTheme
@@ -71,17 +82,17 @@ const val ROUTE_SETTINGS = "settings"
 
 private data class SolNavItem(
     val route: String,
-    val labelFa: String,
+    val labelResId: Int,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector,
 )
 
 private val NAV_ITEMS = listOf(
-    SolNavItem(ROUTE_HOME, "دستیار", Icons.Filled.Mic, Icons.Outlined.Mic),
-    SolNavItem(ROUTE_MEMORY, "حافظه", Icons.Filled.Psychology, Icons.Outlined.Psychology),
-    SolNavItem(ROUTE_CONTACTS, "مخاطبین", Icons.Filled.Contacts, Icons.Outlined.Contacts),
-    SolNavItem(ROUTE_HISTORY, "سوابق", Icons.Filled.History, Icons.Outlined.History),
-    SolNavItem(ROUTE_SETTINGS, "تنظیمات", Icons.Filled.Settings, Icons.Outlined.Settings),
+    SolNavItem(ROUTE_HOME, R.string.nav_home, Icons.Filled.Mic, Icons.Outlined.Mic),
+    SolNavItem(ROUTE_MEMORY, R.string.nav_memory, Icons.Filled.Psychology, Icons.Outlined.Psychology),
+    SolNavItem(ROUTE_CONTACTS, R.string.nav_contacts, Icons.Filled.Contacts, Icons.Outlined.Contacts),
+    SolNavItem(ROUTE_HISTORY, R.string.nav_history, Icons.Filled.History, Icons.Outlined.History),
+    SolNavItem(ROUTE_SETTINGS, R.string.nav_settings, Icons.Filled.Settings, Icons.Outlined.Settings),
 )
 
 @Composable
@@ -89,59 +100,29 @@ fun SolAppRoot(
     viewModel: SolViewModel,
     externalVoiceTriggerNonce: Int = 0,
 ) {
+    val chatViewModel: ChatViewModel = viewModel()
+    val memoryViewModel: MemoryViewModel = viewModel()
+    val settingsViewModel: SettingsViewModel = viewModel()
+    val backupViewModel: BackupViewModel = viewModel()
+    val slmViewModel: SlmViewModel = viewModel()
+
+    val context = LocalContext.current
     val preferences by viewModel.preferences.collectAsStateWithLifecycle()
-    val memories by viewModel.memories.collectAsStateWithLifecycle()
-    val persons by viewModel.persons.collectAsStateWithLifecycle()
-    val locations by viewModel.locations.collectAsStateWithLifecycle()
-    val history by viewModel.history.collectAsStateWithLifecycle()
-    val books by viewModel.books.collectAsStateWithLifecycle()
-    val roles by viewModel.roles.collectAsStateWithLifecycle()
-    val backgroundLogs by viewModel.backgroundLogs.collectAsStateWithLifecycle()
-    val enabledPeriodicJobs by viewModel.enabledPeriodicJobs.collectAsStateWithLifecycle()
-    val bookChunkCount by viewModel.bookChunkCount.collectAsStateWithLifecycle()
-    val scheduledAlarms by viewModel.scheduledAlarms.collectAsStateWithLifecycle()
-    val userUtteranceExamples by viewModel.userUtteranceExamples.collectAsStateWithLifecycle()
-
-    val listeningState by viewModel.listeningState.collectAsStateWithLifecycle()
-    val partialSpeechText by viewModel.partialSpeechText.collectAsStateWithLifecycle()
-    val micRms by viewModel.micRms.collectAsStateWithLifecycle()
-    val activeAsrBackend by viewModel.activeAsrBackend.collectAsStateWithLifecycle()
-    val voskModelStatus by viewModel.voskModelStatus.collectAsStateWithLifecycle()
-    val vocabularyTermsCount by viewModel.vocabularyTermsCount.collectAsStateWithLifecycle()
-    val ramSnapshot by viewModel.ramSnapshot.collectAsStateWithLifecycle()
-    val slmStatus by viewModel.slmStatus.collectAsStateWithLifecycle()
-    val slmRuntimeState by viewModel.slmRuntimeState.collectAsStateWithLifecycle()
-    val isSlmGenerating by viewModel.isSlmGenerating.collectAsStateWithLifecycle()
-    val canScheduleExactAlarms by viewModel.canScheduleExactAlarms.collectAsStateWithLifecycle()
-
-    val ttsAvailability by viewModel.ttsAvailability.collectAsStateWithLifecycle()
-    val piperStatus by viewModel.piperStatus.collectAsStateWithLifecycle()
-    val speakerIdState by viewModel.speakerIdState.collectAsStateWithLifecycle()
-    val isMicServiceRunning by viewModel.isMicServiceRunning.collectAsStateWithLifecycle()
-    val isSpeaking by viewModel.isSpeaking.collectAsStateWithLifecycle()
-    val persianVoices by viewModel.persianVoices.collectAsStateWithLifecycle()
-    val activeTask by viewModel.activeTask.collectAsStateWithLifecycle()
-    val pendingConfirmation by viewModel.pendingConfirmation.collectAsStateWithLifecycle()
-    val isListeningForConfirm by viewModel.isListeningForConfirm.collectAsStateWithLifecycle()
-    val confirmVoiceFeedback by viewModel.confirmVoiceFeedback.collectAsStateWithLifecycle()
-    val pendingBookFetch by viewModel.pendingBookFetch.collectAsStateWithLifecycle()
-    val isFetchingBook by viewModel.isFetchingBook.collectAsStateWithLifecycle()
-    val pendingWebSearch by viewModel.pendingWebSearch.collectAsStateWithLifecycle()
-    val voiceRoleSession by viewModel.voiceRoleSession.collectAsStateWithLifecycle()
     val showCapabilitiesSheet by viewModel.showCapabilitiesSheet.collectAsStateWithLifecycle()
-    val pendingBackupRequest by viewModel.pendingBackupRequest.collectAsStateWithLifecycle()
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
-
-    val inputText by viewModel.inputText.collectAsStateWithLifecycle()
-    val messages by viewModel.messages.collectAsStateWithLifecycle()
-    val contacts by viewModel.contacts.collectAsStateWithLifecycle()
-    val batteryStatus by viewModel.batteryStatus.collectAsStateWithLifecycle()
-    val volumeStatus by viewModel.volumeStatus.collectAsStateWithLifecycle()
-    val launchableApps by viewModel.launchableApps.collectAsStateWithLifecycle()
-    val securityAudit by viewModel.securityAudit.collectAsStateWithLifecycle()
     val hasMicPermission by viewModel.hasMicPermission.collectAsStateWithLifecycle()
     val hasContactsPermission by viewModel.hasContactsPermission.collectAsStateWithLifecycle()
     val hasNotificationPermission by viewModel.hasNotificationPermission.collectAsStateWithLifecycle()
+
+    // Lightweight global modal states only
+    val listeningState by chatViewModel.listeningState.collectAsStateWithLifecycle()
+    val pendingConfirmation by chatViewModel.pendingConfirmation.collectAsStateWithLifecycle()
+    val isListeningForConfirm by chatViewModel.isListeningForConfirm.collectAsStateWithLifecycle()
+    val confirmVoiceFeedback by chatViewModel.confirmVoiceFeedback.collectAsStateWithLifecycle()
+    val pendingWebSearch by chatViewModel.pendingWebSearch.collectAsStateWithLifecycle()
+    val pendingBookFetch by memoryViewModel.pendingBookFetch.collectAsStateWithLifecycle()
+    val voiceRoleSession by memoryViewModel.voiceRoleSession.collectAsStateWithLifecycle()
+    val pendingBackupRequest by backupViewModel.pendingBackupRequest.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -156,16 +137,16 @@ fun SolAppRoot(
     val micPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        viewModel.refreshSystemSnapshots()
+        viewModel.refreshPermissions()
         if (granted) {
             when {
-                pendingConfirmation != null -> viewModel.startVoiceConfirmationListening()
-                voiceRoleSession != null -> viewModel.listenVoiceExplanationForRole()
-                else -> viewModel.startVoiceListening()
+                pendingConfirmation != null -> chatViewModel.startVoiceConfirmationListening()
+                voiceRoleSession != null -> memoryViewModel.listenVoiceExplanationForRole()
+                else -> chatViewModel.startVoiceListening()
             }
         } else {
             scope.launch {
-                snackbarHostState.showSnackbar("مجوز میکروفون رد شد؛ می‌توانید فرمان را تایپ کنید.")
+                snackbarHostState.showSnackbar(context.getString(R.string.mic_permission_denied_msg))
             }
         }
     }
@@ -173,10 +154,10 @@ fun SolAppRoot(
     val contactsPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        viewModel.refreshSystemSnapshots()
+        viewModel.refreshPermissions()
         if (!granted) {
             scope.launch {
-                snackbarHostState.showSnackbar("دسترسی به مخاطبین داده نشد؛ مخاطبین حافظه Sol همچنان فعال هستند.")
+                snackbarHostState.showSnackbar(context.getString(R.string.contacts_permission_denied_msg))
             }
         }
     }
@@ -184,14 +165,14 @@ fun SolAppRoot(
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) {
-        viewModel.refreshSystemSnapshots()
+        viewModel.refreshPermissions()
     }
 
     val localBookPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
-            viewModel.importLocalBookFile(uri)
+            memoryViewModel.importLocalBookFile(uri)
         }
     }
 
@@ -199,7 +180,7 @@ fun SolAppRoot(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
-            viewModel.importVoskModelZip(uri)
+            settingsViewModel.importVoskModelZip(uri)
         }
     }
 
@@ -207,7 +188,7 @@ fun SolAppRoot(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
-            viewModel.importLocalSlmModel(uri)
+            slmViewModel.importLocalSlmModel(uri)
         }
     }
 
@@ -215,7 +196,7 @@ fun SolAppRoot(
         contract = ActivityResultContracts.OpenMultipleDocuments(),
     ) { uris ->
         if (uris.isNotEmpty()) {
-            viewModel.importPiperFiles(uris)
+            settingsViewModel.importPiperFiles(uris)
         }
     }
 
@@ -223,7 +204,7 @@ fun SolAppRoot(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
-            viewModel.importSpeakerModel(uri)
+            settingsViewModel.importSpeakerModel(uri)
         }
     }
 
@@ -231,7 +212,7 @@ fun SolAppRoot(
         contract = ActivityResultContracts.CreateDocument("application/octet-stream"),
     ) { uri ->
         if (uri != null) {
-            viewModel.requestBackupPassword(BackupDialogMode.EXPORT, uri)
+            backupViewModel.requestBackupPassword(BackupDialogMode.EXPORT, uri)
         }
     }
 
@@ -239,15 +220,15 @@ fun SolAppRoot(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri ->
         if (uri != null) {
-            viewModel.requestBackupPassword(BackupDialogMode.IMPORT, uri)
+            backupViewModel.requestBackupPassword(BackupDialogMode.IMPORT, uri)
         }
     }
 
     val handleMicClick: () -> Unit = {
         if (listeningState is VoiceListeningState.Listening || listeningState is VoiceListeningState.WakeWordArmed) {
-            viewModel.stopVoiceListening()
+            chatViewModel.stopVoiceListening()
         } else if (hasMicPermission) {
-            viewModel.startVoiceListening()
+            chatViewModel.startVoiceListening()
         } else {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -255,9 +236,9 @@ fun SolAppRoot(
 
     val handleWakeWordClick: () -> Unit = {
         if (listeningState is VoiceListeningState.WakeWordArmed) {
-            viewModel.stopVoiceListening()
+            chatViewModel.stopVoiceListening()
         } else if (hasMicPermission) {
-            viewModel.startWakeWordGuard()
+            chatViewModel.startWakeWordGuard()
         } else {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -265,7 +246,7 @@ fun SolAppRoot(
 
     val handleConfirmVoiceClick: () -> Unit = {
         if (hasMicPermission) {
-            viewModel.startVoiceConfirmationListening()
+            chatViewModel.startVoiceConfirmationListening()
         } else {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
@@ -273,18 +254,17 @@ fun SolAppRoot(
 
     val handleRoleVoiceClick: () -> Unit = {
         if (hasMicPermission) {
-            viewModel.listenVoiceExplanationForRole()
+            memoryViewModel.listenVoiceExplanationForRole()
         } else {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
-    // Stop microphone/wake-word cleanly when app moves to background (Android 12 constraint + battery safety)
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
-                viewModel.onAppBackgrounded()
+                chatViewModel.onAppBackgrounded()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -293,11 +273,10 @@ fun SolAppRoot(
         }
     }
 
-    // Trigger mic automatically when opened from Home Screen Widget or Quick Settings Tile
     LaunchedEffect(externalVoiceTriggerNonce) {
         if (externalVoiceTriggerNonce > 0) {
             if (hasMicPermission) {
-                viewModel.startVoiceListening()
+                chatViewModel.startVoiceListening()
             } else {
                 micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
@@ -326,20 +305,20 @@ fun SolAppRoot(
                     isListeningVoiceConfirm = isListeningForConfirm,
                     voiceConfirmFeedback = confirmVoiceFeedback,
                     onStartVoiceConfirm = handleConfirmVoiceClick,
-                    onStopVoiceConfirm = viewModel::stopVoiceConfirmationListening,
-                    onSelectCandidate = viewModel::selectConfirmationCandidate,
-                    onSelectChannel = viewModel::updateConfirmationChannel,
-                    onMessageChange = viewModel::updateConfirmationMessage,
-                    onConfirm = viewModel::confirmAndExecutePending,
-                    onCancel = viewModel::cancelPendingConfirmation,
+                    onStopVoiceConfirm = chatViewModel::stopVoiceConfirmationListening,
+                    onSelectCandidate = chatViewModel::selectConfirmationCandidate,
+                    onSelectChannel = chatViewModel::updateConfirmationChannel,
+                    onMessageChange = chatViewModel::updateConfirmationMessage,
+                    onConfirm = chatViewModel::confirmAndExecutePending,
+                    onCancel = chatViewModel::cancelPendingConfirmation,
                 )
             }
 
             pendingBookFetch?.let { bookReq ->
                 InternetBookFetchDialog(
                     pending = bookReq,
-                    onUpdateQuery = viewModel::updatePendingBookQuery,
-                    onConfirmFetch = viewModel::confirmInternetBookFetch,
+                    onUpdateQuery = memoryViewModel::updatePendingBookQuery,
+                    onConfirmFetch = memoryViewModel::confirmInternetBookFetch,
                     onPickLocalFile = {
                         localBookPickerLauncher.launch(
                             arrayOf(
@@ -351,35 +330,35 @@ fun SolAppRoot(
                             )
                         )
                     },
-                    onDismiss = viewModel::dismissPendingBookFetch,
+                    onDismiss = memoryViewModel::dismissPendingBookFetch,
                 )
             }
 
             pendingWebSearch?.let { searchReq ->
                 WebSearchConfirmationDialog(
                     pending = searchReq,
-                    onUpdateQuery = viewModel::updatePendingWebSearchQuery,
-                    onConfirm = viewModel::confirmWebSearch,
-                    onDismiss = viewModel::dismissPendingWebSearch,
+                    onUpdateQuery = chatViewModel::updatePendingWebSearchQuery,
+                    onConfirm = chatViewModel::confirmWebSearch,
+                    onDismiss = chatViewModel::dismissPendingWebSearch,
                 )
             }
 
             voiceRoleSession?.let { session ->
                 VoiceRoleTeachingDialog(
                     session = session,
-                    onUpdateDraft = viewModel::updateVoiceRoleDraft,
+                    onUpdateDraft = memoryViewModel::updateVoiceRoleDraft,
                     onStartVoiceExplanation = handleRoleVoiceClick,
-                    onStopVoiceExplanation = viewModel::stopVoiceExplanationListening,
-                    onSave = viewModel::saveVoiceRoleTeaching,
-                    onDismiss = viewModel::dismissVoiceRoleSession,
+                    onStopVoiceExplanation = memoryViewModel::stopVoiceExplanationListening,
+                    onSave = memoryViewModel::saveVoiceRoleTeaching,
+                    onDismiss = memoryViewModel::dismissVoiceRoleSession,
                 )
             }
 
             pendingBackupRequest?.let { req ->
                 BackupPasswordDialog(
                     mode = req.mode,
-                    onConfirm = viewModel::executeEncryptedBackup,
-                    onDismiss = viewModel::dismissBackupPasswordDialog,
+                    onConfirm = backupViewModel::executeEncryptedBackup,
+                    onDismiss = backupViewModel::dismissBackupPasswordDialog,
                 )
             }
 
@@ -398,16 +377,17 @@ fun SolAppRoot(
                             ) {
                                 NAV_ITEMS.forEach { item ->
                                     val selected = currentRoute == item.route
+                                    val label = stringResource(item.labelResId)
                                     NavigationBarItem(
                                         selected = selected,
                                         onClick = { navigateTo(item.route) },
                                         icon = {
                                             Icon(
                                                 imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                                contentDescription = item.labelFa,
+                                                contentDescription = label,
                                             )
                                         },
-                                        label = { Text(item.labelFa, style = MaterialTheme.typography.labelSmall) },
+                                        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
                                         modifier = Modifier.testTag("nav_${item.route}"),
                                     )
                                 }
@@ -416,6 +396,8 @@ fun SolAppRoot(
                     },
                 ) { innerPadding ->
                     if (showCapabilitiesSheet) {
+                        val enabledPeriodicJobs by settingsViewModel.enabledPeriodicJobs.collectAsStateWithLifecycle()
+                        val backgroundLogs by settingsViewModel.backgroundLogs.collectAsStateWithLifecycle()
                         CapabilitiesScreen(
                             capabilities = viewModel.capabilitiesCatalog,
                             enabledPeriodicJobs = enabledPeriodicJobs,
@@ -430,17 +412,17 @@ fun SolAppRoot(
                                 if (!hasNotificationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 }
-                                viewModel.runBackgroundJobNow(jobId)
+                                chatViewModel.runBackgroundJobNow(jobId)
                             },
                             onTogglePeriodicJob = { jobId, enable ->
                                 if (enable && !hasNotificationPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 }
-                                viewModel.togglePeriodicBackgroundJob(jobId, enable)
+                                settingsViewModel.togglePeriodicBackgroundJob(jobId, enable)
                             },
-                            onClearBackgroundLogs = viewModel::clearBackgroundLogs,
-                            onOpenBookRoleStudio = { viewModel.requestBookRoleStudio() },
-                            onRunSampleCommand = { cmd -> viewModel.submitCommand(cmd) },
+                            onClearBackgroundLogs = settingsViewModel::clearBackgroundLogs,
+                            onOpenBookRoleStudio = { memoryViewModel.requestBookRoleStudio() },
+                            onRunSampleCommand = { cmd -> chatViewModel.submitCommand(cmd) },
                             onBack = { viewModel.openCapabilitiesSheet(false) },
                             modifier = Modifier.padding(innerPadding),
                         )
@@ -456,16 +438,17 @@ fun SolAppRoot(
                                 ) {
                                     NAV_ITEMS.forEach { item ->
                                         val selected = currentRoute == item.route
+                                        val label = stringResource(item.labelResId)
                                         NavigationRailItem(
                                             selected = selected,
                                             onClick = { navigateTo(item.route) },
                                             icon = {
                                                 Icon(
                                                     imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                                    contentDescription = item.labelFa,
+                                                    contentDescription = label,
                                                 )
                                             },
-                                            label = { Text(item.labelFa) },
+                                            label = { Text(label) },
                                             modifier = Modifier.testTag("nav_${item.route}"),
                                         )
                                     }
@@ -482,6 +465,22 @@ fun SolAppRoot(
                                     .align(Alignment.CenterVertically),
                             ) {
                                 composable(ROUTE_HOME) {
+                                    val partialSpeechText by chatViewModel.partialSpeechText.collectAsStateWithLifecycle()
+                                    val micRms by chatViewModel.micRms.collectAsStateWithLifecycle()
+                                    val activeAsrBackend by chatViewModel.activeAsrBackend.collectAsStateWithLifecycle()
+                                    val voskModelStatus by chatViewModel.voskModelStatus.collectAsStateWithLifecycle()
+                                    val ttsAvailability by chatViewModel.ttsAvailability.collectAsStateWithLifecycle()
+                                    val isSpeaking by chatViewModel.isSpeaking.collectAsStateWithLifecycle()
+                                    val isFetchingBook by memoryViewModel.isFetchingBook.collectAsStateWithLifecycle()
+                                    val slmRuntimeState by chatViewModel.slmRuntimeState.collectAsStateWithLifecycle()
+                                    val isSlmGenerating by chatViewModel.isSlmGenerating.collectAsStateWithLifecycle()
+                                    val activeRoles by chatViewModel.activeRoles.collectAsStateWithLifecycle()
+                                    val messages by chatViewModel.messages.collectAsStateWithLifecycle()
+                                    val inputText by chatViewModel.inputText.collectAsStateWithLifecycle()
+                                    val activeTask by chatViewModel.activeTask.collectAsStateWithLifecycle()
+                                    val savedLocations by chatViewModel.savedLocations.collectAsStateWithLifecycle()
+                                    val batteryStatus by settingsViewModel.batteryStatus.collectAsStateWithLifecycle()
+
                                     HomeScreen(
                                         capabilitiesCount = viewModel.capabilitiesCatalog.size,
                                         preferences = preferences,
@@ -496,43 +495,50 @@ fun SolAppRoot(
                                         isFetchingBook = isFetchingBook,
                                         slmRuntimeState = slmRuntimeState,
                                         isSlmGenerating = isSlmGenerating,
-                                        activeRoles = roles.filter { it.isActive },
+                                        activeRoles = activeRoles,
                                         messages = messages,
                                         inputText = inputText,
                                         activeTask = activeTask,
-                                        savedLocations = locations,
-                                        onInputChange = viewModel::updateInputText,
-                                        onSendCommand = { viewModel.submitCommand() },
-                                        onQuickCommand = { cmd -> viewModel.submitCommand(cmd) },
+                                        savedLocations = savedLocations,
+                                        onInputChange = chatViewModel::updateInputText,
+                                        onSendCommand = { chatViewModel.submitCommand() },
+                                        onQuickCommand = { cmd -> chatViewModel.submitCommand(cmd) },
                                         onMicClick = handleMicClick,
                                         onWakeWordClick = handleWakeWordClick,
-                                        onStopVoiceListening = viewModel::stopVoiceListening,
+                                        onStopVoiceListening = chatViewModel::stopVoiceListening,
                                         onVoiceErrorAction = { action ->
                                             when (action) {
                                                 VoiceErrorAction.OPEN_MIC_PERMISSION_SETTINGS -> viewModel.openAppPermissionSettings()
                                                 VoiceErrorAction.OPEN_VOSK_SETTINGS -> navigateTo(ROUTE_SETTINGS)
                                                 VoiceErrorAction.RETRY_LISTENING -> {
-                                                    viewModel.clearVoiceError()
+                                                    chatViewModel.clearVoiceError()
                                                     handleMicClick()
                                                 }
-                                                VoiceErrorAction.SWITCH_TO_TEXT_INPUT -> viewModel.clearVoiceError()
-                                                VoiceErrorAction.OPEN_TTS_OR_SYSTEM_SETTINGS -> viewModel.openSystemTtsSettings()
+                                                VoiceErrorAction.SWITCH_TO_TEXT_INPUT -> chatViewModel.clearVoiceError()
+                                                VoiceErrorAction.OPEN_TTS_OR_SYSTEM_SETTINGS -> settingsViewModel.openSystemTtsSettings()
                                             }
                                         },
-                                        onClearVoiceError = viewModel::clearVoiceError,
-                                        onSpeakMessage = viewModel::speakText,
-                                        onStopSpeaking = viewModel::stopSpeaking,
-                                        onOpenSystemTtsSettings = viewModel::openSystemTtsSettings,
-                                        onStopSlmGeneration = viewModel::stopSlmGeneration,
-                                        onResetSlmConversation = viewModel::resetSlmConversation,
-                                        onConfirmCurrentLocation = viewModel::confirmCurrentLocation,
-                                        onDismissTaskCard = viewModel::dismissActiveTaskCard,
+                                        onClearVoiceError = chatViewModel::clearVoiceError,
+                                        onSpeakMessage = chatViewModel::speakText,
+                                        onStopSpeaking = chatViewModel::stopSpeaking,
+                                        onOpenSystemTtsSettings = settingsViewModel::openSystemTtsSettings,
+                                        onStopSlmGeneration = chatViewModel::stopSlmGeneration,
+                                        onResetSlmConversation = chatViewModel::resetSlmConversation,
+                                        onConfirmCurrentLocation = chatViewModel::confirmCurrentLocation,
+                                        onDismissTaskCard = chatViewModel::dismissActiveTaskCard,
                                         onOpenCapabilities = { viewModel.openCapabilitiesSheet(true) },
-                                        onOpenBookRoleStudio = { viewModel.requestBookRoleStudio() },
+                                        onOpenBookRoleStudio = { memoryViewModel.requestBookRoleStudio() },
                                     )
                                 }
 
                                 composable(ROUTE_MEMORY) {
+                                    val memories by memoryViewModel.memories.collectAsStateWithLifecycle()
+                                    val persons by memoryViewModel.persons.collectAsStateWithLifecycle()
+                                    val locations by memoryViewModel.locations.collectAsStateWithLifecycle()
+                                    val books by memoryViewModel.books.collectAsStateWithLifecycle()
+                                    val roles by memoryViewModel.roles.collectAsStateWithLifecycle()
+                                    val userUtteranceExamples by memoryViewModel.userUtteranceExamples.collectAsStateWithLifecycle()
+
                                     MemoryScreen(
                                         memories = memories,
                                         persons = persons,
@@ -541,25 +547,28 @@ fun SolAppRoot(
                                         roles = roles,
                                         userExamples = userUtteranceExamples,
                                         confirmedCurrentLocation = preferences.confirmedCurrentLocation,
-                                        onAddOrUpdateAlias = viewModel::addOrUpdateAlias,
-                                        onAddFact = viewModel::addFact,
-                                        onUpdateMemory = viewModel::updateMemoryItem,
-                                        onDeleteMemory = viewModel::deleteMemoryItem,
-                                        onDeleteUserExample = viewModel::deleteUserUtteranceExample,
-                                        onSavePerson = viewModel::savePerson,
-                                        onDeletePerson = viewModel::deletePerson,
-                                        onSaveLocation = viewModel::saveLocation,
-                                        onDeleteLocation = viewModel::deleteLocation,
-                                        onOpenBookRoleStudio = { viewModel.requestBookRoleStudio() },
-                                        onTeachVoiceForBook = viewModel::openVoiceRoleTeachingForBook,
-                                        onSpeakBook = viewModel::speakText,
-                                        onDeleteBook = viewModel::deleteBook,
-                                        onToggleRoleActive = viewModel::toggleRoleActive,
-                                        onDeleteRole = viewModel::deleteRole,
+                                        onAddOrUpdateAlias = memoryViewModel::addOrUpdateAlias,
+                                        onAddFact = memoryViewModel::addFact,
+                                        onUpdateMemory = memoryViewModel::updateMemoryItem,
+                                        onDeleteMemory = memoryViewModel::deleteMemoryItem,
+                                        onDeleteUserExample = memoryViewModel::deleteUserUtteranceExample,
+                                        onSavePerson = memoryViewModel::savePerson,
+                                        onDeletePerson = memoryViewModel::deletePerson,
+                                        onSaveLocation = memoryViewModel::saveLocation,
+                                        onDeleteLocation = memoryViewModel::deleteLocation,
+                                        onOpenBookRoleStudio = { memoryViewModel.requestBookRoleStudio() },
+                                        onTeachVoiceForBook = memoryViewModel::openVoiceRoleTeachingForBook,
+                                        onSpeakBook = chatViewModel::speakText,
+                                        onDeleteBook = memoryViewModel::deleteBook,
+                                        onToggleRoleActive = memoryViewModel::toggleRoleActive,
+                                        onDeleteRole = memoryViewModel::deleteRole,
                                     )
                                 }
 
                                 composable(ROUTE_CONTACTS) {
+                                    val contactsViewModel: ContactsViewModel = viewModel()
+                                    val contacts by contactsViewModel.contacts.collectAsStateWithLifecycle()
+
                                     ContactsScreen(
                                         contacts = contacts,
                                         hasContactsPermission = hasContactsPermission,
@@ -567,42 +576,53 @@ fun SolAppRoot(
                                             contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
                                         },
                                         onCallContact = { contact ->
-                                            viewModel.initiateContactAction(contact, CommunicationChannel.CALL)
+                                            contactsViewModel.initiateContactAction(contact, CommunicationChannel.CALL)
                                         },
                                         onSmsContact = { contact ->
-                                            viewModel.initiateContactAction(contact, CommunicationChannel.SMS)
+                                            contactsViewModel.initiateContactAction(contact, CommunicationChannel.SMS)
                                         },
-                                        onSaveToMemory = { contact ->
-                                            viewModel.savePerson(
-                                                name = contact.name,
-                                                phone = contact.phone,
-                                                relation = contact.relation,
-                                                callScriptNote = contact.callScriptNote,
-                                            )
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar("${contact.name} در حافظه Sol ذخیره شد")
-                                            }
-                                        },
+                                        onSaveToMemory = contactsViewModel::saveContactToMemory,
                                     )
                                 }
 
                                 composable(ROUTE_HISTORY) {
+                                    val historyViewModel: HistoryViewModel = viewModel()
+                                    val history by historyViewModel.history.collectAsStateWithLifecycle()
+
                                     HistoryScreen(
                                         history = history,
                                         retentionMode = preferences.historyRetentionMode,
                                         privateModeEnabled = preferences.privateModeEnabled,
-                                        onRetentionModeChange = viewModel::setHistoryRetentionMode,
-                                        onPrivateModeChange = viewModel::setPrivateModeEnabled,
-                                        onSpeakText = viewModel::speakText,
-                                        onDeleteItem = viewModel::deleteHistoryEntry,
-                                        onClearAll = viewModel::clearHistory,
+                                        onRetentionModeChange = historyViewModel::setHistoryRetentionMode,
+                                        onPrivateModeChange = historyViewModel::setPrivateModeEnabled,
+                                        onSpeakText = chatViewModel::speakText,
+                                        onDeleteItem = historyViewModel::deleteHistoryEntry,
+                                        onClearAll = historyViewModel::clearHistory,
                                         onDeleteAllData = viewModel::deleteAllUserData,
                                     )
                                 }
 
                                 composable(ROUTE_SETTINGS) {
-                                    val availableTtsEngines by viewModel.availableTtsEngines.collectAsStateWithLifecycle()
-                                    val activeTtsEngineLabel by viewModel.activeTtsEngineLabel.collectAsStateWithLifecycle()
+                                    val ttsAvailability by chatViewModel.ttsAvailability.collectAsStateWithLifecycle()
+                                    val voskModelStatus by chatViewModel.voskModelStatus.collectAsStateWithLifecycle()
+                                    val piperStatus by settingsViewModel.piperStatus.collectAsStateWithLifecycle()
+                                    val availableTtsEngines by settingsViewModel.availableTtsEngines.collectAsStateWithLifecycle()
+                                    val activeTtsEngineLabel by settingsViewModel.activeTtsEngineLabel.collectAsStateWithLifecycle()
+                                    val persianVoices by settingsViewModel.persianVoices.collectAsStateWithLifecycle()
+                                    val vocabularyTermsCount by settingsViewModel.vocabularyTermsCount.collectAsStateWithLifecycle()
+                                    val bookChunkCount by settingsViewModel.bookChunkCount.collectAsStateWithLifecycle()
+                                    val slmStatus by slmViewModel.slmStatus.collectAsStateWithLifecycle()
+                                    val slmRuntimeState by slmViewModel.slmRuntimeState.collectAsStateWithLifecycle()
+                                    val ramSnapshot by settingsViewModel.ramSnapshot.collectAsStateWithLifecycle()
+                                    val canScheduleExactAlarms by settingsViewModel.canScheduleExactAlarms.collectAsStateWithLifecycle()
+                                    val scheduledAlarms by settingsViewModel.scheduledAlarms.collectAsStateWithLifecycle()
+                                    val batteryStatus by settingsViewModel.batteryStatus.collectAsStateWithLifecycle()
+                                    val volumeStatus by settingsViewModel.volumeStatus.collectAsStateWithLifecycle()
+                                    val launchableApps by settingsViewModel.launchableApps.collectAsStateWithLifecycle()
+                                    val securityAudit by settingsViewModel.securityAudit.collectAsStateWithLifecycle()
+                                    val speakerIdState by settingsViewModel.speakerIdState.collectAsStateWithLifecycle()
+                                    val isMicServiceRunning by settingsViewModel.isMicServiceRunning.collectAsStateWithLifecycle()
+
                                     SettingsScreen(
                                         preferences = preferences,
                                         ttsAvailability = ttsAvailability,
@@ -622,28 +642,28 @@ fun SolAppRoot(
                                         volumeStatus = volumeStatus,
                                         launchableApps = launchableApps,
                                         securityAudit = securityAudit,
-                                        onOwnerNameChange = viewModel::setOwnerName,
-                                        onVoicePersonaChange = viewModel::setVoicePersona,
-                                        onSelectTtsEngine = viewModel::setPreferredTtsEngine,
-                                        onSelectTtsVoice = viewModel::setPreferredTtsVoice,
-                                        onSpeechRateChange = viewModel::setSpeechRate,
-                                        onAutoSpeakChange = viewModel::setAutoSpeak,
-                                        onTestVoice = viewModel::testVoiceSample,
-                                        onOpenSystemTtsSettings = viewModel::openSystemTtsSettings,
-                                        onRecheckSystemTts = viewModel::recheckSystemTts,
+                                        onOwnerNameChange = settingsViewModel::setOwnerName,
+                                        onVoicePersonaChange = settingsViewModel::setVoicePersona,
+                                        onSelectTtsEngine = settingsViewModel::setPreferredTtsEngine,
+                                        onSelectTtsVoice = settingsViewModel::setPreferredTtsVoice,
+                                        onSpeechRateChange = settingsViewModel::setSpeechRate,
+                                        onAutoSpeakChange = settingsViewModel::setAutoSpeak,
+                                        onTestVoice = settingsViewModel::testVoiceSample,
+                                        onOpenSystemTtsSettings = settingsViewModel::openSystemTtsSettings,
+                                        onRecheckSystemTts = settingsViewModel::recheckSystemTts,
                                         onPickPiperFiles = {
                                             piperFilesPickerLauncher.launch(arrayOf("*/*"))
                                         },
-                                        onDeletePiperModel = viewModel::deletePiperModel,
+                                        onDeletePiperModel = settingsViewModel::deletePiperModel,
                                         speakerIdState = speakerIdState,
                                         onRecordOwnerVoice = {
                                             if (hasMicPermission) {
-                                                viewModel.recordOwnerVoice()
+                                                settingsViewModel.recordOwnerVoice()
                                             } else {
                                                 micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                             }
                                         },
-                                        onClearOwnerVoice = viewModel::clearOwnerVoice,
+                                        onClearOwnerVoice = settingsViewModel::clearOwnerVoice,
                                         onPickSpeakerModel = {
                                             speakerModelPickerLauncher.launch(arrayOf("*/*"))
                                         },
@@ -652,34 +672,38 @@ fun SolAppRoot(
                                             if (enable && !hasMicPermission) {
                                                 micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                             } else {
-                                                viewModel.setScreenOffMicEnabled(enable)
+                                                settingsViewModel.setScreenOffMicEnabled(enable)
                                             }
                                         },
-                                        onVoskOfflineToggle = viewModel::setVoskOfflineEnabled,
-                                        onWakeWordToggle = viewModel::setWakeWordEnabled,
-                                        onVadSilenceTimeoutChange = viewModel::setVadSilenceTimeoutMs,
-                                        onMaxVoiceListenSecondsChange = viewModel::setMaxVoiceListenSeconds,
-                                        onWakeWordTimeoutMinutesChange = viewModel::setWakeWordTimeoutMinutes,
-                                        onVoiceCueFeedbackChange = viewModel::setVoiceCueFeedbackEnabled,
-                                        onDownloadVoskModel = viewModel::downloadVoskPersianModel,
+                                        onContinuousListeningToggle = { enable ->
+                                            if (!enable) chatViewModel.stopContinuousWakeSession()
+                                            settingsViewModel.setContinuousListeningAfterWake(enable)
+                                        },
+                                        onVoskOfflineToggle = settingsViewModel::setVoskOfflineEnabled,
+                                        onWakeWordToggle = settingsViewModel::setWakeWordEnabled,
+                                        onVadSilenceTimeoutChange = settingsViewModel::setVadSilenceTimeoutMs,
+                                        onMaxVoiceListenSecondsChange = settingsViewModel::setMaxVoiceListenSeconds,
+                                        onWakeWordTimeoutMinutesChange = settingsViewModel::setWakeWordTimeoutMinutes,
+                                        onVoiceCueFeedbackChange = settingsViewModel::setVoiceCueFeedbackEnabled,
+                                        onDownloadVoskModel = settingsViewModel::downloadVoskPersianModel,
                                         onPickVoskZip = {
                                             voskZipPickerLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
                                         },
-                                        onUnloadVoskRam = viewModel::unloadVoskModelFromRam,
-                                        onDeleteVoskModel = viewModel::deleteVoskModel,
-                                        onSlmToggle = viewModel::setSlmSynthesisEnabled,
-                                        onSlmPreferGpuToggle = viewModel::setSlmPreferGpu,
-                                        onDownloadSlmModel = viewModel::downloadSlmModel,
-                                        onCancelSlmDownload = viewModel::cancelSlmDownload,
+                                        onUnloadVoskRam = settingsViewModel::unloadVoskModelFromRam,
+                                        onDeleteVoskModel = settingsViewModel::deleteVoskModel,
+                                        onSlmToggle = slmViewModel::setSlmSynthesisEnabled,
+                                        onSlmPreferGpuToggle = slmViewModel::setSlmPreferGpu,
+                                        onDownloadSlmModel = slmViewModel::downloadSlmModel,
+                                        onCancelSlmDownload = slmViewModel::cancelSlmDownload,
                                         onPickSlmFile = {
                                             slmModelPickerLauncher.launch(arrayOf("application/octet-stream", "*/*"))
                                         },
-                                        onTestLoadSlmInRam = viewModel::testLoadSlmInRam,
-                                        onUnloadSlmRam = viewModel::unloadSlmFromRam,
-                                        onDeleteSlmModel = viewModel::deleteSlmModel,
-                                        onAddQuickSettingsTile = viewModel::requestAddQuickSettingsTile,
-                                        onRequestExactAlarmPermission = viewModel::requestExactAlarmPermission,
-                                        onCancelScheduledAlarm = viewModel::cancelScheduledAlarm,
+                                        onTestLoadSlmInRam = slmViewModel::testLoadSlmInRam,
+                                        onUnloadSlmRam = slmViewModel::unloadSlmFromRam,
+                                        onDeleteSlmModel = slmViewModel::deleteSlmModel,
+                                        onAddQuickSettingsTile = settingsViewModel::requestAddQuickSettingsTile,
+                                        onRequestExactAlarmPermission = settingsViewModel::requestExactAlarmPermission,
+                                        onCancelScheduledAlarm = settingsViewModel::cancelScheduledAlarm,
                                         onExportEncryptedBackup = {
                                             val jDate = JalaliCalendar.fromMillis().formatShortFa().replace("/", "-")
                                             backupExportLauncher.launch("sol-backup-$jDate.solbackup")
@@ -687,18 +711,18 @@ fun SolAppRoot(
                                         onImportEncryptedBackup = {
                                             backupImportLauncher.launch(arrayOf("application/octet-stream", "*/*"))
                                         },
-                                        onTrimRamNow = viewModel::trimRamManually,
-                                        onInvocationModeChange = viewModel::setInvocationMode,
-                                        onDeliveryPreferenceChange = viewModel::setDeliveryPreference,
-                                        onConfirmationPolicyChange = viewModel::setConfirmationPolicy,
-                                        onDarkThemeChange = viewModel::setDarkTheme,
-                                        onVolumePercentChange = viewModel::setMediaVolumePercent,
-                                        onOpenWifi = viewModel::openWifiSettings,
-                                        onOpenLocation = viewModel::openLocationSettings,
-                                        onOpenBluetooth = viewModel::openBluetoothSettings,
-                                        onOpenBattery = viewModel::openBatterySettings,
+                                        onTrimRamNow = backupViewModel::trimRamManually,
+                                        onInvocationModeChange = settingsViewModel::setInvocationMode,
+                                        onDeliveryPreferenceChange = settingsViewModel::setDeliveryPreference,
+                                        onConfirmationPolicyChange = settingsViewModel::setConfirmationPolicy,
+                                        onDarkThemeChange = settingsViewModel::setDarkTheme,
+                                        onVolumePercentChange = settingsViewModel::setMediaVolumePercent,
+                                        onOpenWifi = settingsViewModel::openWifiSettings,
+                                        onOpenLocation = settingsViewModel::openLocationSettings,
+                                        onOpenBluetooth = settingsViewModel::openBluetoothSettings,
+                                        onOpenBattery = settingsViewModel::openBatterySettings,
                                         onLaunchApp = { label ->
-                                            viewModel.launchInstalledApp(label)
+                                            settingsViewModel.launchInstalledApp(label)
                                         },
                                     )
                                 }

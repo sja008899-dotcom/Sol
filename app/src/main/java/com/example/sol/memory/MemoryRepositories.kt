@@ -212,7 +212,23 @@ class KnowledgeRepository(private val dao: MemoryDao) {
 
     suspend fun getAllChunksOnce(): List<BookChunkEntity> = dao.getAllBookChunksOnce()
 
+    suspend fun getIndexedBookIdsOnce(): Set<Long> = dao.getIndexedBookIdsOnce().toSet()
+
+    suspend fun getChunkCountOnce(): Int = dao.getChunkCountOnce()
+
     suspend fun getChunksForBookOnce(bookId: Long): List<BookChunkEntity> = dao.getChunksForBookOnce(bookId)
+
+    suspend fun searchBookChunksFts(ftsQuery: String, limit: Int = 24): List<BookChunkEntity> =
+        dao.searchBookChunksFts(ftsQuery, limit)
+
+    suspend fun searchBookChunksLikeFallback(term: String, limit: Int = 16): List<BookChunkEntity> =
+        dao.searchBookChunksLikeFallback(term, limit)
+
+    suspend fun getChunksForBookTitleLimit(bookTitle: String, limit: Int = 12): List<BookChunkEntity> =
+        dao.getChunksForBookTitleLimit(bookTitle, limit)
+
+    suspend fun getRecentChunksLimit(limit: Int = 12): List<BookChunkEntity> =
+        dao.getRecentChunksLimit(limit)
 
     suspend fun replaceChunksForBook(bookId: Long, chunks: List<BookChunkEntity>) {
         dao.replaceChunksForBook(bookId, chunks)

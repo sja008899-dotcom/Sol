@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,8 +39,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.R
 import com.example.sol.contacts.ContactSource
 import com.example.sol.contacts.ResolvedContact
 import com.example.sol.memory.PersianNormalizer
@@ -68,12 +73,13 @@ fun ContactsScreen(
     Column(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Text(
-                text = "مدیریت مخاطبین",
+                text = stringResource(R.string.contacts_title),
                 style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.semantics { heading() },
             )
             Text(
-                text = "تماس و پیامک فقط پس از نمایش شماره و تأیید شما اجرا می‌شود.",
+                text = stringResource(R.string.contacts_subtitle),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -95,17 +101,20 @@ fun ContactsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "دسترسی به دفترچه تلفن گوشی",
+                                text = stringResource(R.string.contacts_perm_card_title),
                                 style = MaterialTheme.typography.titleSmall,
                             )
                             Text(
-                                text = "برای جست‌وجوی مخاطبین گوشی اجازه دسترسی بدهید؛ یا اشخاص را در حافظه Sol ثبت کنید.",
+                                text = stringResource(R.string.contacts_perm_card_sub),
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Button(onClick = onRequestContactsPermission) {
-                            Text("مجوز")
+                        Button(
+                            onClick = onRequestContactsPermission,
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) {
+                            Text(stringResource(R.string.action_grant_permission))
                         }
                     }
                 }
@@ -115,7 +124,7 @@ fun ContactsScreen(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                placeholder = { Text("جست‌وجوی نام یا شماره…") },
+                placeholder = { Text(stringResource(R.string.contacts_search_hint)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
@@ -141,7 +150,7 @@ fun ContactsScreen(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "مخاطبی پیدا نشد",
+                    text = stringResource(R.string.contacts_empty),
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
@@ -180,7 +189,7 @@ fun ContactsScreen(
                                     }
                                 }
                                 Text(
-                                    text = contact.phone.ifBlank { "بدون شماره" },
+                                    text = contact.phone.ifBlank { stringResource(R.string.contacts_no_phone) },
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.primary,
                                 )
@@ -204,7 +213,7 @@ fun ContactsScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.BookmarkAdd,
-                                        contentDescription = "ذخیره در حافظه Sol",
+                                        contentDescription = stringResource(R.string.cd_save_contact_memory),
                                         tint = MaterialTheme.colorScheme.secondary,
                                     )
                                 }
@@ -217,7 +226,7 @@ fun ContactsScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Sms,
-                                    contentDescription = "پیامک با تأیید",
+                                    contentDescription = stringResource(R.string.cd_sms_with_confirm),
                                     tint = MaterialTheme.colorScheme.primary,
                                 )
                             }
@@ -229,7 +238,7 @@ fun ContactsScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Call,
-                                    contentDescription = "تماس با تأیید",
+                                    contentDescription = stringResource(R.string.cd_call_with_confirm),
                                     tint = MaterialTheme.colorScheme.tertiary,
                                 )
                             }

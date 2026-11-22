@@ -1,6 +1,7 @@
 package com.example.sol.memory
 
 import androidx.room.Entity
+import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -102,6 +103,14 @@ data class BookChunkEntity(
     val bookId: Long,
     val bookTitle: String,
     val chunkIndex: Int,
+    val contentText: String,
+    val normalizedTokens: String,
+)
+
+@Fts4(contentEntity = BookChunkEntity::class)
+@Entity(tableName = "book_chunks_fts")
+data class BookChunkFtsEntity(
+    val bookTitle: String,
     val contentText: String,
     val normalizedTokens: String,
 )

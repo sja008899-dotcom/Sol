@@ -951,7 +951,7 @@ class EncryptedBackupManager(
     private suspend fun estimateBackupPayloadBytes(): Long {
         val dbFile = context.getDatabasePath("sol_memory.db")
         val dbSize = if (dbFile.isFile) dbFile.length() else 0L
-        val chunksCount = knowledgeRepository.getAllChunksOnce().size.toLong()
+        val chunksCount = knowledgeRepository.getChunkCountOnce().toLong()
         return maxOf(dbSize, chunksCount * 700L, 64L * 1024L)
     }
 

@@ -7,6 +7,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.sol.ui.SolAppRoot
 import com.example.sol.ui.SolViewModel
@@ -15,6 +16,7 @@ class MainActivity : ComponentActivity() {
     private val voiceTriggerNonce = mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         handleVoiceLaunchIntent(intent)
         enableEdgeToEdge(
