@@ -19,6 +19,10 @@ class SpeakerEmbedder(private val modelFile: File) {
 
     val isReady: Boolean get() = session != null
 
+    // The current feature extractor is not a real log-mel Fbank implementation.
+    // Keep speaker verification disabled until the exact model preprocessing contract is implemented.
+    val isPreprocessingSupported: Boolean get() = false
+
     @Synchronized
     fun initialize(): Boolean {
         if (isReady) return true
@@ -53,6 +57,11 @@ class SpeakerEmbedder(private val modelFile: File) {
         val ortSession = session ?: return null
 
         return try {
+            if (!isPreprocessingSupported) {
+                throw IllegalStateException(
+                    "Speaker model preprocessing is not validated; refusing to generate an unreliable embedding."
+                )
+            }
             val fbank = computeFbank(pcm16k)
             val frames = fbank.size / 80
 
