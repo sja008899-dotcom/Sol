@@ -71,7 +71,7 @@ class LocalSlmEngine(
                 "بارگذاری متوقف شد: RAM آزاد (${state.availableRamMb}MB) کمتر از حداقل لازم (${state.requiredRamMb}MB) است."
             !hasFile ->
                 if (enabled) {
-                    "فایل مدل آفلاین (.litertlm) نصب نیست؛ فقط هستهٔ سریع قانون‌محور و جست‌وجوی BM25 فعال است."
+                    "فایل مدل زبانی آفلاین (.litertlm) نصب نیست؛ فقط هستهٔ سریع قانون‌محور و جست‌وجوی BM25 فعال است."
                 } else {
                     "مدل زبانی آفلاین (فاز ۳) خاموش و نصب‌نشده است (هستهٔ سریع قانون‌محور + BM25 فعال)."
                 }
@@ -100,12 +100,16 @@ class LocalSlmEngine(
     fun downloadModel(spec: SlmModelSpec, onSavedPath: (String) -> Unit) =
         modelDownloader.downloadModel(spec, onSavedPath)
 
+    // Keep the callback last so Kotlin trailing-lambda calls remain source-compatible.
     internal suspend fun downloadModelSync(
         spec: SlmModelSpec,
-        onSavedPath: (String) -> Unit = {},
         allowHttpsWithoutPinnedHash: Boolean = false,
-    ): Result<File> =
-        modelDownloader.downloadModelSync(spec, onSavedPath, allowHttpsWithoutPinnedHash)
+        onSavedPath: (String) -> Unit = {},
+    ): Result<File> = modelDownloader.downloadModelSync(
+        spec = spec,
+        onSavedPath = onSavedPath,
+        allowHttpsWithoutPinnedHash = allowHttpsWithoutPinnedHash,
+    )
 
     fun cancelDownload() = modelDownloader.cancelDownload()
 
