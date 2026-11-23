@@ -117,6 +117,8 @@ class TtsManager(
 
         Thread({
             val pcm = piperEngine.synthesize(text)
+            if (generation != speechGeneration.get()) return@Thread
+
             val played = pcm != null &&
                 pcm.isNotEmpty() &&
                 piperEngine.play(pcm, piperEngine.sampleRate)
