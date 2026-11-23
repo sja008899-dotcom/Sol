@@ -47,7 +47,7 @@ internal class ModelDownloader(
 
     suspend fun downloadModelSync(
         spec: SlmModelSpec,
-        onSavedPath: (String) -> Unit,
+        onSavedPath: (String) -> Unit = {},
         allowHttpsWithoutPinnedHash: Boolean = false,
     ): Result<File> = withContext(Dispatchers.IO) {
         val destDir = modelStore.modelsDir.apply { mkdirs() }
