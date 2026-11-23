@@ -18,7 +18,8 @@ class PiperTtsEngine(
     private var env: OrtEnvironment? = null
     private var session: OrtSession? = null
     private var config: PiperConfig? = null
-    private var audioTrack: AudioTrack? = null
+    @Volatile private var audioTrack: AudioTrack? = null
+    @Volatile private var playbackGeneration: Long = 0L
 
     val isReady: Boolean get() = session != null && config != null
     val sampleRate: Int get() = config?.sampleRate ?: 22050
@@ -88,27 +89,68 @@ class PiperTtsEngine(
         return map
     }
 
+    @Synchronized
     fun play(pcm: ShortArray, sampleRate: Int): Boolean {
+        if (pcm.isEmpty()) return false
+        val generation = playbackGeneration
+        var track: AudioTrack? = null
         return try {
-            val track = AudioTrack.Builder()
-                .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANT).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
-                .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
+            track = AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build()
+                )
                 .setBufferSizeInBytes(pcm.size * 2)
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .build()
+
             audioTrack = track
-            track.write(pcm, 0, pcm.size)
+            val written = track.write(pcm, 0, pcm.size)
+            if (written != pcm.size || generation != playbackGeneration) {
+                return false
+            }
+
             track.play()
-            true
+            while (
+                generation == playbackGeneration &&
+                track.playState == AudioTrack.PLAYSTATE_PLAYING &&
+                track.playbackHeadPosition < pcm.size
+            ) {
+                Thread.sleep(10L)
+            }
+
+            generation == playbackGeneration &&
+                track.playbackHeadPosition >= pcm.size
+        } catch (t: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
         } catch (t: Throwable) {
             Log.e("PiperTtsEngine", "Piper playback failed", t)
             false
+        } finally {
+            try { track?.stop() } catch (_: Throwable) {}
+            try { track?.release() } catch (_: Throwable) {}
+            if (audioTrack === track) audioTrack = null
         }
     }
 
+    @Synchronized
     fun stop() {
-        try { audioTrack?.pause(); audioTrack?.flush(); audioTrack?.release() } catch (_: Throwable) {}
+        playbackGeneration++
+        val track = audioTrack
         audioTrack = null
+        try { track?.pause() } catch (_: Throwable) {}
+        try { track?.flush() } catch (_: Throwable) {}
+        try { track?.release() } catch (_: Throwable) {}
     }
 
     fun release() {
