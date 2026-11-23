@@ -9,6 +9,7 @@ import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.atomic.AtomicLong
 
 sealed interface PiperTtsStatus {
     data object NotInstalled : PiperTtsStatus
@@ -38,6 +39,7 @@ class TtsManager(
     private val configFile = File(piperDir, "persian.onnx.json")
 
     private val piperEngine = PiperTtsEngine(modelFile, configFile)
+    private val speechGeneration = AtomicLong(0L)
 
     private val _isPiperSpeaking = MutableStateFlow(false)
     val isPiperSpeaking: StateFlow<Boolean> = _isPiperSpeaking.asStateFlow()
@@ -109,26 +111,27 @@ class TtsManager(
     }
 
     private fun speakWithPiper(text: String) {
+        val generation = speechGeneration.incrementAndGet()
+        piperEngine.stop()
         _isPiperSpeaking.value = true
 
-        Thread {
+        Thread({
             val pcm = piperEngine.synthesize(text)
             val played = pcm != null &&
                 pcm.isNotEmpty() &&
                 piperEngine.play(pcm, piperEngine.sampleRate)
 
-            if (played) {
-                _isPiperSpeaking.value = false
-            } else {
+            if (generation != speechGeneration.get()) return@Thread
+
+            _isPiperSpeaking.value = false
+            if (!played) {
                 Log.e(
                     "TtsManager",
                     "خطا در تولید یا پخش صدای Piper. استفاده از موتور سیستم."
                 )
-
-                _isPiperSpeaking.value = false
                 speakWithSystem(text)
             }
-        }.start()
+        }, "Sol-Piper-TTS").start()
     }
 
     fun speakWithSystem(
@@ -149,6 +152,7 @@ class TtsManager(
     }
 
     fun stop() {
+        speechGeneration.incrementAndGet()
         piperEngine.stop()
         systemTts.stop()
         _isPiperSpeaking.value = false
@@ -156,6 +160,7 @@ class TtsManager(
     }
 
     fun disableAndDeletePiper() {
+        speechGeneration.incrementAndGet()
         piperEngine.release()
         piperDir.deleteRecursively()
         _piperStatus.value = PiperTtsStatus.NotInstalled
