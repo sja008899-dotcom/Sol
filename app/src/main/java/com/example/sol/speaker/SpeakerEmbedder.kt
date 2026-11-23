@@ -19,7 +19,10 @@ class SpeakerEmbedder(private val modelFile: File) {
 
     val isReady: Boolean get() = session != null
 
+    @Synchronized
     fun initialize(): Boolean {
+        if (isReady) return true
+        release()
         return try {
             require(modelFile.exists()) {
                 "Speaker embedding model missing"
