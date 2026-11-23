@@ -25,7 +25,10 @@ class PiperTtsEngine(
     val isReady: Boolean get() = session != null && config != null
     val sampleRate: Int get() = config?.sampleRate ?: 22050
 
+    @Synchronized
     fun initialize(): Boolean {
+        if (isReady) return true
+        release()
         return try {
             require(modelFile.exists()) { "Piper model missing" }
             require(configFile.exists()) { "Piper config missing" }
@@ -128,7 +131,7 @@ class PiperTtsEngine(
                 Thread.sleep(10L)
             }
 
-            generation == playbackGeneration &&
+            generation == playbackGeneration.get() &&
                 track.playbackHeadPosition >= pcm.size
         } catch (t: InterruptedException) {
             Thread.currentThread().interrupt()
