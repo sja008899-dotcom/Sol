@@ -192,7 +192,9 @@ class VoiceEngine(
                 _rmsDb.value = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
             }
 
-            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onBufferReceived(buffer: ByteArray?) {
+                // Intentionally unused; final and partial speech results arrive via callbacks below.
+            }
 
             override fun onEndOfSpeech() {
                 _state.value = VoiceListeningState.Processing
@@ -240,7 +242,9 @@ class VoiceEngine(
                 }
             }
 
-            override fun onEvent(eventType: Int, params: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {
+                // Intentionally unused; no vendor-specific SpeechRecognizer events handled.
+            }
         })
 
         scheduleMaxDurationTimer(safeMaxDurationMs) {

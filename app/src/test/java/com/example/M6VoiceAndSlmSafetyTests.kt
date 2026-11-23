@@ -35,7 +35,7 @@ import org.robolectric.annotation.Config
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [31])
 class M6VoiceAndSlmSafetyTests {
 
     @Test

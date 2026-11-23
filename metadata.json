@@ -1,6 +1,6 @@
 {
   "name": "Sol",
-  "description": "Standalone offline-first Persian voice and life assistant with local Room memory, command brain, contacts, communication confirmation, and device controls.",
+  "description": "Sol is an offline-first Persian (fa-IR, RTL) voice and life assistant built with Kotlin and Jetpack Compose, featuring on-device NLU, local Room memory, Jalali calendar/exact alarms, encrypted backups, and optional user-confirmed network downloads.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

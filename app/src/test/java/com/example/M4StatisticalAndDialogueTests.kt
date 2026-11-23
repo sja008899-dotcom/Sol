@@ -30,7 +30,7 @@ import java.io.File
 import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [31])
 class M4StatisticalAndDialogueTests {
 
     @Test

@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class BackupViewModel(application: Application) : AndroidViewModel(application) {
     private val c = (application as SolApplication).container
@@ -88,8 +89,8 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
         val kb = bytes / 1024.0
         val mb = kb / 1024.0
         return when {
-            mb >= 1.0 -> String.format("%.1f MB", mb)
-            kb >= 1.0 -> String.format("%.0f KB", kb)
+            mb >= 1.0 -> String.format(Locale.US, "%.1f MB", mb)
+            kb >= 1.0 -> String.format(Locale.US, "%.0f KB", kb)
             else -> "$bytes B"
         }
     }

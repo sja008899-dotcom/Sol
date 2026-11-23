@@ -1,8 +1,0 @@
-{
-  "name": "Sol",
-  "description": "Offline-first Persian voice and life assistant for Android: local memory, rule + statistical NLU, safe skills, and confirmed calls/SMS.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}
