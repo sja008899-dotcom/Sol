@@ -1,6 +1,5 @@
 package com.example.sol.knowledge
 
-import android.content.Context
 import android.net.Uri
 import com.example.sol.network.SolHttpClient
 import com.example.sol.network.SolStorageGuard
@@ -102,7 +101,7 @@ class LocalSlmEngine(
 
     internal suspend fun downloadModelSync(
         spec: SlmModelSpec,
-        onSavedPath: (String) -> Unit,
+        onSavedPath: (String) -> Unit = {},
         allowHttpsWithoutPinnedHash: Boolean = false,
     ): Result<File> =
         modelDownloader.downloadModelSync(spec, onSavedPath, allowHttpsWithoutPinnedHash)
