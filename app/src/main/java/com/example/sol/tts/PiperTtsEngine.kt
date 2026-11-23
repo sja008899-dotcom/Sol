@@ -10,6 +10,7 @@ import android.util.Log
 import java.io.File
 import java.nio.FloatBuffer
 import java.nio.LongBuffer
+import java.util.concurrent.atomic.AtomicLong
 
 class PiperTtsEngine(
     private val modelFile: File,
@@ -19,7 +20,7 @@ class PiperTtsEngine(
     private var session: OrtSession? = null
     private var config: PiperConfig? = null
     @Volatile private var audioTrack: AudioTrack? = null
-    @Volatile private var playbackGeneration: Long = 0L
+    private val playbackGeneration = AtomicLong(0L)
 
     val isReady: Boolean get() = session != null && config != null
     val sampleRate: Int get() = config?.sampleRate ?: 22050
@@ -89,10 +90,9 @@ class PiperTtsEngine(
         return map
     }
 
-    @Synchronized
     fun play(pcm: ShortArray, sampleRate: Int): Boolean {
         if (pcm.isEmpty()) return false
-        val generation = playbackGeneration
+        val generation = playbackGeneration.get()
         var track: AudioTrack? = null
         return try {
             track = AudioTrack.Builder()
@@ -115,13 +115,13 @@ class PiperTtsEngine(
 
             audioTrack = track
             val written = track.write(pcm, 0, pcm.size)
-            if (written != pcm.size || generation != playbackGeneration) {
+            if (written != pcm.size || generation != playbackGeneration.get()) {
                 return false
             }
 
             track.play()
             while (
-                generation == playbackGeneration &&
+                generation == playbackGeneration.get() &&
                 track.playState == AudioTrack.PLAYSTATE_PLAYING &&
                 track.playbackHeadPosition < pcm.size
             ) {
@@ -143,9 +143,8 @@ class PiperTtsEngine(
         }
     }
 
-    @Synchronized
     fun stop() {
-        playbackGeneration++
+        playbackGeneration.incrementAndGet()
         val track = audioTrack
         audioTrack = null
         try { track?.pause() } catch (_: Throwable) {}
