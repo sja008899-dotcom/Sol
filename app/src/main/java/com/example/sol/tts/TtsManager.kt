@@ -1,7 +1,6 @@
 package com.example.sol.tts
 
 import android.content.Context
-import android.media.AudioManager
 import android.util.Log
 import com.example.sol.memory.VoicePersona
 import com.example.sol.voice.PersianTTS
@@ -11,11 +10,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class PiperTtsStatus {
-    READY,
-    MODEL_MISSING,
-    INIT_FAILED,
-    DISABLED
+sealed interface PiperTtsStatus {
+    data object NotInstalled : PiperTtsStatus
+
+    data class PartialSelection(
+        val noteFa: String
+    ) : PiperTtsStatus
+
+    data class Ready(
+        val sampleRate: Int,
+        val sizeMb: Int
+    ) : PiperTtsStatus
+
+    data class Error(
+        val messageFa: String
+    ) : PiperTtsStatus
 }
 
 class TtsManager(
@@ -24,8 +33,7 @@ class TtsManager(
     private val audioManager: SolAudioManager
 ) {
     private val appContext = context.applicationContext
-    private val filesDir = appContext.filesDir
-    private val piperDir = File(filesDir, "piper")
+    private val piperDir = File(appContext.filesDir, "piper")
     private val modelFile = File(piperDir, "persian.onnx")
     private val configFile = File(piperDir, "persian.onnx.json")
 
@@ -34,7 +42,8 @@ class TtsManager(
     private val _isPiperSpeaking = MutableStateFlow(false)
     val isPiperSpeaking: StateFlow<Boolean> = _isPiperSpeaking.asStateFlow()
 
-    private val _piperStatus = MutableStateFlow(PiperTtsStatus.DISABLED)
+    private val _piperStatus =
+        MutableStateFlow<PiperTtsStatus>(PiperTtsStatus.NotInstalled)
     val piperStatus: StateFlow<PiperTtsStatus> = _piperStatus.asStateFlow()
 
     init {
@@ -42,16 +51,39 @@ class TtsManager(
     }
 
     fun refreshInstalledPiper(): Boolean {
-        if (!modelFile.exists() || !configFile.exists()) {
+        val hasModel = modelFile.isFile && modelFile.length() > 0L
+        val hasConfig = configFile.isFile && configFile.length() > 0L
+
+        if (!hasModel && !hasConfig) {
             piperEngine.release()
-            _piperStatus.value = PiperTtsStatus.MODEL_MISSING
+            _piperStatus.value = PiperTtsStatus.NotInstalled
+            return false
+        }
+
+        if (!hasModel || !hasConfig) {
+            piperEngine.release()
+            _piperStatus.value = PiperTtsStatus.PartialSelection(
+                noteFa = "برای فعال‌سازی Piper هر دو فایل مدل ONNX و تنظیمات JSON لازم است."
+            )
             return false
         }
 
         val initialized = piperEngine.initialize()
-        _piperStatus.value =
-            if (initialized) PiperTtsStatus.READY
-            else PiperTtsStatus.INIT_FAILED
+
+        _piperStatus.value = if (initialized) {
+            val totalBytes = modelFile.length() + configFile.length()
+
+            PiperTtsStatus.Ready(
+                sampleRate = piperEngine.sampleRate,
+                sizeMb = (totalBytes / (1024L * 1024L))
+                    .toInt()
+                    .coerceAtLeast(1)
+            )
+        } else {
+            PiperTtsStatus.Error(
+                messageFa = "راه‌اندازی موتور Piper ناموفق بود؛ فایل ONNX و تنظیمات JSON را بررسی کنید."
+            )
+        }
 
         return initialized
     }
@@ -59,7 +91,7 @@ class TtsManager(
     fun speak(
         text: String,
         speechRate: Float = 1.0f,
-        persona: VoicePersona = VoicePersona.Natural,
+        persona: VoicePersona = VoicePersona.FEMALE_CALM,
         preferredVoiceName: String = ""
     ) {
         if (text.isBlank()) return
@@ -67,7 +99,12 @@ class TtsManager(
         if (piperEngine.isReady) {
             speakWithPiper(text)
         } else {
-            speakWithSystem(text)
+            speakWithSystem(
+                text = text,
+                speechRate = speechRate,
+                persona = persona,
+                preferredVoiceName = preferredVoiceName
+            )
         }
     }
 
@@ -81,27 +118,33 @@ class TtsManager(
                 piperEngine.play(pcm, piperEngine.sampleRate)
 
             if (played) {
-                onPiperDone()
+                _isPiperSpeaking.value = false
             } else {
                 Log.e(
                     "TtsManager",
                     "خطا در تولید یا پخش صدای Piper. استفاده از موتور سیستم."
                 )
+
                 _isPiperSpeaking.value = false
                 speakWithSystem(text)
             }
         }.start()
     }
 
-    private fun onPiperDone() {
-        _isPiperSpeaking.value = false
-    }
-
     fun speakWithSystem(
         text: String,
+        speechRate: Float = 1.0f,
+        persona: VoicePersona = VoicePersona.FEMALE_CALM,
+        preferredVoiceName: String = "",
         onDone: (() -> Unit)? = null
     ) {
-        systemTts.speak(text)
+        systemTts.speak(
+            text = text,
+            speechRate = speechRate,
+            persona = persona,
+            preferredVoiceName = preferredVoiceName
+        )
+
         onDone?.invoke()
     }
 
@@ -115,21 +158,13 @@ class TtsManager(
     fun disableAndDeletePiper() {
         piperEngine.release()
         piperDir.deleteRecursively()
-        _piperStatus.value = PiperTtsStatus.DISABLED
+        _piperStatus.value = PiperTtsStatus.NotInstalled
         _isPiperSpeaking.value = false
     }
 
     fun importPiperUris(uris: List<android.net.Uri>): Result<String> {
         return try {
             piperDir.mkdirs()
-
-            val importFile = { uri: android.net.Uri, target: File ->
-                appContext.contentResolver.openInputStream(uri)?.use { input ->
-                    target.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                } ?: throw IllegalArgumentException("فایل قابل خواندن نیست.")
-            }
 
             var importedModel = false
             var importedConfig = false
@@ -143,24 +178,30 @@ class TtsManager(
                     null
                 )?.use { cursor ->
                     if (cursor.moveToFirst()) {
-                        cursor.getString(cursor.getColumnIndexOrThrow(
-                            android.provider.OpenableColumns.DISPLAY_NAME
-                        ))
+                        cursor.getString(
+                            cursor.getColumnIndexOrThrow(
+                                android.provider.OpenableColumns.DISPLAY_NAME
+                            )
+                        )
                     } else {
                         ""
                     }
-                }.orEmpty()
+                }.orEmpty().lowercase()
 
-                val lower = name.lowercase()
-                when {
-                    lower.endsWith(".onnx") ->
-                        importFile(uri, modelFile).also { importedModel = true }
+                val target = when {
+                    name.endsWith(".onnx") -> modelFile
+                    name.endsWith(".json") -> configFile
+                    else -> null
+                } ?: return@forEach
 
-                    lower.endsWith(".json") ->
-                        importFile(uri, configFile).also { importedConfig = true }
+                appContext.contentResolver.openInputStream(uri)?.use { input ->
+                    target.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                } ?: throw IllegalArgumentException("فایل قابل خواندن نیست.")
 
-                    else -> Unit
-                }
+                if (target === modelFile) importedModel = true
+                if (target === configFile) importedConfig = true
             }
 
             if (!importedModel || !importedConfig) {
