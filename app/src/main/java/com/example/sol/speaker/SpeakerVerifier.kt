@@ -96,7 +96,8 @@ class SpeakerIdManager(
     val uiState: StateFlow<SpeakerIdUiState> = _uiState.asStateFlow()
 
     val isActive: Boolean
-        get() = embedder.isModelPresent && embedder.isReady && ownerProfile.exists()
+        get() = embedder.isModelPresent && embedder.isReady &&
+            embedder.isPreprocessingSupported && ownerProfile.exists()
 
     fun refreshStatus() {
         _uiState.value = computeStatus(isRecording = _uiState.value.isRecordingOwner)
@@ -111,10 +112,12 @@ class SpeakerIdManager(
     private fun computeStatus(isRecording: Boolean = false): SpeakerIdUiState {
         val hasModel = embedder.isModelPresent
         val hasOwner = ownerProfile.exists()
-        val active = hasModel && embedder.isReady && hasOwner
+        val active = hasModel && embedder.isReady &&
+            embedder.isPreprocessingSupported && hasOwner
         val label = when {
             isRecording -> "در حال ضبط (لطفاً با صدای عادی صحبت کنید)…"
             active -> "✅ شناسایی صدای مالک (N5) فعال است؛ دستورات صوتی فقط برای صدای مالک اجرا می‌شوند."
+            hasModel && !embedder.isPreprocessingSupported -> "N5 غیرفعال: پیش‌پردازش صوت مدل هنوز با مشخصات رسمی مدل تطبیق داده نشده است؛ احراز هویت صوتی برای جلوگیری از خطا فعال نمی‌شود."
             hasModel && !embedder.isReady -> "N5 غیرفعال: فایل مدل موجود است اما موتور ONNX آماده نیست؛ مدل را دوباره وارد کنید."
             hasModel && !hasOwner -> "N5 غیرفعال: مدل گوینده نصب است، اما هنوز نمونهٔ صدای مالک ضبط نشده است."
             !hasModel && hasOwner -> "N5 غیرفعال: نمونهٔ صدای مالک ذخیره شده، اما مدل ONNX گوینده انتخاب نشده است."
