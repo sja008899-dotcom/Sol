@@ -1,5 +1,6 @@
 package com.example.sol.knowledge
 
+import android.content.Context
 import android.net.Uri
 import com.example.sol.network.SolHttpClient
 import com.example.sol.network.SolStorageGuard
