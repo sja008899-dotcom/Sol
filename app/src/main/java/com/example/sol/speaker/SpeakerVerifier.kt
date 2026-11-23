@@ -96,7 +96,7 @@ class SpeakerIdManager(
     val uiState: StateFlow<SpeakerIdUiState> = _uiState.asStateFlow()
 
     val isActive: Boolean
-        get() = embedder.isModelPresent && ownerProfile.exists()
+        get() = embedder.isModelPresent && embedder.isReady && ownerProfile.exists()
 
     fun refreshStatus() {
         _uiState.value = computeStatus(isRecording = _uiState.value.isRecordingOwner)
@@ -111,10 +111,11 @@ class SpeakerIdManager(
     private fun computeStatus(isRecording: Boolean = false): SpeakerIdUiState {
         val hasModel = embedder.isModelPresent
         val hasOwner = ownerProfile.exists()
-        val active = hasModel && hasOwner
+        val active = hasModel && embedder.isReady && hasOwner
         val label = when {
             isRecording -> "در حال ضبط (لطفاً با صدای عادی صحبت کنید)…"
             active -> "✅ شناسایی صدای مالک (N5) فعال است؛ دستورات صوتی فقط برای صدای مالک اجرا می‌شوند."
+            hasModel && !embedder.isReady -> "N5 غیرفعال: فایل مدل موجود است اما موتور ONNX آماده نیست؛ مدل را دوباره وارد کنید."
             hasModel && !hasOwner -> "N5 غیرفعال: مدل گوینده نصب است، اما هنوز نمونهٔ صدای مالک ضبط نشده است."
             !hasModel && hasOwner -> "N5 غیرفعال: نمونهٔ صدای مالک ذخیره شده، اما مدل ONNX گوینده انتخاب نشده است."
             else -> "N5 غیرفعال: مدل گوینده و نمونهٔ صدای مالک ثبت نشده‌اند (حالت Fail-safe بدون مسدودسازی)."
@@ -163,6 +164,11 @@ class SpeakerIdManager(
     suspend fun enrollOwnerFromPcm(pcm16k: FloatArray): Result<String> = withContext(Dispatchers.IO) {
         if (!embedder.isModelPresent) {
             val msg = "N5 غیرفعال است: ابتدا فایل مدل ONNX شناسایی گوینده را انتخاب کنید."
+            setFeedback(msg, isError = true)
+            return@withContext Result.failure(IllegalStateException(msg))
+        }
+        if (!embedder.isReady && !embedder.initialize()) {
+            val msg = "راه‌اندازی مدل ONNX شناسایی گوینده ناموفق بود؛ N5 غیرفعال باقی ماند."
             setFeedback(msg, isError = true)
             return@withContext Result.failure(IllegalStateException(msg))
         }
@@ -374,7 +380,12 @@ class SpeakerIdManager(
             if (!temp.renameTo(modelFile)) {
                 temp.copyTo(modelFile, overwrite = true)
             }
-            val msg = "مدل شناسایی گوینده وارد شد. اکنون دکمه «ضبط صدای من» را بزنید تا N5 فعال شود."
+            if (!embedder.initialize()) {
+                val msg = "فایل مدل کپی شد اما راه‌اندازی موتور ONNX ناموفق بود؛ N5 غیرفعال باقی ماند."
+                setFeedback(msg, isError = true)
+                return@withContext Result.failure(IllegalStateException(msg))
+            }
+            val msg = "مدل شناسایی گوینده وارد و موتور ONNX آماده شد. اکنون دکمه «ضبط صدای من» را بزنید."
             setFeedback(msg, isError = false)
             Result.success(msg)
         } catch (t: Throwable) {
