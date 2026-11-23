@@ -11,6 +11,7 @@ class SpeakerEmbedder(private val modelFile: File) {
     private var env: OrtEnvironment? = null
     private var session: OrtSession? = null
 
+    val isModelPresent: Boolean get() = modelFile.exists() && modelFile.isFile && modelFile.length() > 0L
     val isReady: Boolean get() = session != null
 
     fun initialize(): Boolean {
@@ -37,7 +38,7 @@ class SpeakerEmbedder(private val modelFile: File) {
             val fbank = computeFbank(pcm16k)
             val frames = fbank.size / 80
             val inputName = s.inputNames.firstOrNull { it.contains("feat", true) || it.contains("input", true) } ?: s.inputNames.first()
-            
+
             val tensor = OnnxTensor.createTensor(e, FloatBuffer.wrap(fbank), longArrayOf(1, frames.toLong(), 80))
             val result = s.run(mapOf(inputName to tensor))
             val out = result.get(0) as OnnxTensor
@@ -91,5 +92,15 @@ class SpeakerEmbedder(private val modelFile: File) {
         try { session?.close() } catch (_: Throwable) {}
         session = null
         env = null
+    }
+
+    companion object {
+        fun l2Normalize(vec: FloatArray): FloatArray {
+            if (vec.isEmpty()) return vec
+            var sumSq = 0f
+            for (v in vec) sumSq += v * v
+            val norm = kotlin.math.sqrt(sumSq).coerceAtLeast(1e-8f)
+            return FloatArray(vec.size) { i -> vec[i] / norm }
+        }
     }
 }
