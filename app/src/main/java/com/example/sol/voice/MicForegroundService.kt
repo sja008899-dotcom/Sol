@@ -103,13 +103,7 @@ class MicForegroundService : Service() {
                     AudioFormat.ENCODING_PCM_16BIT,
                 ).coerceAtLeast(2048)
 
-                recorder = AudioRecord(
-                    MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                    sampleRate,
-                    AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
-                    minBuf * 2,
-                )
+                recorder = createMicServiceAudioRecord(sampleRate, minBuf * 2)
                 audioRecord = recorder
                 if (recorder.state != AudioRecord.STATE_INITIALIZED) {
                     Log.e(TAG, "AudioRecord not initialized")
@@ -164,6 +158,30 @@ class MicForegroundService : Service() {
                 stopSelf()
             }
         }, "SolMicForegroundLoop").also { it.start() }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun createMicServiceAudioRecord(sampleRate: Int, bufferBytes: Int): AudioRecord {
+        for (source in listOf(MediaRecorder.AudioSource.VOICE_RECOGNITION, MediaRecorder.AudioSource.MIC)) {
+            val candidate = AudioRecord(
+                source,
+                sampleRate,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufferBytes,
+            )
+            if (candidate.state == AudioRecord.STATE_INITIALIZED) {
+                return candidate
+            }
+            runCatching { candidate.release() }
+        }
+        return AudioRecord(
+            MediaRecorder.AudioSource.MIC,
+            sampleRate,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+            bufferBytes,
+        )
     }
 
     private fun findValidVoskDir(root: File): File? {

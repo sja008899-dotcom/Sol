@@ -408,6 +408,127 @@ class M2SecurityNetworkTests {
         )
     }
 
+    @Test
+    fun `a4 official ui download supports huggingface redirect x-linked-etag sha256 verification and 404 mirror fallback`(): Unit = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+
+        // 1. Vosk fallback from 404 on 0.5 to 200 on 0.42
+        val zipBytes = ByteArrayOutputStream().use { baos ->
+            ZipOutputStream(baos).use { zos ->
+                zos.putNextEntry(ZipEntry("vosk-model-small-fa-0.42/am/final.mdl"))
+                zos.write("MDL".toByteArray())
+                zos.closeEntry()
+                zos.putNextEntry(ZipEntry("vosk-model-small-fa-0.42/conf/mfcc.conf"))
+                zos.write("--use-energy=false".toByteArray())
+                zos.closeEntry()
+            }
+            baos.toByteArray()
+        }
+        val requestedUrls = mutableListOf<String>()
+        val fallbackVoskClient = SolHttpClient(
+            dnsResolver = publicDns(),
+            connectionOpener = { url ->
+                requestedUrls += url.toString()
+                if (url.toString().contains("0.5.zip")) {
+                    FakeHttpURLConnection(url, 404)
+                } else {
+                    FakeHttpURLConnection(url, 200, zipBytes)
+                }
+            },
+            availableBytesProvider = { 4L * 1024L * 1024L * 1024L },
+        )
+        val voskEngine = VoskVoiceEngine(
+            context = context,
+            httpClient = fallbackVoskClient,
+            availableBytesProvider = { 4L * 1024L * 1024L * 1024L },
+        )
+        voskEngine.deleteInstalledModel()
+        val voskRes = voskEngine.downloadPersianSmallModelSync(allowHttpsWithoutPinnedHash = true)
+        assertTrue("Expected Vosk 404 fallback download to succeed: ${voskRes.exceptionOrNull()}", voskRes.isSuccess)
+        assertTrue(requestedUrls.any { it.contains("0.5.zip") })
+        assertTrue(requestedUrls.any { it.contains("0.42.zip") })
+        assertTrue(voskEngine.isModelInstalled())
+        voskEngine.deleteInstalledModel()
+
+        // 2. Hugging Face 302 redirect to hf.co CDN with X-Linked-Etag SHA-256 + X-Linked-Size
+        val slmPayload = ByteArray(1_050_000) { idx -> ((idx * 17 + 3) and 0xFF).toByte() }
+        val expectedLinkedSha = sha256Hex(slmPayload)
+        val hfClient = SolHttpClient(
+            dnsResolver = publicDns(),
+            connectionOpener = { url ->
+                val urlStr = url.toString()
+                when {
+                    urlStr.contains("Qwen3-0.6B_dynamic_wi4b32_afp32") -> FakeHttpURLConnection(url, 404)
+                    urlStr.contains("huggingface.co") -> FakeHttpURLConnection(
+                        url = url,
+                        code = 302,
+                        headers = mapOf(
+                            "Location" to "https://cas-bridge.xethub.hf.co/blob/test-model.litertlm",
+                            "X-Linked-Etag" to "\"$expectedLinkedSha\"",
+                            "X-Linked-Size" to slmPayload.size.toString(),
+                        ),
+                        declaredLength = -1L,
+                    )
+                    urlStr.contains("cas-bridge.xethub.hf.co") -> FakeHttpURLConnection(
+                        url = url,
+                        code = 200,
+                        body = slmPayload,
+                        headers = mapOf("ETag" to "\"$expectedLinkedSha\""),
+                    )
+                    else -> FakeHttpURLConnection(url, 404)
+                }
+            },
+            availableBytesProvider = { 5L * 1024L * 1024L * 1024L },
+        )
+        val slmEngine = LocalSlmEngine(
+            context = context,
+            httpClient = hfClient,
+            availableBytesProvider = { 5L * 1024L * 1024L * 1024L },
+        )
+        var savedSlmPath = ""
+        val slmRes = slmEngine.downloadModelSync(
+            spec = SlmModelCatalog.models.first(),
+            onSavedPath = { savedSlmPath = it },
+            allowHttpsWithoutPinnedHash = true,
+        )
+        assertTrue("Expected HF SLM download with fallback + X-Linked-Etag to succeed: ${slmRes.exceptionOrNull()}", slmRes.isSuccess)
+        assertTrue(File(savedSlmPath).exists())
+        File(savedSlmPath).delete()
+
+        // 3. Mismatched X-Linked-Etag MUST reject and clean .part
+        val badHfClient = SolHttpClient(
+            dnsResolver = publicDns(),
+            connectionOpener = { url ->
+                if (url.toString().contains("huggingface.co")) {
+                    FakeHttpURLConnection(
+                        url = url,
+                        code = 302,
+                        headers = mapOf(
+                            "Location" to "https://cas-bridge.xethub.hf.co/blob/tampered.litertlm",
+                            "X-Linked-Etag" to "\"${"0".repeat(64)}\"",
+                            "X-Linked-Size" to slmPayload.size.toString(),
+                        ),
+                    )
+                } else {
+                    FakeHttpURLConnection(url, 200, slmPayload)
+                }
+            },
+            availableBytesProvider = { 5L * 1024L * 1024L * 1024L },
+        )
+        val badSlmEngine = LocalSlmEngine(
+            context = context,
+            httpClient = badHfClient,
+            availableBytesProvider = { 5L * 1024L * 1024L * 1024L },
+        )
+        val mismatchRes = badSlmEngine.downloadModelSync(
+            spec = SlmModelCatalog.models.first(),
+            onSavedPath = {},
+            allowHttpsWithoutPinnedHash = true,
+        )
+        assertTrue(mismatchRes.isFailure)
+        assertTrue(mismatchRes.exceptionOrNull() is SolNetworkException.IntegrityMismatchException)
+    }
+
     // =========================================================================
     // A5: Encrypted Backup V3 Streaming + V2 Compat + Atomic Room Transaction
     // =========================================================================

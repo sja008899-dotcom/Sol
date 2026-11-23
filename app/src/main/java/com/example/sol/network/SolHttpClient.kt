@@ -293,6 +293,231 @@ class SolHttpClient(
         }
     }
 
+    private data class SafeConnectionResult(
+        val connection: HttpURLConnection,
+        val finalUrl: URL,
+        val linkedSha256: String?,
+        val linkedSizeBytes: Long,
+    )
+
+    fun downloadOfficialHttpsFile(
+        urlString: String,
+        partFile: File,
+        estimatedBytes: Long,
+        allowedHostSuffixes: Set<String>? = DEFAULT_MODEL_ALLOWED_HOSTS,
+        redirectAllowedHostSuffixes: Set<String>? = DEFAULT_CDN_REDIRECT_HOSTS,
+        isCancelled: () -> Boolean = { false },
+        onProgress: (percent: Int, downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
+    ): File {
+        val checkDir = partFile.parentFile ?: partFile
+        checkDir.mkdirs()
+
+        val initialDiskCheck = SolStorageGuard.checkFreeSpace(
+            targetPath = checkDir,
+            payloadBytes = estimatedBytes.coerceAtLeast(1L),
+            availableBytesProvider = availableBytesProvider,
+        )
+        if (!initialDiskCheck.hasEnoughSpace) {
+            throw SolNetworkException.InsufficientDiskSpaceException(
+                availableMb = initialDiskCheck.availableMb,
+                requiredMb = initialDiskCheck.requiredMb,
+            )
+        }
+
+        val existingLength = if (partFile.isFile) partFile.length() else 0L
+        val safeConn = openOfficialDownloadConnection(
+            urlString = urlString,
+            partFile = partFile,
+            existingLength = existingLength,
+            allowedHostSuffixes = allowedHostSuffixes,
+            redirectAllowedHostSuffixes = redirectAllowedHostSuffixes,
+        )
+
+        val conn = safeConn.connection
+        var shouldDeletePartOnError = false
+        return try {
+            val code = conn.responseCode
+            val contentType = conn.contentType.orEmpty().lowercase(Locale.ROOT)
+            if (contentType.contains("text/html")) {
+                shouldDeletePartOnError = true
+                throw SolNetworkException.HttpStatusException(code)
+            }
+            if (code !in 200..299) {
+                throw SolNetworkException.HttpStatusException(code)
+            }
+
+            val appendMode = (code == HttpURLConnection.HTTP_PARTIAL && partFile.isFile && partFile.length() > 0L)
+            val resumeOffset = if (appendMode) partFile.length() else 0L
+            if (appendMode) {
+                val contentRange = conn.getHeaderField("Content-Range")
+                if (!contentRange.isNullOrBlank() && !contentRange.startsWith("bytes $resumeOffset-")) {
+                    shouldDeletePartOnError = true
+                    throw SolNetworkException.IntegrityMismatchException()
+                }
+            }
+
+            val serverSha256 = safeConn.linkedSha256
+                ?: parseSha256Header(conn.getHeaderField("X-Linked-Etag"))
+                ?: parseSha256Header(conn.getHeaderField("ETag"))
+
+            val exactTotal = resolveAuthoritativeTotalBytes(
+                conn = conn,
+                code = code,
+                linkedSizeBytes = safeConn.linkedSizeBytes,
+                resumeOffset = resumeOffset,
+            )
+            if (exactTotal > 0L) {
+                val remainingCheck = SolStorageGuard.checkFreeSpace(
+                    targetPath = checkDir,
+                    payloadBytes = (exactTotal - resumeOffset).coerceAtLeast(0L),
+                    availableBytesProvider = availableBytesProvider,
+                )
+                if (!remainingCheck.hasEnoughSpace) {
+                    throw SolNetworkException.InsufficientDiskSpaceException(
+                        availableMb = remainingCheck.availableMb,
+                        requiredMb = remainingCheck.requiredMb,
+                    )
+                }
+            }
+
+            val displayTotal = if (exactTotal > 0L) exactTotal else estimatedBytes.coerceAtLeast(1L)
+            val (totalDownloaded, actualHex) = streamToPartFile(
+                conn = conn,
+                partFile = partFile,
+                appendMode = appendMode,
+                resumeOffset = resumeOffset,
+                displayTotal = displayTotal,
+                exactTotal = exactTotal,
+                isCancelled = isCancelled,
+                onProgress = onProgress,
+                markDeleteOnError = { shouldDeletePartOnError = true },
+            )
+
+            val lengthMismatch = exactTotal > 0L && totalDownloaded != exactTotal
+            val hashMismatch = serverSha256 != null && !actualHex.equals(serverSha256, ignoreCase = true)
+            if (lengthMismatch || hashMismatch) {
+                shouldDeletePartOnError = true
+                throw SolNetworkException.IntegrityMismatchException()
+            }
+
+            partFile
+        } catch (e: SolNetworkException) {
+            if (shouldDeletePartOnError) partFile.delete()
+            throw e
+        } catch (t: Throwable) {
+            if (shouldDeletePartOnError) partFile.delete()
+            throw SolNetworkException.TransportException(t)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun openOfficialDownloadConnection(
+        urlString: String,
+        partFile: File,
+        existingLength: Long,
+        allowedHostSuffixes: Set<String>?,
+        redirectAllowedHostSuffixes: Set<String>?,
+    ): SafeConnectionResult {
+        val headers = mutableMapOf("User-Agent" to USER_AGENT)
+        if (existingLength > 0L) {
+            headers["Range"] = "bytes=$existingLength-"
+        }
+        val first = openSafeConnectionWithMetadata(
+            urlString = urlString,
+            allowedHostSuffixes = allowedHostSuffixes,
+            redirectHostSuffixes = redirectAllowedHostSuffixes,
+            extraHeaders = headers,
+            connectTimeoutMs = DOWNLOAD_CONNECT_TIMEOUT_MS,
+            readTimeoutMs = DOWNLOAD_READ_TIMEOUT_MS,
+        )
+        if (first.connection.responseCode == 416 && existingLength > 0L) {
+            first.connection.disconnect()
+            partFile.delete()
+            return openSafeConnectionWithMetadata(
+                urlString = urlString,
+                allowedHostSuffixes = allowedHostSuffixes,
+                redirectHostSuffixes = redirectAllowedHostSuffixes,
+                extraHeaders = mapOf("User-Agent" to USER_AGENT),
+                connectTimeoutMs = DOWNLOAD_CONNECT_TIMEOUT_MS,
+                readTimeoutMs = DOWNLOAD_READ_TIMEOUT_MS,
+            )
+        }
+        return first
+    }
+
+    private fun streamToPartFile(
+        conn: HttpURLConnection,
+        partFile: File,
+        appendMode: Boolean,
+        resumeOffset: Long,
+        displayTotal: Long,
+        exactTotal: Long,
+        isCancelled: () -> Boolean,
+        onProgress: (percent: Int, downloadedBytes: Long, totalBytes: Long) -> Unit,
+        markDeleteOnError: () -> Unit,
+    ): Pair<Long, String> {
+        val digest = MessageDigest.getInstance("SHA-256")
+        var totalDownloaded = 0L
+        if (appendMode) {
+            updateDigestFromFilePrefix(partFile, digest)
+            totalDownloaded = resumeOffset
+        } else if (partFile.exists()) {
+            partFile.delete()
+        }
+
+        val buf = ByteArray(32 * 1024)
+        var lastPct = -1
+        conn.inputStream.use { input ->
+            FileOutputStream(partFile, appendMode).use { output ->
+                while (true) {
+                    if (isCancelled()) {
+                        markDeleteOnError()
+                        throw SolNetworkException.CancelledException()
+                    }
+                    val read = input.read(buf)
+                    if (read == -1) break
+                    totalDownloaded += read
+                    if (exactTotal > 0L && totalDownloaded > exactTotal) {
+                        markDeleteOnError()
+                        throw SolNetworkException.IntegrityMismatchException()
+                    }
+                    output.write(buf, 0, read)
+                    digest.update(buf, 0, read)
+
+                    val effectiveDenom = displayTotal.coerceAtLeast(totalDownloaded)
+                    val pct = ((totalDownloaded * 100L) / effectiveDenom).toInt().coerceIn(0, 99)
+                    if (pct != lastPct) {
+                        lastPct = pct
+                        onProgress(pct, totalDownloaded, effectiveDenom)
+                    }
+                }
+            }
+        }
+        onProgress(100, totalDownloaded, totalDownloaded.coerceAtLeast(displayTotal))
+        val actualHex = digest.digest().joinToString("") { "%02x".format(it) }
+        return totalDownloaded to actualHex
+    }
+
+    private fun resolveAuthoritativeTotalBytes(
+        conn: HttpURLConnection,
+        code: Int,
+        linkedSizeBytes: Long,
+        resumeOffset: Long,
+    ): Long {
+        if (linkedSizeBytes > 0L) return linkedSizeBytes
+        val linkedHeader = conn.getHeaderField("X-Linked-Size")?.trim()?.toLongOrNull() ?: -1L
+        if (linkedHeader > 0L) return linkedHeader
+        if (code == HttpURLConnection.HTTP_PARTIAL) {
+            val fromRange = parseTotalFromContentRange(conn.getHeaderField("Content-Range"))
+            if (fromRange > 0L) return fromRange
+            val rem = conn.contentLengthLong
+            if (rem > 0L) return resumeOffset + rem
+        }
+        val len = conn.contentLengthLong
+        return if (len > 0L) len else -1L
+    }
+
     internal fun validateUrlForRequest(
         rawUrl: String,
         allowedHostSuffixes: Set<String>? = null,
@@ -326,7 +551,28 @@ class SolHttpClient(
         connectTimeoutMs: Int,
         readTimeoutMs: Int,
     ): Pair<HttpURLConnection, URL> {
+        val res = openSafeConnectionWithMetadata(
+            urlString = urlString,
+            allowedHostSuffixes = allowedHostSuffixes,
+            redirectHostSuffixes = allowedHostSuffixes,
+            extraHeaders = extraHeaders,
+            connectTimeoutMs = connectTimeoutMs,
+            readTimeoutMs = readTimeoutMs,
+        )
+        return res.connection to res.finalUrl
+    }
+
+    private fun openSafeConnectionWithMetadata(
+        urlString: String,
+        allowedHostSuffixes: Set<String>?,
+        redirectHostSuffixes: Set<String>?,
+        extraHeaders: Map<String, String>,
+        connectTimeoutMs: Int,
+        readTimeoutMs: Int,
+    ): SafeConnectionResult {
         var currentUrl = validateUrlForRequest(urlString, allowedHostSuffixes)
+        var linkedSha256: String? = null
+        var linkedSizeBytes = -1L
         var hops = 0
         while (hops <= MAX_REDIRECTS) {
             val conn = try {
@@ -346,6 +592,12 @@ class SolHttpClient(
                 conn.disconnect()
                 throw SolNetworkException.TransportException(t)
             }
+            if (linkedSha256 == null) {
+                linkedSha256 = parseSha256Header(conn.getHeaderField("X-Linked-Etag"))
+            }
+            if (linkedSizeBytes <= 0L) {
+                linkedSizeBytes = conn.getHeaderField("X-Linked-Size")?.trim()?.toLongOrNull() ?: -1L
+            }
             if (code in REDIRECT_CODES) {
                 val location = conn.getHeaderField("Location").orEmpty().trim()
                 conn.disconnect()
@@ -354,11 +606,16 @@ class SolHttpClient(
                 }
                 val resolvedTarget = runCatching { URL(currentUrl, location).toString() }
                     .getOrElse { throw SolNetworkException.InsecureSchemeException("مسیر انتقال نامعتبر") }
-                currentUrl = validateUrlForRequest(resolvedTarget, allowedHostSuffixes)
+                currentUrl = validateUrlForRequest(resolvedTarget, redirectHostSuffixes)
                 hops++
                 continue
             }
-            return conn to currentUrl
+            return SafeConnectionResult(
+                connection = conn,
+                finalUrl = currentUrl,
+                linkedSha256 = linkedSha256,
+                linkedSizeBytes = linkedSizeBytes,
+            )
         }
         throw SolNetworkException.RedirectLimitException()
     }
@@ -406,6 +663,33 @@ class SolHttpClient(
             "hf.co",
             "alphacephei.com",
         )
+
+        val DEFAULT_CDN_REDIRECT_HOSTS: Set<String> = setOf(
+            "huggingface.co",
+            "hf.co",
+            "amazonaws.com",
+            "cloudfront.net",
+            "alphacephei.com",
+        )
+
+        fun parseSha256Header(raw: String?): String? {
+            if (raw.isNullOrBlank()) return null
+            val cleaned = raw.trim()
+                .removePrefix("W/")
+                .removePrefix("w/")
+                .trim('"', '\'')
+                .removePrefix("sha256:")
+                .removePrefix("SHA256:")
+                .trim()
+            return if (isValidSha256Hex(cleaned)) cleaned else null
+        }
+
+        fun parseTotalFromContentRange(header: String?): Long {
+            if (header.isNullOrBlank()) return -1L
+            val slashIdx = header.lastIndexOf('/')
+            if (slashIdx < 0 || slashIdx + 1 >= header.length) return -1L
+            return header.substring(slashIdx + 1).trim().toLongOrNull() ?: -1L
+        }
 
         fun isValidSha256Hex(value: String): Boolean {
             val trimmed = value.trim()

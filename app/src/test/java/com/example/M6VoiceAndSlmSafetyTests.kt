@@ -346,11 +346,30 @@ class M6VoiceAndSlmSafetyTests {
         val audioErr = VoiceEngine.classifySpeechRecognizerError(SpeechRecognizer.ERROR_AUDIO)
         assertEquals(VoiceErrorAction.SWITCH_TO_TEXT_INPUT, audioErr.action)
 
+        val langNotSupported = VoiceEngine.classifySpeechRecognizerError(SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED)
+        assertEquals(VoiceErrorAction.OPEN_VOSK_SETTINGS, langNotSupported.action)
+        assertFalse(langNotSupported.messageFa.contains("کد 12"))
+
+        val langUnavailable = VoiceEngine.classifySpeechRecognizerError(SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE)
+        assertEquals(VoiceErrorAction.OPEN_VOSK_SETTINGS, langUnavailable.action)
+
         val missingModelErr = VoiceEngine.classifyVoskError("مدل آفلاین Vosk نصب نشده است.")
         assertEquals(VoiceErrorAction.OPEN_VOSK_SETTINGS, missingModelErr.action)
 
         val micPermVosk = VoiceEngine.classifyVoskError("مجوز میکروفون صادر نشده است")
         assertEquals(VoiceErrorAction.OPEN_MIC_PERMISSION_SETTINGS, micPermVosk.action)
+    }
+
+    @Test
+    fun `part c speaker id manager sets inline feedback when recording without speaker model`() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val manager = com.example.sol.speaker.SpeakerIdManager(context)
+        manager.deleteAllSpeakerData()
+        val res = manager.recordAndEnrollOwner()
+        assertTrue(res.isFailure)
+        val ui = manager.uiState.value
+        assertTrue(ui.feedbackIsError)
+        assertTrue(ui.feedbackMessageFa.contains("Piper") || ui.feedbackMessageFa.contains("گوینده"))
     }
 
     @Test

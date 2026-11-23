@@ -197,6 +197,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun testSpeakerMicrophone() {
+        viewModelScope.launch {
+            c.voiceEngine.stopListening()
+            c.ttsManager.stop()
+            c.speakerIdManager.testMicrophoneHealth().fold(
+                onSuccess = { msg -> c.uiBridge.postBanner(msg) },
+                onFailure = { err -> c.uiBridge.postBanner(err.message ?: "تست میکروفون ناموفق بود.") },
+            )
+        }
+    }
+
     fun clearOwnerVoice() {
         viewModelScope.launch(Dispatchers.IO) {
             c.speakerIdManager.clearOwnerProfile()

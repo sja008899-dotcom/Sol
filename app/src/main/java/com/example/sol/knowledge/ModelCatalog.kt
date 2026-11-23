@@ -14,9 +14,13 @@ data class SlmModelSpec(
     val minFreeRamMb: Long,
     val requiredFreeDiskMb: Long,
     val isRecommendedFor4Gb: Boolean,
+    val fallbackDownloadUrls: List<String> = emptyList(),
 ) {
     fun hasVerifiedIntegrityMetadata(): Boolean =
         SolHttpClient.isValidSha256Hex(sha256) && expectedBytes > 0L
+
+    fun estimatedDownloadBytes(): Long =
+        if (expectedBytes > 0L) expectedBytes else approxSizeMb.toLong().coerceAtLeast(10L) * 1024L * 1024L
 }
 
 object SlmModelCatalog {
@@ -35,15 +39,19 @@ object SlmModelCatalog {
         SlmModelSpec(
             id = "qwen3_0_6b_int4",
             titleFa = "Qwen3-0.6B فشرده (پیشنهادی برای ۴GB RAM)",
-            descriptionFa = "مدل کوانتیزه Mixed-INT4 با پشتیبانی خوب از فارسی؛ سبک‌ترین و پایدارترین گزینه واقعی برای گوشی‌های ۴ گیگابایتی.",
-            fileName = "qwen3_0.6b_torchao_mixed_int4_runtime_bmm_kv2048_prefill256.litertlm",
-            downloadUrl = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/qwen3_0.6b_torchao_mixed_int4_runtime_bmm_kv2048_prefill256.litertlm",
+            descriptionFa = "مدل کوانتیزه INT4 با پشتیبانی خوب از فارسی؛ سبک‌ترین و پایدارترین گزینه واقعی برای گوشی‌های ۴ گیگابایتی.",
+            fileName = "Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm",
+            downloadUrl = "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm",
             sha256 = QWEN3_0_6B_INT4_SHA256,
             expectedBytes = QWEN3_0_6B_INT4_BYTES,
             approxSizeMb = 498,
             minFreeRamMb = 620L,
             requiredFreeDiskMb = 1647L,
             isRecommendedFor4Gb = true,
+            fallbackDownloadUrls = listOf(
+                "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/qwen3_0.6b_torchao_mixed_int4_runtime_bmm_kv2048_prefill256.litertlm",
+                "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B.litertlm",
+            ),
         ),
         SlmModelSpec(
             id = "qwen3_0_6b_int8",
@@ -57,6 +65,9 @@ object SlmModelCatalog {
             minFreeRamMb = 760L,
             requiredFreeDiskMb = 1757L,
             isRecommendedFor4Gb = false,
+            fallbackDownloadUrls = listOf(
+                "https://huggingface.co/litert-community/Qwen3-0.6B/resolve/main/Qwen3-0.6B_dynamic_wi4b32_afp32.litertlm",
+            ),
         ),
         SlmModelSpec(
             id = "qwen2_5_1_5b_q8",

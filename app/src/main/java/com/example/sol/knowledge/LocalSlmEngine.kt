@@ -100,8 +100,12 @@ class LocalSlmEngine(
     fun downloadModel(spec: SlmModelSpec, onSavedPath: (String) -> Unit) =
         modelDownloader.downloadModel(spec, onSavedPath)
 
-    internal suspend fun downloadModelSync(spec: SlmModelSpec, onSavedPath: (String) -> Unit): Result<File> =
-        modelDownloader.downloadModelSync(spec, onSavedPath)
+    internal suspend fun downloadModelSync(
+        spec: SlmModelSpec,
+        onSavedPath: (String) -> Unit,
+        allowHttpsWithoutPinnedHash: Boolean = false,
+    ): Result<File> =
+        modelDownloader.downloadModelSync(spec, onSavedPath, allowHttpsWithoutPinnedHash)
 
     fun cancelDownload() = modelDownloader.cancelDownload()
 

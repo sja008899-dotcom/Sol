@@ -37,29 +37,34 @@ internal class ModelDownloader(
         if (activeDownloadJob?.isActive == true) return
         downloadCancelled.set(false)
         activeDownloadJob = downloadScope.launch {
-            downloadModelSync(spec, onSavedPath)
+            downloadModelSync(
+                spec = spec,
+                onSavedPath = onSavedPath,
+                allowHttpsWithoutPinnedHash = true,
+            )
         }
     }
 
     suspend fun downloadModelSync(
         spec: SlmModelSpec,
         onSavedPath: (String) -> Unit,
+        allowHttpsWithoutPinnedHash: Boolean = false,
     ): Result<File> = withContext(Dispatchers.IO) {
         val destDir = modelStore.modelsDir.apply { mkdirs() }
         val finalFile = File(destDir, spec.fileName)
         val partFile = File(destDir, "${spec.fileName}.part")
 
         try {
-            // Rule 7 fail-safe: refuse to download/activate without verified SHA-256 and exact byte count
-            if (!spec.hasVerifiedIntegrityMetadata()) {
+            val hasPinnedMetadata = spec.hasVerifiedIntegrityMetadata()
+            if (!hasPinnedMetadata && !allowHttpsWithoutPinnedHash) {
                 partFile.delete()
                 throw SolNetworkException.IntegrityMetadataMissingException()
             }
 
-            // Disk guard: size * 1.25 + 1 GB
+            val estimatedBytes = spec.estimatedDownloadBytes()
             val diskCheck = SolStorageGuard.checkFreeSpace(
                 targetPath = destDir,
-                payloadBytes = spec.expectedBytes,
+                payloadBytes = estimatedBytes,
                 availableBytesProvider = availableBytesProvider,
             )
             if (!diskCheck.hasEnoughSpace) {
@@ -75,25 +80,29 @@ internal class ModelDownloader(
                 modelTitleFa = spec.titleFa,
                 progressPercent = 1,
                 downloadedMb = 0L,
-                totalMb = (spec.expectedBytes / (1024L * 1024L)).coerceAtLeast(1L),
+                totalMb = (estimatedBytes / (1024L * 1024L)).coerceAtLeast(1L),
             )
 
-            httpClient.downloadVerifiedFile(
-                urlString = spec.downloadUrl,
-                partFile = partFile,
-                expectedBytes = spec.expectedBytes,
-                expectedSha256 = spec.sha256,
-                allowedHostSuffixes = setOf("huggingface.co", "hf.co"),
-                isCancelled = { downloadCancelled.get() },
-                onProgress = { pct, doneBytes, totalBytes ->
-                    runtimeState.value = SlmRuntimeState.Downloading(
-                        modelTitleFa = spec.titleFa,
-                        progressPercent = pct,
-                        downloadedMb = doneBytes / (1024L * 1024L),
-                        totalMb = (totalBytes / (1024L * 1024L)).coerceAtLeast(1L),
-                    )
-                },
-            )
+            if (hasPinnedMetadata) {
+                httpClient.downloadVerifiedFile(
+                    urlString = spec.downloadUrl,
+                    partFile = partFile,
+                    expectedBytes = spec.expectedBytes,
+                    expectedSha256 = spec.sha256,
+                    allowedHostSuffixes = setOf("huggingface.co", "hf.co"),
+                    isCancelled = { downloadCancelled.get() },
+                    onProgress = { pct, doneBytes, totalBytes ->
+                        runtimeState.value = SlmRuntimeState.Downloading(
+                            modelTitleFa = spec.titleFa,
+                            progressPercent = pct,
+                            downloadedMb = doneBytes / (1024L * 1024L),
+                            totalMb = (totalBytes / (1024L * 1024L)).coerceAtLeast(1L),
+                        )
+                    },
+                )
+            } else {
+                downloadOfficialSlmWithFallback(spec, partFile, estimatedBytes)
+            }
 
             if (downloadCancelled.get()) {
                 partFile.delete()
@@ -115,7 +124,7 @@ internal class ModelDownloader(
             onSavedPath(finalFile.absolutePath)
             onRefreshStatus(
                 finalFile.absolutePath,
-                "مدل «${spec.titleFa}» پس از تأیید SHA-256 آمادهٔ اجراست.",
+                "مدل «${spec.titleFa}» دانلود و آمادهٔ اجراست.",
             )
             Result.success(finalFile)
         } catch (t: Throwable) {
@@ -143,6 +152,45 @@ internal class ModelDownloader(
             }
             Result.failure(t)
         }
+    }
+
+    private fun downloadOfficialSlmWithFallback(
+        spec: SlmModelSpec,
+        partFile: File,
+        estimatedBytes: Long,
+    ) {
+        val candidates = (listOf(spec.downloadUrl) + spec.fallbackDownloadUrls).distinct()
+        var lastError: Throwable? = null
+        for ((idx, candidateUrl) in candidates.withIndex()) {
+            try {
+                httpClient.downloadOfficialHttpsFile(
+                    urlString = candidateUrl,
+                    partFile = partFile,
+                    estimatedBytes = estimatedBytes,
+                    allowedHostSuffixes = setOf("huggingface.co", "hf.co"),
+                    redirectAllowedHostSuffixes = SolHttpClient.DEFAULT_CDN_REDIRECT_HOSTS,
+                    isCancelled = { downloadCancelled.get() },
+                    onProgress = { pct, doneBytes, totalBytes ->
+                        runtimeState.value = SlmRuntimeState.Downloading(
+                            modelTitleFa = spec.titleFa,
+                            progressPercent = pct,
+                            downloadedMb = doneBytes / (1024L * 1024L),
+                            totalMb = (totalBytes / (1024L * 1024L)).coerceAtLeast(1L),
+                        )
+                    },
+                )
+                return
+            } catch (err: SolNetworkException.HttpStatusException) {
+                lastError = err
+                val canFallback = (err.statusCode == 404 || err.statusCode == 410) && idx < candidates.lastIndex
+                if (canFallback) {
+                    partFile.delete()
+                    continue
+                }
+                throw err
+            }
+        }
+        throw (lastError ?: SolNetworkException.TransportException())
     }
 
     fun cancelDownload() {

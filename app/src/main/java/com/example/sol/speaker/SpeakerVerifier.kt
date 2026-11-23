@@ -68,6 +68,8 @@ data class SpeakerIdUiState(
     val isActive: Boolean = false,
     val isRecordingOwner: Boolean = false,
     val statusLabelFa: String = "N5 غیرفعال: مدل شناسایی گوینده یا نمونهٔ صدای مالک ثبت نشده است.",
+    val feedbackMessageFa: String = "",
+    val feedbackIsError: Boolean = false,
 )
 
 /**
@@ -84,6 +86,12 @@ class SpeakerIdManager(
 ) {
     private val appContext = context.applicationContext
 
+    @Volatile
+    private var lastFeedbackFa: String = ""
+
+    @Volatile
+    private var lastFeedbackIsError: Boolean = false
+
     private val _uiState = MutableStateFlow(computeStatus())
     val uiState: StateFlow<SpeakerIdUiState> = _uiState.asStateFlow()
 
@@ -94,12 +102,18 @@ class SpeakerIdManager(
         _uiState.value = computeStatus(isRecording = _uiState.value.isRecordingOwner)
     }
 
+    private fun setFeedback(messageFa: String, isError: Boolean) {
+        lastFeedbackFa = messageFa
+        lastFeedbackIsError = isError
+        refreshStatus()
+    }
+
     private fun computeStatus(isRecording: Boolean = false): SpeakerIdUiState {
         val hasModel = embedder.isModelPresent
         val hasOwner = ownerProfile.exists()
         val active = hasModel && hasOwner
         val label = when {
-            isRecording -> "در حال ضبط نمونهٔ صدای مالک (۳ ثانیه صحبت کنید)…"
+            isRecording -> "در حال ضبط (لطفاً با صدای عادی صحبت کنید)…"
             active -> "✅ شناسایی صدای مالک (N5) فعال است؛ دستورات صوتی فقط برای صدای مالک اجرا می‌شوند."
             hasModel && !hasOwner -> "N5 غیرفعال: مدل گوینده نصب است، اما هنوز نمونهٔ صدای مالک ضبط نشده است."
             !hasModel && hasOwner -> "N5 غیرفعال: نمونهٔ صدای مالک ذخیره شده، اما مدل ONNX گوینده انتخاب نشده است."
@@ -111,6 +125,8 @@ class SpeakerIdManager(
             isActive = active,
             isRecordingOwner = isRecording,
             statusLabelFa = label,
+            feedbackMessageFa = lastFeedbackFa,
+            feedbackIsError = lastFeedbackIsError,
         )
     }
 
@@ -146,83 +162,188 @@ class SpeakerIdManager(
 
     suspend fun enrollOwnerFromPcm(pcm16k: FloatArray): Result<String> = withContext(Dispatchers.IO) {
         if (!embedder.isModelPresent) {
-            return@withContext Result.failure(
-                IllegalStateException("N5 غیرفعال است: ابتدا فایل مدل ONNX شناسایی گوینده را انتخاب کنید.")
-            )
+            val msg = "N5 غیرفعال است: ابتدا فایل مدل ONNX شناسایی گوینده را انتخاب کنید."
+            setFeedback(msg, isError = true)
+            return@withContext Result.failure(IllegalStateException(msg))
         }
         if (pcm16k.size < 8_000) {
-            return@withContext Result.failure(
-                IllegalArgumentException("صدای ضبط‌شده بسیار کوتاه بود؛ لطفاً حدود ۳ ثانیه صحبت کنید.")
-            )
+            val msg = "صدای ضبط‌شده بسیار کوتاه بود؛ لطفاً حدود ۳ ثانیه صحبت کنید."
+            setFeedback(msg, isError = true)
+            return@withContext Result.failure(IllegalArgumentException(msg))
         }
         val embedding = embedder.embed(pcm16k)
-            ?: return@withContext Result.failure(
-                IllegalStateException("استخراج بردار صدای مالک از مدل ناموفق بود.")
-            )
+            ?: run {
+                val msg = "استخراج بردار صدای مالک از مدل گوینده ناموفق بود؛ مطمئن شوید مدل ONNX انتخاب‌شده مخصوص استخراج بردار صوتی گوینده است (نه Piper TTS)."
+                setFeedback(msg, isError = true)
+                return@withContext Result.failure(IllegalStateException(msg))
+            }
         if (!ownerProfile.save(embedding)) {
-            return@withContext Result.failure(
-                IllegalStateException("ذخیرهٔ رمزنگاری‌شدهٔ صدای مالک ناموفق بود.")
-            )
+            val msg = "ذخیرهٔ رمزنگاری‌شدهٔ صدای مالک ناموفق بود."
+            setFeedback(msg, isError = true)
+            return@withContext Result.failure(IllegalStateException(msg))
         }
-        refreshStatus()
-        Result.success("صدای شما با موفقیت به‌صورت رمزنگاری‌شده در دستگاه ذخیره شد و N5 فعال گردید.")
+        val okMsg = "صدای شما با موفقیت به‌صورت رمزنگاری‌شده در دستگاه ذخیره شد و N5 فعال گردید."
+        setFeedback(okMsg, isError = false)
+        Result.success(okMsg)
     }
 
     @SuppressLint("MissingPermission")
     suspend fun recordAndEnrollOwner(durationMs: Long = 3_000L): Result<String> = withContext(Dispatchers.IO) {
         if (!embedder.isModelPresent) {
-            return@withContext Result.failure(
-                IllegalStateException("N5 غیرفعال است: برای ثبت صدای مالک، ابتدا مدل ONNX گوینده را انتخاب کنید.")
-            )
+            val msg = "N5 غیرفعال است: فایل‌های Piper (.onnx و .json) فقط برای حرف‌زدن Sol هستند؛ برای ثبت صدای مالک ابتدا فایل مدل ONNX شناسایی گوینده را انتخاب کنید."
+            setFeedback(msg, isError = true)
+            return@withContext Result.failure(IllegalStateException(msg))
         }
+        val wasMicServiceRunning = com.example.sol.voice.MicForegroundService.isRunning.value
+        if (wasMicServiceRunning) {
+            com.example.sol.voice.MicForegroundService.stop(appContext)
+            kotlinx.coroutines.delay(150L)
+        }
+
+        lastFeedbackFa = ""
+        lastFeedbackIsError = false
         _uiState.value = computeStatus(isRecording = true)
         var recorder: AudioRecord? = null
         try {
-            val sampleRate = 16_000
-            val targetSamples = ((sampleRate * durationMs) / 1000L).toInt().coerceAtLeast(16_000)
-            val minBuf = AudioRecord.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-            ).coerceAtLeast(4096)
-
-            recorder = AudioRecord(
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                minBuf * 2,
+            val capture = capturePcmSamples(durationMs) { newRecorder -> recorder = newRecorder }
+            capture.fold(
+                onSuccess = { samples -> enrollOwnerFromPcm(samples) },
+                onFailure = { err ->
+                    val errMsg = err.localizedMessage ?: "ضبط صدای مالک ناموفق بود."
+                    setFeedback(errMsg, isError = true)
+                    Result.failure(err)
+                },
             )
-            if (recorder.state != AudioRecord.STATE_INITIALIZED) {
-                return@withContext Result.failure(IllegalStateException("آماده‌سازی میکروفون برای ضبط صدای مالک ممکن نشد."))
-            }
-
-            recorder.startRecording()
-            val captured = FloatArray(targetSamples)
-            val chunk = ShortArray(2048)
-            var offset = 0
-            val deadline = System.currentTimeMillis() + durationMs + 1_500L
-            while (offset < targetSamples && System.currentTimeMillis() < deadline) {
-                val read = recorder.read(chunk, 0, min(chunk.size, targetSamples - offset))
-                if (read > 0) {
-                    for (i in 0 until read) {
-                        captured[offset + i] = chunk[i] / 32768f
-                    }
-                    offset += read
-                }
-            }
-            if (offset < 8_000) {
-                return@withContext Result.failure(IllegalStateException("دادهٔ صوتی کافی دریافت نشد."))
-            }
-            val finalSamples = if (offset == captured.size) captured else captured.copyOf(offset)
-            enrollOwnerFromPcm(finalSamples)
         } catch (t: Throwable) {
-            Result.failure(IllegalStateException("خطا در ضبط صدای مالک: ${t.localizedMessage ?: "نامشخص"}"))
+            val msg = "خطا در ضبط صدای مالک: ${t.localizedMessage ?: "نامشخص"}"
+            setFeedback(msg, isError = true)
+            Result.failure(IllegalStateException(msg))
         } finally {
             runCatching { recorder?.stop() }
             runCatching { recorder?.release() }
+            if (wasMicServiceRunning) {
+                com.example.sol.voice.MicForegroundService.start(appContext)
+            }
             _uiState.value = computeStatus(isRecording = false)
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    suspend fun testMicrophoneHealth(durationMs: Long = 1_500L): Result<String> = withContext(Dispatchers.IO) {
+        val wasMicServiceRunning = com.example.sol.voice.MicForegroundService.isRunning.value
+        if (wasMicServiceRunning) {
+            com.example.sol.voice.MicForegroundService.stop(appContext)
+            kotlinx.coroutines.delay(150L)
+        }
+
+        lastFeedbackFa = ""
+        lastFeedbackIsError = false
+        _uiState.value = computeStatus(isRecording = true)
+        var recorder: AudioRecord? = null
+        try {
+            val capture = capturePcmSamples(durationMs) { newRecorder -> recorder = newRecorder }
+            capture.fold(
+                onSuccess = { samples ->
+                    var sumSq = 0.0
+                    for (s in samples) sumSq += s.toDouble() * s.toDouble()
+                    val rms = sqrt(sumSq / samples.size.coerceAtLeast(1))
+                    val pct = (rms * 500.0).toInt().coerceIn(0, 100)
+                    val okMsg = "✅ میکروفون دستگاه سالم است و صدا دریافت شد (سطح صدا: $pct٪ • ${samples.size} نمونه ۱۶kHz)."
+                    setFeedback(okMsg, isError = false)
+                    Result.success(okMsg)
+                },
+                onFailure = { err ->
+                    val msg = err.localizedMessage ?: "میکروفون پاسخ نداد؛ مجوز صدا و برنامهٔ پس‌زمینه را بررسی کنید."
+                    setFeedback(msg, isError = true)
+                    Result.failure(err)
+                },
+            )
+        } catch (t: Throwable) {
+            val msg = "تست میکروفون ناموفق بود: ${t.localizedMessage ?: "خطای سخت‌افزار"}"
+            setFeedback(msg, isError = true)
+            Result.failure(IllegalStateException(msg))
+        } finally {
+            runCatching { recorder?.stop() }
+            runCatching { recorder?.release() }
+            if (wasMicServiceRunning) {
+                com.example.sol.voice.MicForegroundService.start(appContext)
+            }
+            _uiState.value = computeStatus(isRecording = false)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun capturePcmSamples(
+        durationMs: Long,
+        onRecorderCreated: (AudioRecord) -> Unit,
+    ): Result<FloatArray> {
+        val sampleRate = 16_000
+        val targetSamples = ((sampleRate * durationMs) / 1000L).toInt().coerceAtLeast(12_000)
+        val minBuf = AudioRecord.getMinBufferSize(
+            sampleRate,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+        ).coerceAtLeast(4096)
+
+        val recorder = createAudioRecorder(sampleRate, minBuf * 2)
+        onRecorderCreated(recorder)
+        if (recorder.state != AudioRecord.STATE_INITIALIZED) {
+            return Result.failure(IllegalStateException("آماده‌سازی میکروفون برای ضبط ممکن نشد (دسترسی میکروفون مشغول یا مسدود است)."))
+        }
+
+        recorder.startRecording()
+        if (recorder.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+            return Result.failure(IllegalStateException("شروع ضبط میکروفون توسط سیستم قطع شد؛ برنامهٔ دیگری در حال استفاده از میکروفون است."))
+        }
+
+        val captured = FloatArray(targetSamples)
+        val chunk = ShortArray(2048)
+        var offset = 0
+        var consecutiveReadErrors = 0
+        val deadline = System.currentTimeMillis() + durationMs + 1_500L
+        while (offset < targetSamples && System.currentTimeMillis() < deadline) {
+            val read = recorder.read(chunk, 0, min(chunk.size, targetSamples - offset))
+            if (read > 0) {
+                consecutiveReadErrors = 0
+                for (i in 0 until read) {
+                    captured[offset + i] = chunk[i] / 32768f
+                }
+                offset += read
+            } else if (read < 0) {
+                consecutiveReadErrors++
+                if (consecutiveReadErrors >= 5) {
+                    return Result.failure(IllegalStateException("دریافت صدا از میکروفون متوقف شد (کد خواندن: $read)."))
+                }
+            }
+        }
+        if (offset < 8_000) {
+            return Result.failure(IllegalStateException("دادهٔ صوتی کافی از میکروفون دریافت نشد."))
+        }
+        return Result.success(if (offset == captured.size) captured else captured.copyOf(offset))
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun createAudioRecorder(sampleRate: Int, bufferBytes: Int): AudioRecord {
+        for (source in listOf(MediaRecorder.AudioSource.VOICE_RECOGNITION, MediaRecorder.AudioSource.MIC)) {
+            val candidate = AudioRecord(
+                source,
+                sampleRate,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufferBytes,
+            )
+            if (candidate.state == AudioRecord.STATE_INITIALIZED) {
+                return candidate
+            }
+            runCatching { candidate.release() }
+        }
+        return AudioRecord(
+            MediaRecorder.AudioSource.MIC,
+            sampleRate,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+            bufferBytes,
+        )
     }
 
     suspend fun importSpeakerModel(uri: Uri): Result<String> = withContext(Dispatchers.IO) {
@@ -234,13 +355,17 @@ class SpeakerIdManager(
             } ?: return@withContext Result.failure(IllegalArgumentException("باز کردن فایل مدل گوینده ممکن نشد."))
 
             if (!temp.exists() || temp.length() == 0L) {
-                return@withContext Result.failure(IllegalArgumentException("فایل مدل گوینده خالی است."))
+                val msg = "فایل مدل گوینده خالی است."
+                setFeedback(msg, isError = true)
+                return@withContext Result.failure(IllegalArgumentException(msg))
             }
 
             val testEmbedder = SpeakerEmbedder(temp)
             if (!testEmbedder.initialize()) {
                 testEmbedder.release()
-                return@withContext Result.failure(IllegalArgumentException("فایل انتخاب‌شده یک مدل معتبر ONNX نیست."))
+                val msg = "فایل انتخاب‌شده یک مدل معتبر ONNX نیست."
+                setFeedback(msg, isError = true)
+                return@withContext Result.failure(IllegalArgumentException(msg))
             }
             testEmbedder.release()
 
@@ -249,10 +374,13 @@ class SpeakerIdManager(
             if (!temp.renameTo(modelFile)) {
                 temp.copyTo(modelFile, overwrite = true)
             }
-            refreshStatus()
-            Result.success("مدل شناسایی گوینده وارد شد. اکنون دکمه «ضبط صدای من» را بزنید تا N5 فعال شود.")
+            val msg = "مدل شناسایی گوینده وارد شد. اکنون دکمه «ضبط صدای من» را بزنید تا N5 فعال شود."
+            setFeedback(msg, isError = false)
+            Result.success(msg)
         } catch (t: Throwable) {
-            Result.failure(IllegalArgumentException("خطا در وارد کردن مدل گوینده: ${t.localizedMessage ?: "نامشخص"}"))
+            val msg = "خطا در وارد کردن مدل گوینده: ${t.localizedMessage ?: "نامشخص"}"
+            setFeedback(msg, isError = true)
+            Result.failure(IllegalArgumentException(msg))
         } finally {
             if (temp.exists()) temp.delete()
         }
@@ -260,13 +388,15 @@ class SpeakerIdManager(
 
     fun clearOwnerProfile() {
         ownerProfile.clear()
-        refreshStatus()
+        setFeedback("نمونهٔ صدای مالک پاک شد (N5 غیرفعال).", isError = false)
     }
 
     fun deleteAllSpeakerData() {
         embedder.release()
         ownerProfile.clear()
         runCatching { modelFile.delete() }
+        lastFeedbackFa = ""
+        lastFeedbackIsError = false
         refreshStatus()
     }
 

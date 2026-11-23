@@ -122,6 +122,7 @@ fun SettingsScreen(
     onRecordOwnerVoice: () -> Unit,
     onClearOwnerVoice: () -> Unit,
     onPickSpeakerModel: () -> Unit,
+    onTestSpeakerMic: () -> Unit = {},
     isMicServiceRunning: Boolean,
     onScreenOffMicToggle: (Boolean) -> Unit,
     onContinuousListeningToggle: (Boolean) -> Unit,
@@ -212,18 +213,10 @@ fun SettingsScreen(
                 when (voskModelStatus) {
                     is VoskModelStatus.NotInstalled -> {
                         Text(
-                            text = "مدل آفلاین فارسی Vosk (~۴۷ مگابایت) هنوز نصب نشده است. پس از نصب، تشخیص گفتار بدون اینترنت و با لغت‌نامه تقویتی کار می‌کند.",
+                            text = "مدل آفلاین فارسی Vosk (~۶۰ مگابایت) هنوز نصب نشده است. پس از دانلود مستقیم و ایمن (HTTPS) از مخزن رسمی Alpha Cephei، تشخیص گفتار بدون نیاز به اینترنت کار می‌کند.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        if (!com.example.sol.voice.VoskVoiceEngine.hasVerifiedDownloadMetadata()) {
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "🔒 هشدار امنیتی: اثر انگشت SHA-256 نسخهٔ آنلاین Vosk هنوز تأیید نشده؛ دانلود خودکار برای ایمنی متوقف است. لطفاً فایل ZIP مدل را با دکمه «نصب از فایل ZIP گوشی» وارد کنید.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
                         Spacer(modifier = Modifier.height(8.dp))
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -235,7 +228,7 @@ fun SettingsScreen(
                             ) {
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("دانلود یک‌باره مدل فارسی (~47MB)")
+                                Text("دانلود یک‌باره مدل فارسی (~60MB)")
                             }
                             OutlinedButton(onClick = onPickVoskZip) {
                                 Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -760,13 +753,11 @@ fun SettingsScreen(
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
-                                        if (!spec.hasVerifiedIntegrityMetadata()) {
-                                            Text(
-                                                text = "🔒 هشدار امنیتی: اثر انگشت SHA-256 این نسخه هنوز تأیید نشده (دانلود خودکار تا زمان تأیید متوقف است؛ از انتخاب فایل محلی .litertlm استفاده کنید).",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.error,
-                                            )
-                                        }
+                                        Text(
+                                            text = "دریافت مستقیم از مخزن رسمی Hugging Face (HTTPS + بررسی خودکار ETag/حجم سرور در حین دانلود).",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Button(
                                             onClick = { onDownloadSlmModel(spec) },
@@ -1104,15 +1095,46 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "نمونهٔ برداری صدای مالک با AES-256 (EncryptedFile) فقط روی گوشی نگهداری می‌شود. اگر مدل یا نمونهٔ صدا ثبت نشده باشد، N5 در حالت Fail-safe غیرفعال است.",
+                    text = "نکته: فایل‌های .onnx و .json در بخش «صدای Sol (Piper)» فقط برای حرف‌زدن Sol هستند. برای شناسایی صدای مالک، یک مدل ONNX استخراج بردار گوینده (ورودی صوت ۱۶kHz) لازم است؛ بردار صدای شما با AES-256 فقط روی گوشی نگهداری می‌شود و تا زمان انتخاب مدل گوینده، N5 در حالت Fail-safe غیرفعال است.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (speakerIdState.feedbackMessageFa.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        color = if (speakerIdState.feedbackIsError) {
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+                        } else {
+                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f)
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = speakerIdState.feedbackMessageFa,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (speakerIdState.feedbackIsError) {
+                                MaterialTheme.colorScheme.onErrorContainer
+                            } else {
+                                MaterialTheme.colorScheme.onTertiaryContainer
+                            },
+                            modifier = Modifier.padding(10.dp),
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    OutlinedButton(
+                        onClick = onPickSpeakerModel,
+                        modifier = Modifier.testTag("pick_speaker_model_button"),
+                    ) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(if (speakerIdState.isModelInstalled) "تغییر مدل گوینده (.onnx)" else "۱. انتخاب مدل گوینده (.onnx)")
+                    }
                     Button(
                         onClick = onRecordOwnerVoice,
                         enabled = !speakerIdState.isRecordingOwner,
@@ -1120,15 +1142,14 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Default.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (speakerIdState.isRecordingOwner) "در حال ضبط…" else "ضبط صدای من")
+                        Text(if (speakerIdState.isRecordingOwner) "در حال ضبط…" else "۲. ضبط صدای من")
                     }
                     OutlinedButton(
-                        onClick = onPickSpeakerModel,
-                        modifier = Modifier.testTag("pick_speaker_model_button"),
+                        onClick = onTestSpeakerMic,
+                        enabled = !speakerIdState.isRecordingOwner,
+                        modifier = Modifier.testTag("test_speaker_mic_button"),
                     ) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (speakerIdState.isModelInstalled) "تغییر مدل گوینده (.onnx)" else "انتخاب مدل گوینده (.onnx)")
+                        Text("تست سلامت میکروفون")
                     }
                     if (speakerIdState.isOwnerEnrolled) {
                         OutlinedButton(

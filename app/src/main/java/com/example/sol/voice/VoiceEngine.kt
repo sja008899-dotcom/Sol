@@ -108,6 +108,9 @@ class VoiceEngine(
     ) {
         stopSpeechForBargeIn()
         stopListening()
+        if (MicForegroundService.isRunning.value) {
+            MicForegroundService.stop(context)
+        }
         _partialText.value = ""
         _rmsDb.value = 0f
 
@@ -162,8 +165,24 @@ class VoiceEngine(
             return
         }
 
+        startSystemSpeechRecognizer(
+            safeVadMs = safeVadMs,
+            safeMaxDurationMs = safeMaxDurationMs,
+            playCue = playCue,
+            preferOfflineInSystem = true,
+            onFinalResult = onFinalResult,
+        )
+    }
+
+    private fun startSystemSpeechRecognizer(
+        safeVadMs: Long,
+        safeMaxDurationMs: Long,
+        playCue: Boolean,
+        preferOfflineInSystem: Boolean,
+        onFinalResult: (String) -> Unit,
+    ) {
         audioManager.requestListeningFocus { stopListening() }
-        if (playCue) audioManager.playVoiceCue(isStart = true)
+        if (playCue && preferOfflineInSystem) audioManager.playVoiceCue(isStart = true)
 
         val instance = SpeechRecognizer.createSpeechRecognizer(context.applicationContext)
         recognizer = instance
@@ -171,8 +190,9 @@ class VoiceEngine(
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "fa-IR")
-            putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, true)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            if (preferOfflineInSystem) {
+                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            }
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, safeVadMs)
@@ -203,10 +223,24 @@ class VoiceEngine(
 
             override fun onError(error: Int) {
                 cancelMaxDurationTimer()
+                cleanupRecognizer()
+                val isLangUnavailable = error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
+                    error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE
+                if (preferOfflineInSystem && isLangUnavailable) {
+                    mainHandler.post {
+                        startSystemSpeechRecognizer(
+                            safeVadMs = safeVadMs,
+                            safeMaxDurationMs = safeMaxDurationMs,
+                            playCue = playCue,
+                            preferOfflineInSystem = false,
+                            onFinalResult = onFinalResult,
+                        )
+                    }
+                    return
+                }
                 audioManager.abandonListeningFocus()
                 _state.value = classifySpeechRecognizerError(error)
                 _rmsDb.value = 0f
-                cleanupRecognizer()
             }
 
             override fun onResults(results: Bundle?) {
@@ -293,6 +327,9 @@ class VoiceEngine(
             stopSpeechForBargeIn()
         }
         stopListening()
+        if (MicForegroundService.isRunning.value) {
+            MicForegroundService.stop(context)
+        }
         _activeBackend.value = ActiveAsrBackend.VOSK_OFFLINE
         audioManager.requestListeningFocus { stopListening() }
         if (playCue) audioManager.playVoiceCue(isStart = true)
@@ -414,6 +451,10 @@ class VoiceEngine(
             SpeechRecognizer.ERROR_AUDIO -> VoiceListeningState.Error(
                 messageFa = "خطا در دریافت صدا از میکروفون؛ لطفاً دوباره امتحان کنید.",
                 action = VoiceErrorAction.SWITCH_TO_TEXT_INPUT,
+            )
+            SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED, SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE -> VoiceListeningState.Error(
+                messageFa = "بستهٔ آفلاین فارسی سیستم نصب نیست؛ برای شنود آفلاین مدل Vosk را در تنظیمات دانلود کنید یا به اینترنت متصل شوید.",
+                action = VoiceErrorAction.OPEN_VOSK_SETTINGS,
             )
             else -> VoiceListeningState.Error(
                 messageFa = "تشخیص گفتار سیستم ناموفق بود (کد $errorCode).",

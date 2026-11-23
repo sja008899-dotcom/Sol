@@ -38,8 +38,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -96,6 +98,16 @@ private val NAV_ITEMS = listOf(
     SolNavItem(ROUTE_SETTINGS, R.string.nav_settings, Icons.Filled.Settings, Icons.Outlined.Settings),
 )
 
+private enum class PendingMicPermissionAction {
+    HOME_LISTEN,
+    WAKE_WORD,
+    CONFIRM_VOICE,
+    ROLE_VOICE,
+    RECORD_OWNER_VOICE,
+    TEST_OWNER_MIC,
+    SCREEN_OFF_MIC,
+}
+
 @Composable
 fun SolAppRoot(
     viewModel: SolViewModel,
@@ -135,15 +147,27 @@ fun SolAppRoot(
         }
     }
 
+    var pendingMicAction by remember { mutableStateOf<PendingMicPermissionAction?>(null) }
+
     val micPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
         viewModel.refreshPermissions()
+        val requested = pendingMicAction
+        pendingMicAction = null
         if (granted) {
-            when {
-                pendingConfirmation != null -> chatViewModel.startVoiceConfirmationListening()
-                voiceRoleSession != null -> memoryViewModel.listenVoiceExplanationForRole()
-                else -> chatViewModel.startVoiceListening()
+            when (requested) {
+                PendingMicPermissionAction.RECORD_OWNER_VOICE -> settingsViewModel.recordOwnerVoice()
+                PendingMicPermissionAction.TEST_OWNER_MIC -> settingsViewModel.testSpeakerMicrophone()
+                PendingMicPermissionAction.SCREEN_OFF_MIC -> settingsViewModel.setScreenOffMicEnabled(true)
+                PendingMicPermissionAction.WAKE_WORD -> chatViewModel.startWakeWordGuard()
+                PendingMicPermissionAction.CONFIRM_VOICE -> chatViewModel.startVoiceConfirmationListening()
+                PendingMicPermissionAction.ROLE_VOICE -> memoryViewModel.listenVoiceExplanationForRole()
+                PendingMicPermissionAction.HOME_LISTEN, null -> when {
+                    pendingConfirmation != null -> chatViewModel.startVoiceConfirmationListening()
+                    voiceRoleSession != null -> memoryViewModel.listenVoiceExplanationForRole()
+                    else -> chatViewModel.startVoiceListening()
+                }
             }
         } else {
             scope.launch {
@@ -231,6 +255,7 @@ fun SolAppRoot(
         } else if (hasMicPermission) {
             chatViewModel.startVoiceListening()
         } else {
+            pendingMicAction = PendingMicPermissionAction.HOME_LISTEN
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -241,6 +266,7 @@ fun SolAppRoot(
         } else if (hasMicPermission) {
             chatViewModel.startWakeWordGuard()
         } else {
+            pendingMicAction = PendingMicPermissionAction.WAKE_WORD
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -249,6 +275,7 @@ fun SolAppRoot(
         if (hasMicPermission) {
             chatViewModel.startVoiceConfirmationListening()
         } else {
+            pendingMicAction = PendingMicPermissionAction.CONFIRM_VOICE
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -257,6 +284,7 @@ fun SolAppRoot(
         if (hasMicPermission) {
             memoryViewModel.listenVoiceExplanationForRole()
         } else {
+            pendingMicAction = PendingMicPermissionAction.ROLE_VOICE
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
@@ -664,6 +692,15 @@ fun SolAppRoot(
                                             if (hasMicPermission) {
                                                 settingsViewModel.recordOwnerVoice()
                                             } else {
+                                                pendingMicAction = PendingMicPermissionAction.RECORD_OWNER_VOICE
+                                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                            }
+                                        },
+                                        onTestSpeakerMic = {
+                                            if (hasMicPermission) {
+                                                settingsViewModel.testSpeakerMicrophone()
+                                            } else {
+                                                pendingMicAction = PendingMicPermissionAction.TEST_OWNER_MIC
                                                 micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                             }
                                         },
@@ -674,6 +711,7 @@ fun SolAppRoot(
                                         isMicServiceRunning = isMicServiceRunning,
                                         onScreenOffMicToggle = { enable ->
                                             if (enable && !hasMicPermission) {
+                                                pendingMicAction = PendingMicPermissionAction.SCREEN_OFF_MIC
                                                 micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                             } else {
                                                 settingsViewModel.setScreenOffMicEnabled(enable)

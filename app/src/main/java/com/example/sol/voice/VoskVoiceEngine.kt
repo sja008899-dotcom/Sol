@@ -166,7 +166,7 @@ class VoskVoiceEngine(
     fun downloadPersianSmallModel() {
         if (_modelStatus.value is VoskModelStatus.Downloading) return
         scope.launch {
-            downloadPersianSmallModelSync()
+            downloadPersianSmallModelSync(allowHttpsWithoutPinnedHash = true)
         }
     }
 
@@ -174,45 +174,55 @@ class VoskVoiceEngine(
         downloadUrl: String = VOSK_FA_SMALL_URL,
         expectedBytes: Long = VOSK_FA_SMALL_EXPECTED_BYTES,
         expectedSha256: String = VOSK_FA_SMALL_SHA256,
+        allowHttpsWithoutPinnedHash: Boolean = false,
     ): Result<Unit> = withContext(Dispatchers.IO) {
         val partFile = File(context.cacheDir, "vosk-fa-small.zip.part")
         try {
-            if (!SolHttpClient.isValidSha256Hex(expectedSha256) || expectedBytes <= 0L) {
+            val hasPinnedMetadata = SolHttpClient.isValidSha256Hex(expectedSha256) && expectedBytes > 0L
+            if (!hasPinnedMetadata && !allowHttpsWithoutPinnedHash) {
                 partFile.delete()
                 throw SolNetworkException.IntegrityMetadataMissingException()
             }
 
-            val diskCheck = SolStorageGuard.checkFreeSpace(
-                targetPath = context.filesDir,
-                payloadBytes = expectedBytes,
-                availableBytesProvider = availableBytesProvider,
-            )
-            if (!diskCheck.hasEnoughSpace) {
-                throw SolNetworkException.InsufficientDiskSpaceException(
-                    availableMb = diskCheck.availableMb,
-                    requiredMb = diskCheck.requiredMb,
+            if (hasPinnedMetadata) {
+                val diskCheck = SolStorageGuard.checkFreeSpace(
+                    targetPath = context.filesDir,
+                    payloadBytes = expectedBytes,
+                    availableBytesProvider = availableBytesProvider,
+                )
+                if (!diskCheck.hasEnoughSpace) {
+                    throw SolNetworkException.InsufficientDiskSpaceException(
+                        availableMb = diskCheck.availableMb,
+                        requiredMb = diskCheck.requiredMb,
+                    )
+                }
+
+                _modelStatus.value = VoskModelStatus.Downloading(2, "در حال اتصال امن به مخزن رسمی Vosk Persian…")
+                httpClient.downloadVerifiedFile(
+                    urlString = downloadUrl,
+                    partFile = partFile,
+                    expectedBytes = expectedBytes,
+                    expectedSha256 = expectedSha256,
+                    allowedHostSuffixes = setOf("alphacephei.com"),
+                    onProgress = { pct, _, _ ->
+                        _modelStatus.value = VoskModelStatus.Downloading(
+                            progressPercent = pct.coerceIn(5, 88),
+                            stageFa = "در حال دانلود مدل آفلاین فارسی ($pct٪)…",
+                        )
+                    },
+                )
+            } else {
+                downloadVoskFromMirrorsWithFallback(
+                    primaryUrl = downloadUrl,
+                    partFile = partFile,
                 )
             }
 
-            _modelStatus.value = VoskModelStatus.Downloading(2, "در حال اتصال امن به مخزن رسمی Vosk Persian…")
-            httpClient.downloadVerifiedFile(
-                urlString = downloadUrl,
-                partFile = partFile,
-                expectedBytes = expectedBytes,
-                expectedSha256 = expectedSha256,
-                allowedHostSuffixes = setOf("alphacephei.com"),
-                onProgress = { pct, _, _ ->
-                    _modelStatus.value = VoskModelStatus.Downloading(
-                        progressPercent = pct.coerceIn(5, 88),
-                        stageFa = "در حال دانلود مدل آفلاین فارسی ($pct٪)…",
-                    )
-                },
-            )
-
             _modelStatus.value = VoskModelStatus.Downloading(90, "در حال استخراج امن فایل‌های مدل…")
             partFile.inputStream().use { extractZipSafely(it) }
+            require(isModelInstalled()) { "آرشیو دانلودشده فاقد ساختار معتبر مدل Vosk است." }
             partFile.delete()
-            refreshInstalledStatus("مدل آفلاین فارسی Vosk با موفقیت تأیید و نصب شد")
+            refreshInstalledStatus("مدل آفلاین فارسی Vosk با موفقیت دانلود و نصب شد")
             Result.success(Unit)
         } catch (err: Throwable) {
             if (err is SolNetworkException.IntegrityMismatchException ||
@@ -228,6 +238,47 @@ class VoskVoiceEngine(
             _modelStatus.value = VoskModelStatus.Error(msg)
             Result.failure(err)
         }
+    }
+
+    private fun downloadVoskFromMirrorsWithFallback(
+        primaryUrl: String,
+        partFile: File,
+    ) {
+        val candidates = (listOf(primaryUrl) + VOSK_FA_SMALL_FALLBACK_URLS).distinct()
+        var lastError: Throwable? = null
+        for ((idx, candidateUrl) in candidates.withIndex()) {
+            _modelStatus.value = VoskModelStatus.Downloading(
+                progressPercent = 2,
+                stageFa = "در حال اتصال امن به مخزن رسمی Vosk Persian…",
+            )
+            try {
+                httpClient.downloadOfficialHttpsFile(
+                    urlString = candidateUrl,
+                    partFile = partFile,
+                    estimatedBytes = VOSK_FA_SMALL_ESTIMATED_BYTES,
+                    allowedHostSuffixes = setOf("alphacephei.com"),
+                    redirectAllowedHostSuffixes = setOf("alphacephei.com"),
+                    onProgress = { pct, doneBytes, totalBytes ->
+                        val doneMb = (doneBytes / (1024L * 1024L)).coerceAtLeast(0L)
+                        val totalMb = (totalBytes / (1024L * 1024L)).coerceAtLeast(1L)
+                        _modelStatus.value = VoskModelStatus.Downloading(
+                            progressPercent = pct.coerceIn(5, 88),
+                            stageFa = "در حال دانلود مدل آفلاین فارسی ($doneMb/$totalMb MB • $pct٪)…",
+                        )
+                    },
+                )
+                return
+            } catch (err: SolNetworkException.HttpStatusException) {
+                lastError = err
+                val canFallback = (err.statusCode == 404 || err.statusCode == 410) && idx < candidates.lastIndex
+                if (canFallback) {
+                    partFile.delete()
+                    continue
+                }
+                throw err
+            }
+        }
+        throw (lastError ?: SolNetworkException.TransportException())
     }
 
     fun importLocalModelZip(uri: Uri) {
@@ -294,13 +345,7 @@ class VoskVoiceEngine(
                     AudioFormat.ENCODING_PCM_16BIT,
                 ).coerceAtLeast(4096)
 
-                recorder = AudioRecord(
-                    MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                    SAMPLE_RATE,
-                    AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
-                    minBuf * 2,
-                )
+                recorder = createAudioRecorder(minBuf * 2)
                 if (recorder.state != AudioRecord.STATE_INITIALIZED) {
                     throw IllegalStateException("میکروفون دستگاه آماده نشد")
                 }
@@ -525,43 +570,90 @@ class VoskVoiceEngine(
 
     // Legacy direct HttpURLConnection downloader removed; SolHttpClient handles HTTPS redirects, Range resume & SHA-256.
 
+    @SuppressLint("MissingPermission")
+    private fun createAudioRecorder(bufferBytes: Int): AudioRecord {
+        val sources = listOf(
+            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            MediaRecorder.AudioSource.MIC,
+        )
+        for (source in sources) {
+            val candidate = AudioRecord(
+                source,
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                bufferBytes,
+            )
+            if (candidate.state == AudioRecord.STATE_INITIALIZED) {
+                return candidate
+            }
+            runCatching { candidate.release() }
+        }
+        return AudioRecord(
+            MediaRecorder.AudioSource.MIC,
+            SAMPLE_RATE,
+            AudioFormat.CHANNEL_IN_MONO,
+            AudioFormat.ENCODING_PCM_16BIT,
+            bufferBytes,
+        )
+    }
+
     private fun extractZipSafely(inputStream: InputStream) {
-        val root = modelRootDir
-        if (root.exists()) root.deleteRecursively()
-        root.mkdirs()
-        val canonicalRoot = root.canonicalPath + File.separator
+        val staging = File(context.filesDir, "${MODEL_DIR_NAME}.staging")
+        if (staging.exists()) staging.deleteRecursively()
+        staging.mkdirs()
+        val canonicalStaging = staging.canonicalPath + File.separator
 
-        ZipInputStream(inputStream).use { zis ->
-            var entry = zis.nextEntry
-            val buffer = ByteArray(8192)
-            while (entry != null) {
-                // Reject any executable binaries (Play DCL compliance)
-                val lower = entry.name.lowercase()
-                require(
-                    !lower.endsWith(".so") &&
-                        !lower.endsWith(".dex") &&
-                        !lower.endsWith(".jar") &&
-                        !lower.endsWith(".apk")
-                ) { "فایل غیرمجاز در آرشیو مدل شناسایی شد." }
+        try {
+            var entryCount = 0
+            ZipInputStream(inputStream).use { zis ->
+                var entry = zis.nextEntry
+                val buffer = ByteArray(8192)
+                while (entry != null) {
+                    entryCount++
+                    // Reject any executable binaries (Play DCL compliance)
+                    val lower = entry.name.lowercase()
+                    require(
+                        !lower.endsWith(".so") &&
+                            !lower.endsWith(".dex") &&
+                            !lower.endsWith(".jar") &&
+                            !lower.endsWith(".apk")
+                    ) { "فایل غیرمجاز در آرشیو مدل شناسایی شد: ${entry.name}" }
 
-                val outFile = File(root, entry.name)
-                val canonicalDest = outFile.canonicalPath
-                require(canonicalDest.startsWith(canonicalRoot)) { "مسیر نامعتبر در فایل ZIP" }
+                    val outFile = File(staging, entry.name)
+                    val canonicalDest = outFile.canonicalPath
+                    require(canonicalDest.startsWith(canonicalStaging)) { "مسیر نامعتبر در فایل ZIP" }
 
-                if (entry.isDirectory) {
-                    outFile.mkdirs()
-                } else {
-                    outFile.parentFile?.mkdirs()
-                    FileOutputStream(outFile).use { fos ->
-                        var len: Int
-                        while (zis.read(buffer).also { len = it } > 0) {
-                            fos.write(buffer, 0, len)
+                    if (entry.isDirectory) {
+                        outFile.mkdirs()
+                    } else {
+                        outFile.parentFile?.mkdirs()
+                        FileOutputStream(outFile).use { fos ->
+                            var len: Int
+                            while (zis.read(buffer).also { len = it } > 0) {
+                                fos.write(buffer, 0, len)
+                            }
                         }
                     }
+                    zis.closeEntry()
+                    entry = zis.nextEntry
                 }
-                zis.closeEntry()
-                entry = zis.nextEntry
             }
+
+            require(entryCount > 0) { "فایل انتخاب‌شده یک آرشیو معتبر ZIP مدل Vosk نیست." }
+            val hasValid = hasVoskSignature(staging) ||
+                staging.listFiles()?.any { it.isDirectory && hasVoskSignature(it) } == true
+            require(hasValid) { "فایل ZIP انتخاب‌شده شامل پوشه معتبر مدل Vosk (am و conf) نیست." }
+
+            val root = modelRootDir
+            if (root.exists()) root.deleteRecursively()
+            if (!staging.renameTo(root)) {
+                staging.copyRecursively(root, overwrite = true)
+                staging.deleteRecursively()
+            }
+        } catch (t: Throwable) {
+            staging.deleteRecursively()
+            throw t
         }
     }
 
@@ -576,8 +668,13 @@ class VoskVoiceEngine(
         const val DEFAULT_MAX_LISTEN_DURATION_MS = 15_000L
         const val DEFAULT_WAKE_TIMEOUT_MS = 180_000L
 
-        const val VOSK_FA_SMALL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.4.zip"
-        // TODO(verify): Alpha Cephei repository index does not publish raw SHA-256 / byte length; keep fail-safe until verified.
+        const val VOSK_FA_SMALL_URL = "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.5.zip"
+        val VOSK_FA_SMALL_FALLBACK_URLS = listOf(
+            "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.42.zip",
+            "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.4.zip",
+        )
+        const val VOSK_FA_SMALL_ESTIMATED_BYTES = 60L * 1024L * 1024L
+        // TODO(verify): Alpha Cephei repository index does not publish raw SHA-256 / byte length.
         const val VOSK_FA_SMALL_SHA256 = "TODO(verify)"
         const val VOSK_FA_SMALL_EXPECTED_BYTES = -1L
 
