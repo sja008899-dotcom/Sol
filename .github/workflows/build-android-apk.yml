@@ -61,9 +61,19 @@ jobs:
           elif [ -s debug.keystore.base64 ]; then
             tr -d '\r\n' < debug.keystore.base64 | base64 -d > debug.keystore
             echo "Restored debug.keystore from repository debug.keystore.base64."
+          elif [ -s debug.keystore ]; then
+            echo "Using existing debug.keystore."
           else
-            echo "::error::Neither DEBUG_KEYSTORE_BASE64 secret nor debug.keystore.base64 exists. Refusing to generate a mismatched ephemeral keystore."
-            exit 1
+            echo "::warning::Neither DEBUG_KEYSTORE_BASE64 secret nor debug.keystore.base64 was found; generating a CI debug.keystore. Add DEBUG_KEYSTORE_BASE64 secret or commit debug.keystore.base64 for consistent debug signing across runs."
+            keytool -genkeypair -noprompt \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
           fi
           touch .env
 
