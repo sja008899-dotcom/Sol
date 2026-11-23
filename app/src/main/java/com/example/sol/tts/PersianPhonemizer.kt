@@ -31,7 +31,7 @@ object PersianPhonemizer {
         val tokens = mutableListOf<String>()
         for (rawChar in text) {
             val ch = when (rawChar) {
-                'ك' -> 'ک'
+                'ك' -> 'К'
                 'ي', 'ى', 'ئ' -> 'ی'
                 'ة' -> 'ه'
                 'ؤ' -> 'و'
