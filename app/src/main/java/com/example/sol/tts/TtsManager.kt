@@ -99,7 +99,7 @@ class TtsManager(
         if (text.isBlank()) return
 
         if (piperEngine.isReady) {
-            speakWithPiper(text)
+            speakWithPiper(text, speechRate, persona, preferredVoiceName)
         } else {
             speakWithSystem(
                 text = text,
@@ -110,7 +110,12 @@ class TtsManager(
         }
     }
 
-    private fun speakWithPiper(text: String) {
+    private fun speakWithPiper(
+        text: String,
+        speechRate: Float,
+        persona: VoicePersona,
+        preferredVoiceName: String
+    ) {
         val generation = speechGeneration.incrementAndGet()
         piperEngine.stop()
         _isPiperSpeaking.value = true
@@ -131,7 +136,12 @@ class TtsManager(
                     "TtsManager",
                     "خطا در تولید یا پخش صدای Piper. استفاده از موتور سیستم."
                 )
-                speakWithSystem(text)
+                speakWithSystem(
+                    text = text,
+                    speechRate = speechRate,
+                    persona = persona,
+                    preferredVoiceName = preferredVoiceName
+                )
             }
         }, "Sol-Piper-TTS").start()
     }
