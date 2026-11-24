@@ -1126,7 +1126,7 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Sol از مدل سبک و تأییدشدهٔ CAM++ (~۸.۶ مگابایت، با اثر انگشت SHA-256) استفاده می‌کند. با زدن «ضبط صدای من»، در صورت نبود مدل ابتدا به‌صورت خودکار دانلود و سپس صدای شما با رمزنگاری AES-256 روی گوشی ثبت می‌شود.",
+                    text = "Sol از مدل تأییدشدهٔ CAM++ FP32 (~۲۸ مگابایت، با اثر انگشت SHA-256) استفاده می‌کند. با زدن «ضبط صدای من»، در صورت نبود یا ناسازگاری مدل ابتدا به‌صورت خودکار دانلود و سپس صدای شما با رمزنگاری AES-256 روی گوشی ثبت می‌شود.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1242,7 +1242,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("دانلود مستقیم مدل CAM++ (~8.6MB)")
+                            Text("دانلود مستقیم مدل CAM++ (~28MB)")
                         }
                     }
                     OutlinedButton(

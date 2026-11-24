@@ -88,7 +88,8 @@ data class SpeakerIdUiState(
 
 /**
  * Coordinates N5 Speaker ID lifecycle cleanly:
- * - Self-contained: automatically downloads & verifies CAM++ (campplus_zh_en_int8.onnx) when needed.
+ * - Self-contained: automatically downloads & verifies CAM++ FP32 (campplus_zh_en_fp32.onnx) when needed.
+ * - Auto-recovery: automatically replaces outdated/incompatible ONNX files (e.g., legacy int8 ConvInteger models).
  * - Fail-safe: when either the speaker ONNX model or the encrypted owner profile is absent, N5 reports inactive and never blocks commands.
  * - Active gate: when both exist, voice audio is checked via [verifyVoicePcm] before executing commands in CommandBrain.
  */
@@ -104,6 +105,8 @@ class SpeakerIdManager(
 ) {
     private val appContext = context.applicationContext
     private val downloadMutex = Mutex()
+    private val customTrustedShaFile: File
+        get() = File(modelFile.parentFile ?: appContext.filesDir, "${modelFile.name}.custom_sha256")
 
     @Volatile
     private var lastFeedbackFa: String = ""
@@ -114,8 +117,26 @@ class SpeakerIdManager(
     private val _uiState = MutableStateFlow(computeStatus())
     val uiState: StateFlow<SpeakerIdUiState> = _uiState.asStateFlow()
 
+    private fun readTrustedCustomSha256(): String? {
+        if (!customTrustedShaFile.exists()) return null
+        return runCatching { customTrustedShaFile.readText().trim().lowercase() }
+            .getOrNull()
+            ?.takeIf { SolHttpClient.isValidSha256Hex(it) }
+    }
+
+    private fun hasTrustedCustomModel(): Boolean {
+        val pinned = readTrustedCustomSha256() ?: return false
+        return embedder.isModelPresent && embedder.currentSha256().equals(pinned, ignoreCase = true)
+    }
+
+    fun isModelCompatible(): Boolean {
+        if (!embedder.isModelPresent) return false
+        if (embedder.isReady) return true
+        return embedder.isOfficialModelVerified() || hasTrustedCustomModel()
+    }
+
     val isActive: Boolean
-        get() = embedder.isModelPresent && ownerProfile.exists()
+        get() = isModelCompatible() && ownerProfile.exists()
 
     fun refreshStatus() {
         val current = _uiState.value
@@ -141,19 +162,21 @@ class SpeakerIdManager(
         remainingSeconds: Int = 0,
         liveRmsLevel: Float = 0f,
     ): SpeakerIdUiState {
-        val hasModel = embedder.isModelPresent
+        val hasCompatibleModel = isModelCompatible()
+        val hasOutdatedFile = embedder.isModelPresent && !hasCompatibleModel
         val hasOwner = ownerProfile.exists()
-        val active = hasModel && hasOwner
+        val active = hasCompatibleModel && hasOwner
         val label = when {
-            isDownloading -> "در حال دانلود خودکار مدل شناسایی صدا (CAM++ • $downloadPercent٪)…"
+            isDownloading -> "در حال دانلود خودکار مدل شناسایی صدا (CAM++ FP32 • $downloadPercent٪)…"
             isRecording -> "در حال ضبط (${remainingSeconds.coerceAtLeast(1)} ثانیه باقی‌مانده — با صدای عادی صحبت کنید)…"
             active -> "✅ شناسایی صدای مالک (N5) فعال است؛ دستورات صوتی فقط برای صدای مالک اجرا می‌شوند."
-            hasModel && !hasOwner -> "✅ مدل CAM++ آماده است؛ دکمه «ضبط صدای من» را بزنید تا N5 فعال شود."
-            !hasModel && hasOwner -> "نمونهٔ صدای مالک ذخیره شده؛ با اولین دانلود/ضبط، مدل CAM++ خودکار نصب می‌شود."
-            else -> "آمادهٔ راه‌اندازی خودکار: با زدن «ضبط صدای من»، مدل سبک CAM++ (~۸.۶MB) خودکار دانلود و صدای شما ثبت می‌شود."
+            hasOutdatedFile -> "نسخهٔ قبلی مدل گوینده با موتور گوشی ناسازگار است؛ با زدن «ضبط صدای من» یا دانلود، نسخهٔ سازگار CAM++ (~۲۸MB) خودکار جایگزین می‌شود."
+            hasCompatibleModel && !hasOwner -> "✅ مدل CAM++ آماده است؛ دکمه «ضبط صدای من» را بزنید تا N5 فعال شود."
+            !hasCompatibleModel && hasOwner -> "نمونهٔ صدای مالک ذخیره شده؛ با اولین دانلود/ضبط، مدل سازگار CAM++ خودکار نصب می‌شود."
+            else -> "آمادهٔ راه‌اندازی خودکار: با زدن «ضبط صدای من»، مدل CAM++ (~۲۸MB) خودکار دانلود و صدای شما ثبت می‌شود."
         }
         return SpeakerIdUiState(
-            isModelInstalled = hasModel,
+            isModelInstalled = hasCompatibleModel,
             isOwnerEnrolled = hasOwner,
             isActive = active,
             isDownloadingModel = isDownloading,
@@ -180,6 +203,10 @@ class SpeakerIdManager(
                 politeMessageFa = POLITE_REJECTION_MESSAGE_FA,
             )
         }
+        if (!embedder.isReady) {
+            val initialized = embedder.initialize(verifyOfficialHash = !hasTrustedCustomModel())
+            if (!initialized) return SpeakerVerificationOutcome.InactiveFailSafe
+        }
         val ownerEmbedding = ownerProfile.load() ?: return SpeakerVerificationOutcome.InactiveFailSafe
         val candidateEmbedding = embedder.embed(pcm16k)
             ?: return SpeakerVerificationOutcome.RejectedNonOwner(
@@ -198,8 +225,13 @@ class SpeakerIdManager(
     }
 
     suspend fun enrollOwnerFromPcm(pcm16k: FloatArray): Result<String> = withContext(Dispatchers.IO) {
-        if (!embedder.isModelPresent) {
-            val msg = "N5 غیرفعال است: ابتدا فایل مدل ONNX شناسایی گوینده را انتخاب کنید."
+        if (!isModelCompatible()) {
+            val msg = "N5 غیرفعال است: ابتدا فایل مدل ONNX سازگار شناسایی گوینده را دریافت یا انتخاب کنید."
+            setFeedback(msg, isError = true)
+            return@withContext Result.failure(IllegalStateException(msg))
+        }
+        if (!embedder.isReady && !embedder.initialize(verifyOfficialHash = !hasTrustedCustomModel())) {
+            val msg = embedder.lastErrorFa.ifBlank { "بارگذاری مدل شناسایی گوینده ناموفق بود." }
             setFeedback(msg, isError = true)
             return@withContext Result.failure(IllegalStateException(msg))
         }
@@ -210,7 +242,8 @@ class SpeakerIdManager(
         }
         val embedding = embedder.embed(pcm16k)
             ?: run {
-                val msg = "استخراج بردار صدای مالک از مدل گوینده ناموفق بود؛ مطمئن شوید مدل ONNX انتخاب‌شده مخصوص استخراج بردار صوتی گوینده است (نه Piper TTS)."
+                val detail = embedder.lastErrorFa.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
+                val msg = "استخراج بردار صدای مالک از مدل گوینده ناموفق بود$detail؛ مطمئن شوید مدل ONNX انتخاب‌شده مخصوص استخراج بردار صوتی گوینده است."
                 setFeedback(msg, isError = true)
                 return@withContext Result.failure(IllegalStateException(msg))
             }
@@ -230,11 +263,19 @@ class SpeakerIdManager(
         estimatedBytes: Long = SpeakerEmbedder.CAMPP_APPROX_BYTES,
     ): Result<String> = withContext(Dispatchers.IO) {
         downloadMutex.withLock {
-            if (embedder.isModelPresent && embedder.initialize()) {
-                val okMsg = "مدل شناسایی صدا (CAM++) آماده است."
+            if (embedder.isModelPresent && embedder.initialize(verifyOfficialHash = true)) {
+                runCatching { customTrustedShaFile.delete() }
+                val okMsg = "مدل شناسایی صدا (CAM++ FP32) آماده است."
                 setFeedback(okMsg, isError = false)
                 return@withLock Result.success(okMsg)
             }
+            // Clear stale/incompatible file (e.g., legacy int8 ConvInteger model) so clean FP32 replaces it
+            embedder.release()
+            runCatching { customTrustedShaFile.delete() }
+            if (modelFile.exists()) {
+                runCatching { modelFile.delete() }
+            }
+
             modelFile.parentFile?.mkdirs()
             val partFile = File(modelFile.parentFile, "${modelFile.name}.part")
             try {
@@ -254,28 +295,51 @@ class SpeakerIdManager(
                     )
                 }
 
-                val headMeta = runCatching {
-                    httpClient.preflightHeadMetadata(downloadUrl, setOf("huggingface.co", "hf.co"))
-                }.getOrNull()
+                val candidateUrls = buildList {
+                    add(downloadUrl)
+                    if (downloadUrl == SpeakerEmbedder.CAMPP_MODEL_URL) {
+                        add(SpeakerEmbedder.CAMPP_FALLBACK_URL)
+                    }
+                }
+                var lastDownloadError: Throwable? = null
+                var downloaded = false
+                for (url in candidateUrls) {
+                    try {
+                        val headMeta = runCatching {
+                            httpClient.preflightHeadMetadata(url, setOf("huggingface.co", "hf.co"))
+                        }.getOrNull()
 
-                httpClient.downloadOfficialHttpsFileResult(
-                    urlString = downloadUrl,
-                    partFile = partFile,
-                    estimatedBytes = headMeta?.contentLengthBytes?.takeIf { it > 0L } ?: estimatedBytes,
-                    expectedSha256Override = expectedSha256,
-                    expectedBytesOverride = headMeta?.contentLengthBytes ?: -1L,
-                    allowedHostSuffixes = setOf("huggingface.co", "hf.co"),
-                    redirectAllowedHostSuffixes = SolHttpClient.DEFAULT_CDN_REDIRECT_HOSTS,
-                    onProgress = { pct, _, _ ->
-                        _uiState.value = computeStatus(
-                            isDownloading = true,
-                            downloadPercent = pct.coerceIn(5, 96),
+                        httpClient.downloadOfficialHttpsFileResult(
+                            urlString = url,
+                            partFile = partFile,
+                            estimatedBytes = headMeta?.contentLengthBytes?.takeIf { it > 0L } ?: estimatedBytes,
+                            expectedSha256Override = expectedSha256,
+                            expectedBytesOverride = headMeta?.contentLengthBytes ?: -1L,
+                            allowedHostSuffixes = setOf("huggingface.co", "hf.co"),
+                            redirectAllowedHostSuffixes = SolHttpClient.DEFAULT_CDN_REDIRECT_HOSTS,
+                            onProgress = { pct, _, _ ->
+                                _uiState.value = computeStatus(
+                                    isDownloading = true,
+                                    downloadPercent = pct.coerceIn(5, 96),
+                                )
+                            },
                         )
-                    },
-                )
+                        downloaded = true
+                        break
+                    } catch (e: SolNetworkException.IntegrityMismatchException) {
+                        throw e
+                    } catch (e: SolNetworkException.InsufficientDiskSpaceException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        lastDownloadError = e
+                    }
+                }
+                if (!downloaded) {
+                    throw lastDownloadError ?: IllegalStateException("دانلود خودکار مدل شناسایی صدا ناموفق بود.")
+                }
 
                 val candidate = SpeakerEmbedder(partFile)
-                if (!candidate.initialize()) {
+                if (!candidate.initialize(verifyOfficialHash = true)) {
                     val errFa = candidate.lastErrorFa.ifBlank { "فایل دانلودشده CAM++ معتبر نیست." }
                     candidate.release()
                     throw IllegalStateException(errFa)
@@ -288,7 +352,7 @@ class SpeakerIdManager(
                     partFile.copyTo(modelFile, overwrite = true)
                     partFile.delete()
                 }
-                check(embedder.initialize()) {
+                check(embedder.initialize(verifyOfficialHash = true)) {
                     embedder.lastErrorFa.ifBlank { "راه‌اندازی مدل شناسایی صدای CAM++ ناموفق بود." }
                 }
 
@@ -322,7 +386,9 @@ class SpeakerIdManager(
             return@withContext Result.failure(SecurityException(msg))
         }
 
-        if (!embedder.isModelPresent) {
+        val readyLocally = isModelCompatible() &&
+            (embedder.isReady || embedder.initialize(verifyOfficialHash = !hasTrustedCustomModel()))
+        if (!readyLocally) {
             val dlRes = ensureAndDownloadSpeakerModel()
             if (dlRes.isFailure) {
                 return@withContext Result.failure(
@@ -528,19 +594,25 @@ class SpeakerIdManager(
             }
 
             val testEmbedder = SpeakerEmbedder(temp)
-            if (!testEmbedder.initialize()) {
+            if (!testEmbedder.initialize(verifyOfficialHash = false)) {
                 val initErr = testEmbedder.lastErrorFa
                 testEmbedder.release()
                 val msg = initErr.ifBlank { "فایل انتخاب‌شده یک مدل معتبر ONNX نیست." }
                 setFeedback(msg, isError = true)
                 return@withContext Result.failure(IllegalArgumentException(msg))
             }
+            val importedSha = testEmbedder.currentSha256()
             testEmbedder.release()
 
             embedder.release()
             if (modelFile.exists()) modelFile.delete()
             if (!temp.renameTo(modelFile)) {
                 temp.copyTo(modelFile, overwrite = true)
+            }
+            if (importedSha.equals(SpeakerEmbedder.EXPECTED_CAMPP_SHA256, ignoreCase = true)) {
+                runCatching { customTrustedShaFile.delete() }
+            } else if (SolHttpClient.isValidSha256Hex(importedSha)) {
+                runCatching { customTrustedShaFile.writeText(importedSha) }
             }
             val msg = "مدل شناسایی گوینده وارد شد. اکنون دکمه «ضبط صدای من» را بزنید تا N5 فعال شود."
             setFeedback(msg, isError = false)
@@ -563,6 +635,7 @@ class SpeakerIdManager(
         embedder.release()
         ownerProfile.clear()
         runCatching { modelFile.delete() }
+        runCatching { customTrustedShaFile.delete() }
         lastFeedbackFa = ""
         lastFeedbackIsError = false
         refreshStatus()

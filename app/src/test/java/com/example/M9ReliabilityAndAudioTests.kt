@@ -446,5 +446,14 @@ class M9ReliabilityAndAudioTests {
         val speakerRes = speakerManager.ensureAndDownloadSpeakerModel()
         assertTrue(speakerRes.isFailure)
         assertTrue(speakerRes.exceptionOrNull() is SolNetworkException.IntegrityMismatchException)
+
+        // Legacy incompatible file (e.g., old int8 ConvInteger ONNX without matching FP32 SHA-256)
+        // must be flagged incompatible so auto-upgrade / enrollment replaces it cleanly.
+        speakerManager.modelFile.parentFile?.mkdirs()
+        speakerManager.modelFile.writeBytes("OLD_INT8_CONVINTEGER_MODEL".toByteArray())
+        speakerManager.refreshStatus()
+        assertFalse(speakerManager.isModelCompatible())
+        assertFalse(speakerManager.uiState.value.isModelInstalled)
+        speakerManager.deleteAllSpeakerData()
     }
 }

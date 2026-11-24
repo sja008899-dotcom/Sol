@@ -102,6 +102,9 @@ class ExampleUnitTest {
         assertEquals(64, PiperConfig.EXPECTED_CONFIG_SHA256.length)
 
         assertTrue(SpeakerEmbedder.CAMPP_MODEL_URL.startsWith("https://huggingface.co/Luigi/campplus-zh-en-onnx/"))
+        assertTrue(SpeakerEmbedder.CAMPP_MODEL_URL.endsWith("campplus_zh_en_fp32.onnx"))
+        assertTrue(SpeakerEmbedder.CAMPP_FALLBACK_URL.startsWith("https://huggingface.co/csukuangfj/speaker-embedding-models/"))
+        assertEquals(28_281_164L, SpeakerEmbedder.CAMPP_APPROX_BYTES)
         assertEquals(64, SpeakerEmbedder.EXPECTED_CAMPP_SHA256.length)
 
         val chunks = TtsManager.splitIntoSentences("سلام! حال شما چطور است؟ امروز ۱.۵ ساعت تمرین داریم.", maxChunkChars = 40)

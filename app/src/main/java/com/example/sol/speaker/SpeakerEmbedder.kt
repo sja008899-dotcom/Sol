@@ -31,37 +31,58 @@ class SpeakerEmbedder(private val modelFile: File) {
 
     val isReady: Boolean get() = session != null
 
-    fun initialize(): Boolean {
+    fun initialize(verifyOfficialHash: Boolean = true): Boolean {
         lastErrorFa = ""
         return try {
             require(modelFile.exists() && modelFile.isFile && modelFile.length() > 0L) {
                 "فایل مدل شناسایی گوینده یافت نشد."
             }
 
-            val actualHash = calculateSHA256(modelFile)
-            if (!actualHash.equals(EXPECTED_CAMPP_SHA256, ignoreCase = true)) {
-                lastErrorFa = "اثر انگشت فایل مدل شناسایی گوینده (CAM++) مطابقت ندارد."
-                throw SecurityException(lastErrorFa)
+            if (verifyOfficialHash) {
+                val actualHash = calculateSHA256(modelFile)
+                if (!actualHash.equals(EXPECTED_CAMPP_SHA256, ignoreCase = true)) {
+                    lastErrorFa = "فایل فعلی مدل شناسایی گوینده قدیمی یا نامعتبر است؛ نسخهٔ سازگار FP32 جایگزین می‌شود."
+                    throw SecurityException(lastErrorFa)
+                }
             }
 
             val ortEnv = OrtEnvironment.getEnvironment()
             val ortSess = ortEnv.createSession(modelFile.absolutePath)
+
+            // Reject non-speaker models (e.g., Piper TTS which expects input_lengths / scales)
+            val inputNames = ortSess.inputNames
+            val looksLikePiperTts = inputNames.any { it.contains("length", true) } &&
+                inputNames.any { it.contains("scale", true) }
+            if (looksLikePiperTts) {
+                runCatching { ortSess.close() }
+                lastErrorFa = "فایل انتخاب‌شده مربوط به صدای Piper TTS است و برای شناسایی صدای گوینده مناسب نیست."
+                throw IllegalArgumentException(lastErrorFa)
+            }
+
             env = ortEnv
             session = ortSess
             true
         } catch (t: Throwable) {
             if (lastErrorFa.isBlank()) {
-                lastErrorFa = t.localizedMessage ?: "خطا در بارگذاری مدل شناسایی گوینده ONNX"
+                lastErrorFa = translateOrtErrorFa(t)
             }
             release()
             false
         }
     }
 
+    fun isOfficialModelVerified(): Boolean =
+        isModelPresent && runCatching {
+            calculateSHA256(modelFile).equals(EXPECTED_CAMPP_SHA256, ignoreCase = true)
+        }.getOrDefault(false)
+
+    fun currentSha256(): String =
+        if (isModelPresent) runCatching { calculateSHA256(modelFile) }.getOrDefault("") else ""
+
     fun embed(pcm16k: FloatArray): FloatArray? {
         if (pcm16k.isEmpty()) return null
         if (!isReady && isModelPresent) {
-            if (!initialize()) return null
+            if (!initialize(verifyOfficialHash = false)) return null
         }
         val ortEnvironment = env ?: return null
         val ortSession = session ?: return null
@@ -74,6 +95,7 @@ class SpeakerEmbedder(private val modelFile: File) {
                     it.contains("fbank", true) ||
                     it.contains("wav", true) ||
                     it.contains("audio", true) ||
+                    it.contains("speech", true) ||
                     it.contains("input", true)
             } ?: ortSession.inputNames.first()
 
@@ -105,11 +127,22 @@ class SpeakerEmbedder(private val modelFile: File) {
             floatBuffer.get(vector)
             if (vector.isEmpty()) null else l2Normalize(vector)
         } catch (t: Throwable) {
-            lastErrorFa = t.localizedMessage ?: "خطا در استخراج بردار صدای گوینده"
+            lastErrorFa = translateOrtErrorFa(t)
             null
         } finally {
             runCatching { result?.close() }
             runCatching { tensor?.close() }
+        }
+    }
+
+    private fun translateOrtErrorFa(t: Throwable): String {
+        val raw = t.localizedMessage.orEmpty()
+        return when {
+            raw.contains("ConvInteger", ignoreCase = true) ||
+                raw.contains("ORT_NOT_IMPLEMENTED", ignoreCase = true) ->
+                "این مدل ONNX از عملگرهای کوانتیزهٔ پشتیبانی‌نشده روی اندروید (ConvInteger) استفاده می‌کند؛ لطفاً نسخهٔ FP32 سازگار را با دانلود خودکار دریافت کنید."
+            raw.isNotBlank() -> raw
+            else -> "خطا در راه‌اندازی یا اجرای مدل شناسایی گوینده ONNX"
         }
     }
 
@@ -133,11 +166,14 @@ class SpeakerEmbedder(private val modelFile: File) {
     }
 
     companion object {
+        // Official FP32 CAM++ ONNX (float32 standard Conv ops, fully supported by onnxruntime-android without ConvInteger)
         const val CAMPP_MODEL_URL =
-            "https://huggingface.co/Luigi/campplus-zh-en-onnx/resolve/main/campplus_zh_en_int8.onnx"
-        const val CAMPP_APPROX_BYTES = 8_595_767L
+            "https://huggingface.co/Luigi/campplus-zh-en-onnx/resolve/main/campplus_zh_en_fp32.onnx"
+        const val CAMPP_FALLBACK_URL =
+            "https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/main/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
+        const val CAMPP_APPROX_BYTES = 28_281_164L
         const val EXPECTED_CAMPP_SHA256 =
-            "27bbb97acd182a8d16aff8e8743d2a54b66450773b84cae140483fe8049bd67d"
+            "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
 
         const val SAMPLE_RATE = 16_000
         const val FRAME_SIZE = 400 // 25ms @ 16kHz

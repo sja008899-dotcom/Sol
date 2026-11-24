@@ -312,7 +312,7 @@ class SolAppContainer(private val application: Application) {
         }
 
         val speakerState = speakerIdManager.uiState.value
-        val needsSpeaker = !speakerIdManager.embedder.isModelPresent && !speakerState.isDownloadingModel
+        val needsSpeaker = !speakerIdManager.isModelCompatible() && !speakerState.isDownloadingModel
         if (needsSpeaker) {
             speakerIdManager.ensureAndDownloadSpeakerModel()
             uiBridge.triggerRefreshSnapshots()
