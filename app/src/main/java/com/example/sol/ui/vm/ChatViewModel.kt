@@ -102,7 +102,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             com.example.sol.voice.MicForegroundService.wakeEvents.collect {
                 if (c.voiceEngine.canStartAutomatedWakeWord()) {
-                    startVoiceListening()
+                    startVoiceListening(fromWakeWord = true)
+                } else if (preferences.value.screenOffMicEnabled && c.voiceEngine.voskEngine.isModelInstalled()) {
+                    com.example.sol.voice.MicForegroundService.resume(getApplication())
                 }
             }
         }

@@ -35,6 +35,9 @@ class SlmViewModel(application: Application) : AndroidViewModel(application) {
 
     val slmRuntimeState: StateFlow<SlmRuntimeState> = c.localSlmEngine.runtimeState
 
+    private val _pendingSlmTierBConfirm = MutableStateFlow<SlmModelSpec?>(null)
+    val pendingSlmTierBConfirm: StateFlow<SlmModelSpec?> = _pendingSlmTierBConfirm.asStateFlow()
+
     init {
         refreshSlmState()
         viewModelScope.launch {
@@ -68,6 +71,24 @@ class SlmViewModel(application: Application) : AndroidViewModel(application) {
             c.localSlmEngine.unloadFromRam("تغییر شتاب‌دهنده سخت‌افزاری؛ در نوبت بعد اعمال می‌شود")
         }
         refreshSlmState()
+    }
+
+    fun requestDownloadSlmModel(spec: SlmModelSpec) {
+        if (spec.hasVerifiedIntegrityMetadata()) {
+            downloadSlmModel(spec)
+        } else {
+            _pendingSlmTierBConfirm.value = spec
+        }
+    }
+
+    fun confirmSlmTierBDownload() {
+        val spec = _pendingSlmTierBConfirm.value ?: return
+        _pendingSlmTierBConfirm.value = null
+        downloadSlmModel(spec)
+    }
+
+    fun dismissSlmTierBDownload() {
+        _pendingSlmTierBConfirm.value = null
     }
 
     fun downloadSlmModel(spec: SlmModelSpec) {

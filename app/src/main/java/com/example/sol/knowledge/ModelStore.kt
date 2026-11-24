@@ -29,10 +29,31 @@ internal class ModelStore(
 
     fun hasInstalledModel(preferredPath: String = ""): Boolean = findActiveModelFile(preferredPath) != null
 
+    fun saveSha256Sidecar(modelFile: File, sha256Hex: String) {
+        if (!com.example.sol.network.SolHttpClient.isValidSha256Hex(sha256Hex)) return
+        runCatching {
+            File(modelFile.parentFile, "${modelFile.name}.sha256")
+                .writeText(sha256Hex.trim().lowercase())
+        }
+    }
+
+    fun readSha256Sidecar(modelFile: File): String {
+        val sidecar = File(modelFile.parentFile, "${modelFile.name}.sha256")
+        if (!sidecar.isFile) return ""
+        val value = runCatching { sidecar.readText().trim().lowercase() }.getOrDefault("")
+        return if (com.example.sol.network.SolHttpClient.isValidSha256Hex(value)) value else ""
+    }
+
     fun deleteAllModels(preferredPath: String) {
-        findActiveModelFile(preferredPath)?.delete()
+        findActiveModelFile(preferredPath)?.let { f ->
+            File(f.parentFile, "${f.name}.sha256").delete()
+            f.delete()
+        }
         modelsDir.listFiles()?.forEach { file ->
-            if (file.name.endsWith(".litertlm", ignoreCase = true) || file.name.endsWith(".part")) {
+            if (file.name.endsWith(".litertlm", ignoreCase = true) ||
+                file.name.endsWith(".part") ||
+                file.name.endsWith(".sha256")
+            ) {
                 file.delete()
             }
         }
@@ -62,6 +83,7 @@ internal class ModelStore(
         val totalMb = (declaredSize.coerceAtLeast(1L)) / (1024L * 1024L)
         onProgress("کپی فایل محلی $safeName", 10, 0L, totalMb)
 
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
         context.contentResolver.openInputStream(uri)?.use { input ->
             FileOutputStream(partFile).use { output ->
                 val buffer = ByteArray(64 * 1024)
@@ -70,6 +92,7 @@ internal class ModelStore(
                 var read: Int
                 while (input.read(buffer).also { read = it } != -1) {
                     output.write(buffer, 0, read)
+                    digest.update(buffer, 0, read)
                     copied += read
                     if (declaredSize > 0L) {
                         val pct = ((copied * 100L) / declaredSize).toInt().coerceIn(5, 99)
@@ -92,6 +115,8 @@ internal class ModelStore(
             partFile.copyTo(finalFile, overwrite = true)
             partFile.delete()
         }
+        val shaHex = digest.digest().joinToString("") { "%02x".format(it) }
+        saveSha256Sidecar(finalFile, shaHex)
         return finalFile
     }
 

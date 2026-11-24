@@ -129,6 +129,7 @@ sealed interface SlmRuntimeState {
         val minRamMb: Long,
         val availableRamMb: Long,
         val lastNoteFa: String = "",
+        val sha256Hex: String = "",
     ) : SlmRuntimeState
 
     data class Loading(
@@ -143,6 +144,7 @@ sealed interface SlmRuntimeState {
         val activeBackend: SlmActiveBackend,
         val availableRamMb: Long,
         val lastFallbackNoteFa: String = "",
+        val sha256Hex: String = "",
     ) : SlmRuntimeState
 
     data class Generating(

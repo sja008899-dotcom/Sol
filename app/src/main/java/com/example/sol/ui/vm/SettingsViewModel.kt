@@ -86,6 +86,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     val recommendedSlmModel: StateFlow<SlmModelSpec> = _recommendedSlmModel.asStateFlow()
 
+    private val _pendingVoskTierBConfirm = MutableStateFlow(false)
+    val pendingVoskTierBConfirm: StateFlow<Boolean> = _pendingVoskTierBConfirm.asStateFlow()
+
     init {
         refreshSettingsSnapshots()
         viewModelScope.launch {
@@ -154,6 +157,23 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     // --- Vosk Offline Voice ---
+    fun requestDownloadVoskModel() {
+        if (com.example.sol.voice.VoskVoiceEngine.hasVerifiedDownloadMetadata()) {
+            downloadVoskPersianModel()
+        } else {
+            _pendingVoskTierBConfirm.value = true
+        }
+    }
+
+    fun confirmVoskTierBDownload() {
+        _pendingVoskTierBConfirm.value = false
+        downloadVoskPersianModel()
+    }
+
+    fun dismissVoskTierBDownload() {
+        _pendingVoskTierBConfirm.value = false
+    }
+
     fun downloadVoskPersianModel() = c.voiceEngine.voskEngine.downloadPersianSmallModel()
     fun importVoskModelZip(uri: Uri) = c.voiceEngine.voskEngine.importLocalModelZip(uri)
     fun unloadVoskModelFromRam() {
@@ -176,6 +196,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 onSuccess = { msg -> c.uiBridge.postBanner(msg) },
                 onFailure = { err -> c.uiBridge.postBanner(err.message ?: "انتخاب فایل‌های Piper ناموفق بود.") },
             )
+        }
+    }
+
+    fun acceptCustomPiperWithRisk() {
+        c.ttsManager.acceptCustomPiperWithRisk()
+        c.uiBridge.postBanner("فایل‌های سفارشی Piper با مسئولیت شما پذیرفته و فعال شدند.")
+    }
+
+    fun rejectCustomPiperWithRisk() {
+        viewModelScope.launch(Dispatchers.IO) {
+            c.ttsManager.rejectPendingCustomPiper()
+            c.uiBridge.postBanner("فایل‌های تأییدنشده Piper حذف شدند.")
         }
     }
 

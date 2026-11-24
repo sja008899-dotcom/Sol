@@ -81,6 +81,11 @@ data class SolPreferences(
     // M8 F2 Reliability diagnostics
     val lastReminderDeliveredAt: Long = 0L,
     val lastReminderDeliveredTitle: String = "",
+    // Two-tier TOFU & user-confirmed custom model integrity pins
+    val trustedVoskSha256: String = "",
+    val trustedVoskBytes: Long = 0L,
+    val trustedPiperOnnxSha256: String = "",
+    val trustedPiperConfigSha256: String = "",
 )
 
 class PreferencesRepository(private val context: Context) {
@@ -114,6 +119,10 @@ class PreferencesRepository(private val context: Context) {
         val CONTINUOUS_LISTENING_AFTER_WAKE = booleanPreferencesKey("continuous_listening_after_wake")
         val LAST_REMINDER_DELIVERED_AT = longPreferencesKey("last_reminder_delivered_at")
         val LAST_REMINDER_DELIVERED_TITLE = stringPreferencesKey("last_reminder_delivered_title")
+        val TRUSTED_VOSK_SHA256 = stringPreferencesKey("trusted_vosk_sha256")
+        val TRUSTED_VOSK_BYTES = longPreferencesKey("trusted_vosk_bytes")
+        val TRUSTED_PIPER_ONNX_SHA256 = stringPreferencesKey("trusted_piper_onnx_sha256")
+        val TRUSTED_PIPER_CONFIG_SHA256 = stringPreferencesKey("trusted_piper_config_sha256")
     }
 
     val preferences: Flow<SolPreferences> = context.solPrefsDataStore.data.map { p ->
@@ -152,6 +161,10 @@ class PreferencesRepository(private val context: Context) {
             continuousListeningAfterWake = p[Keys.CONTINUOUS_LISTENING_AFTER_WAKE] ?: false,
             lastReminderDeliveredAt = p[Keys.LAST_REMINDER_DELIVERED_AT] ?: 0L,
             lastReminderDeliveredTitle = p[Keys.LAST_REMINDER_DELIVERED_TITLE] ?: "",
+            trustedVoskSha256 = p[Keys.TRUSTED_VOSK_SHA256] ?: "",
+            trustedVoskBytes = p[Keys.TRUSTED_VOSK_BYTES] ?: 0L,
+            trustedPiperOnnxSha256 = p[Keys.TRUSTED_PIPER_ONNX_SHA256] ?: "",
+            trustedPiperConfigSha256 = p[Keys.TRUSTED_PIPER_CONFIG_SHA256] ?: "",
         )
     }
 
@@ -277,6 +290,34 @@ class PreferencesRepository(private val context: Context) {
         }
     }
 
+    suspend fun setTrustedVoskModel(sha256: String, bytes: Long) {
+        context.solPrefsDataStore.edit {
+            it[Keys.TRUSTED_VOSK_SHA256] = sha256.trim().lowercase()
+            it[Keys.TRUSTED_VOSK_BYTES] = bytes.coerceAtLeast(0L)
+        }
+    }
+
+    suspend fun clearTrustedVoskModel() {
+        context.solPrefsDataStore.edit {
+            it[Keys.TRUSTED_VOSK_SHA256] = ""
+            it[Keys.TRUSTED_VOSK_BYTES] = 0L
+        }
+    }
+
+    suspend fun setTrustedPiperHashes(onnxSha256: String, configSha256: String) {
+        context.solPrefsDataStore.edit {
+            it[Keys.TRUSTED_PIPER_ONNX_SHA256] = onnxSha256.trim().lowercase()
+            it[Keys.TRUSTED_PIPER_CONFIG_SHA256] = configSha256.trim().lowercase()
+        }
+    }
+
+    suspend fun clearTrustedPiperHashes() {
+        context.solPrefsDataStore.edit {
+            it[Keys.TRUSTED_PIPER_ONNX_SHA256] = ""
+            it[Keys.TRUSTED_PIPER_CONFIG_SHA256] = ""
+        }
+    }
+
     suspend fun resetAllPreferences() {
         context.solPrefsDataStore.edit { it.clear() }
     }
@@ -310,6 +351,10 @@ class PreferencesRepository(private val context: Context) {
             p[Keys.CONTINUOUS_LISTENING_AFTER_WAKE] = restored.continuousListeningAfterWake
             p[Keys.LAST_REMINDER_DELIVERED_AT] = restored.lastReminderDeliveredAt
             p[Keys.LAST_REMINDER_DELIVERED_TITLE] = restored.lastReminderDeliveredTitle
+            p[Keys.TRUSTED_VOSK_SHA256] = restored.trustedVoskSha256
+            p[Keys.TRUSTED_VOSK_BYTES] = restored.trustedVoskBytes
+            p[Keys.TRUSTED_PIPER_ONNX_SHA256] = restored.trustedPiperOnnxSha256
+            p[Keys.TRUSTED_PIPER_CONFIG_SHA256] = restored.trustedPiperConfigSha256
         }
     }
 

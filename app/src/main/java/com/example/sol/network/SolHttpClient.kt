@@ -62,6 +62,18 @@ data class DiskCheckResult(
     val requiredMb: Long get() = requiredBytes / (1024L * 1024L)
 }
 
+data class HeadMetadata(
+    val sha256: String?,
+    val contentLengthBytes: Long,
+    val location: String?,
+)
+
+data class DownloadedFileResult(
+    val file: File,
+    val sha256Hex: String,
+    val totalBytes: Long,
+)
+
 object SolStorageGuard {
     const val ONE_GIB_BYTES: Long = 1_073_741_824L
     const val SAFETY_MULTIPLIER: Double = 1.25
@@ -141,6 +153,49 @@ class SolHttpClient(
                 }
             }
             String(baos.toByteArray(), charset)
+        } catch (e: SolNetworkException) {
+            throw e
+        } catch (t: Throwable) {
+            throw SolNetworkException.TransportException(t)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /**
+     * Performs a single HTTPS HEAD request without following redirects to extract
+     * Hugging Face `X-Linked-Etag` (LFS SHA-256), `X-Linked-Size`, or `Content-Length`.
+     */
+    fun preflightHeadMetadata(
+        urlString: String,
+        allowedHostSuffixes: Set<String>? = DEFAULT_MODEL_ALLOWED_HOSTS,
+    ): HeadMetadata {
+        val url = validateUrlForRequest(urlString, allowedHostSuffixes)
+        val conn = try {
+            connectionOpener(url).apply {
+                instanceFollowRedirects = false
+                requestMethod = "HEAD"
+                connectTimeout = TEXT_CONNECT_TIMEOUT_MS
+                readTimeout = TEXT_READ_TIMEOUT_MS
+                setRequestProperty("User-Agent", USER_AGENT)
+            }
+        } catch (t: Throwable) {
+            throw SolNetworkException.TransportException(t)
+        }
+        return try {
+            val code = conn.responseCode
+            if (code in 400..599) {
+                throw SolNetworkException.HttpStatusException(code)
+            }
+            val sha = parseSha256Header(conn.getHeaderField("X-Linked-Etag"))
+            val linkedSize = conn.getHeaderField("X-Linked-Size")?.trim()?.toLongOrNull() ?: -1L
+            val contentLen = if (linkedSize > 0L) linkedSize else conn.contentLengthLong
+            val location = conn.getHeaderField("Location")?.trim()?.takeIf { it.isNotBlank() }
+            HeadMetadata(
+                sha256 = sha,
+                contentLengthBytes = if (contentLen > 0L) contentLen else -1L,
+                location = location,
+            )
         } catch (e: SolNetworkException) {
             throw e
         } catch (t: Throwable) {
@@ -308,13 +363,46 @@ class SolHttpClient(
         redirectAllowedHostSuffixes: Set<String>? = DEFAULT_CDN_REDIRECT_HOSTS,
         isCancelled: () -> Boolean = { false },
         onProgress: (percent: Int, downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
-    ): File {
+    ): File = downloadOfficialHttpsFileResult(
+        urlString = urlString,
+        partFile = partFile,
+        estimatedBytes = estimatedBytes,
+        allowedHostSuffixes = allowedHostSuffixes,
+        redirectAllowedHostSuffixes = redirectAllowedHostSuffixes,
+        isCancelled = isCancelled,
+        onProgress = onProgress,
+    ).file
+
+    fun downloadOfficialHttpsFileResult(
+        urlString: String,
+        partFile: File,
+        estimatedBytes: Long,
+        expectedSha256Override: String? = null,
+        expectedBytesOverride: Long = -1L,
+        tofuExpectedSha256: String? = null,
+        minAllowedBytes: Long = -1L,
+        maxAllowedBytes: Long = -1L,
+        allowedHostSuffixes: Set<String>? = DEFAULT_MODEL_ALLOWED_HOSTS,
+        redirectAllowedHostSuffixes: Set<String>? = DEFAULT_CDN_REDIRECT_HOSTS,
+        isCancelled: () -> Boolean = { false },
+        onProgress: (percent: Int, downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
+    ): DownloadedFileResult {
         val checkDir = partFile.parentFile ?: partFile
         checkDir.mkdirs()
 
+        if (expectedBytesOverride > 0L) {
+            val belowMin = minAllowedBytes > 0L && expectedBytesOverride < minAllowedBytes
+            val aboveMax = maxAllowedBytes > 0L && expectedBytesOverride > maxAllowedBytes
+            if (belowMin || aboveMax) {
+                partFile.delete()
+                throw SolNetworkException.IntegrityMismatchException()
+            }
+        }
+
+        val initialPayload = if (expectedBytesOverride > 0L) expectedBytesOverride else estimatedBytes.coerceAtLeast(1L)
         val initialDiskCheck = SolStorageGuard.checkFreeSpace(
             targetPath = checkDir,
-            payloadBytes = estimatedBytes.coerceAtLeast(1L),
+            payloadBytes = initialPayload,
             availableBytesProvider = availableBytesProvider,
         )
         if (!initialDiskCheck.hasEnoughSpace) {
@@ -357,16 +445,25 @@ class SolHttpClient(
             }
 
             val serverSha256 = safeConn.linkedSha256
+                ?: expectedSha256Override?.takeIf { isValidSha256Hex(it) }
                 ?: parseSha256Header(conn.getHeaderField("X-Linked-Etag"))
                 ?: parseSha256Header(conn.getHeaderField("ETag"))
 
-            val exactTotal = resolveAuthoritativeTotalBytes(
+            val resolvedFromConn = resolveAuthoritativeTotalBytes(
                 conn = conn,
                 code = code,
                 linkedSizeBytes = safeConn.linkedSizeBytes,
                 resumeOffset = resumeOffset,
             )
+            val exactTotal = if (resolvedFromConn > 0L) resolvedFromConn else expectedBytesOverride
+
             if (exactTotal > 0L) {
+                val belowMin = minAllowedBytes > 0L && exactTotal < minAllowedBytes
+                val aboveMax = maxAllowedBytes > 0L && exactTotal > maxAllowedBytes
+                if (belowMin || aboveMax) {
+                    shouldDeletePartOnError = true
+                    throw SolNetworkException.IntegrityMismatchException()
+                }
                 val remainingCheck = SolStorageGuard.checkFreeSpace(
                     targetPath = checkDir,
                     payloadBytes = (exactTotal - resumeOffset).coerceAtLeast(0L),
@@ -380,7 +477,7 @@ class SolHttpClient(
                 }
             }
 
-            val displayTotal = if (exactTotal > 0L) exactTotal else estimatedBytes.coerceAtLeast(1L)
+            val displayTotal = if (exactTotal > 0L) exactTotal else initialPayload
             val (totalDownloaded, actualHex) = streamToPartFile(
                 conn = conn,
                 partFile = partFile,
@@ -395,12 +492,22 @@ class SolHttpClient(
 
             val lengthMismatch = exactTotal > 0L && totalDownloaded != exactTotal
             val hashMismatch = serverSha256 != null && !actualHex.equals(serverSha256, ignoreCase = true)
-            if (lengthMismatch || hashMismatch) {
+            val tofuMismatch = tofuExpectedSha256 != null &&
+                isValidSha256Hex(tofuExpectedSha256) &&
+                !actualHex.equals(tofuExpectedSha256, ignoreCase = true)
+            val belowMinDownloaded = minAllowedBytes > 0L && totalDownloaded < minAllowedBytes
+            val aboveMaxDownloaded = maxAllowedBytes > 0L && totalDownloaded > maxAllowedBytes
+
+            if (lengthMismatch || hashMismatch || tofuMismatch || belowMinDownloaded || aboveMaxDownloaded) {
                 shouldDeletePartOnError = true
                 throw SolNetworkException.IntegrityMismatchException()
             }
 
-            partFile
+            DownloadedFileResult(
+                file = partFile,
+                sha256Hex = actualHex,
+                totalBytes = totalDownloaded,
+            )
         } catch (e: SolNetworkException) {
             if (shouldDeletePartOnError) partFile.delete()
             throw e

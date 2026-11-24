@@ -1,6 +1,7 @@
 package com.example.sol.voice
 
 import android.annotation.SuppressLint
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,9 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
-import android.media.AudioFormat
 import android.media.AudioRecord
-import android.media.MediaRecorder
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -20,6 +19,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.example.MainActivity
 import com.example.sol.memory.PersianNormalizer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -35,22 +35,39 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * N2: Foreground microphone service allowing wake-word detection even when the screen is off
  * (explicitly authorized by the project owner for Android 12+ compliance).
- * Guarantees AudioRecord and Vosk Recognizer/Model release inside `finally`.
+ * Uses [SafeAudioCapture] and pauses cleanly whenever another Sol component leases the microphone.
  */
 class MicForegroundService : Service() {
     private val running = AtomicBoolean(false)
-    private var audioRecord: AudioRecord? = null
+
+    @Volatile
+    private var activeRecorderRef: AudioRecord? = null
+
+    @Volatile
     private var workerThread: Thread? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            running.set(false)
-            _isRunning.value = false
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_STOP -> {
+                running.set(false)
+                _isPaused.value = false
+                _isRunning.value = false
+                _isMicActive.value = false
+                runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_PAUSE -> {
+                running.set(false)
+                _isPaused.value = true
+                runCatching { activeRecorderRef?.stop() }
+                runCatching { activeRecorderRef?.release() }
+                activeRecorderRef = null
+                workerThread?.interrupt()
+                return START_STICKY
+            }
         }
 
         val hasMicPerm = ContextCompat.checkSelfPermission(
@@ -60,6 +77,17 @@ class MicForegroundService : Service() {
         if (!hasMicPerm) {
             Log.w(TAG, "MicForegroundService started without RECORD_AUDIO permission; stopping safely.")
             _isRunning.value = false
+            _isPaused.value = false
+            _isMicActive.value = false
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        if (findValidVoskDir(File(filesDir, "vosk-model-fa")) == null) {
+            Log.w(TAG, "Vosk offline model not installed; refusing empty MicForegroundService loop.")
+            _isRunning.value = false
+            _isPaused.value = false
+            _isMicActive.value = false
             stopSelf()
             return START_NOT_STICKY
         }
@@ -78,10 +106,13 @@ class MicForegroundService : Service() {
         } catch (t: Throwable) {
             Log.e(TAG, "Failed entering foreground microphone state", t)
             _isRunning.value = false
+            _isPaused.value = false
+            _isMicActive.value = false
             stopSelf()
             return START_NOT_STICKY
         }
 
+        _isPaused.value = false
         _isRunning.value = true
         if (running.compareAndSet(false, true)) {
             startMicLoop()
@@ -92,47 +123,42 @@ class MicForegroundService : Service() {
     @SuppressLint("MissingPermission")
     private fun startMicLoop() {
         workerThread = Thread({
-            var recorder: AudioRecord? = null
             var voskModel: Model? = null
             var recognizer: Recognizer? = null
+            var wakeTimestampToEmit = -1L
             try {
                 val sampleRate = 16_000
-                val minBuf = AudioRecord.getMinBufferSize(
-                    sampleRate,
-                    AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
-                ).coerceAtLeast(2048)
-
-                recorder = createMicServiceAudioRecord(sampleRate, minBuf * 2)
-                audioRecord = recorder
-                if (recorder.state != AudioRecord.STATE_INITIALIZED) {
-                    Log.e(TAG, "AudioRecord not initialized")
+                val voskDir = findValidVoskDir(File(filesDir, "vosk-model-fa"))
+                if (voskDir == null) {
+                    Log.w(TAG, "Vosk model missing inside MicForegroundService.")
                     return@Thread
                 }
 
-                val voskDir = findValidVoskDir(File(filesDir, "vosk-model-fa"))
-                if (voskDir != null) {
-                    voskModel = runCatching { Model(voskDir.absolutePath) }.getOrNull()
-                    if (voskModel != null) {
-                        val grammar = VoiceVocabularyBias().buildWakeWordGrammarJson()
-                        recognizer = runCatching {
-                            Recognizer(voskModel, sampleRate.toFloat(), grammar)
-                        }.getOrNull()
-                    }
+                voskModel = runCatching { Model(voskDir.absolutePath) }.getOrNull()
+                if (voskModel == null) {
+                    Log.e(TAG, "Failed initializing Vosk Model for MicForegroundService.")
+                    return@Thread
+                }
+                val grammar = VoiceVocabularyBias().buildWakeWordGrammarJson()
+                recognizer = runCatching {
+                    Recognizer(voskModel, sampleRate.toFloat(), grammar)
+                }.getOrNull()
+                if (recognizer == null) {
+                    Log.e(TAG, "Failed initializing Vosk Recognizer for MicForegroundService.")
+                    return@Thread
                 }
 
-                recorder.startRecording()
-                val buf = ShortArray(2048)
+                _isMicActive.value = true
                 var lastWakeAt = 0L
-
-                while (running.get() && !Thread.currentThread().isInterrupted) {
-                    val read = recorder.read(buf, 0, buf.size)
-                    if (read <= 0) continue
-
-                    val rec = recognizer
-                    if (rec != null) {
-                        val completed = rec.acceptWaveForm(buf, read)
-                        val jsonStr = if (completed) rec.result else rec.partialResult
+                val activeRec = recognizer
+                val stopOutcome = SafeAudioCapture.runCaptureLoop(
+                    sampleRate = sampleRate,
+                    chunkSize = 2048,
+                    shouldContinue = { running.get() && !Thread.currentThread().isInterrupted },
+                    onRecorderSwap = { activeRecorderRef = it },
+                    onSamples = { buf, read ->
+                        val completed = activeRec.acceptWaveForm(buf, read)
+                        val jsonStr = if (completed) activeRec.result else activeRec.partialResult
                         val key = if (completed) "text" else "partial"
                         val spoken = extractText(jsonStr, key)
                         if (spoken.isNotBlank()) {
@@ -140,57 +166,50 @@ class MicForegroundService : Service() {
                             val now = System.currentTimeMillis()
                             if ((norm.contains("سول") || norm.contains("sol")) && now - lastWakeAt > 4_000L) {
                                 lastWakeAt = now
-                                _wakeEvents.tryEmit(now)
+                                wakeTimestampToEmit = now
+                                running.set(false)
+                                _isPaused.value = true
+                                return@runCaptureLoop false
                             }
                         }
-                    }
+                        true
+                    },
+                )
+                if (stopOutcome is SafeAudioCaptureStop.Failed) {
+                    Log.w(TAG, "MicForegroundService capture stopped: ${stopOutcome.messageFa}")
                 }
             } catch (t: Throwable) {
                 Log.e(TAG, "MicForegroundService loop error", t)
             } finally {
                 running.set(false)
-                _isRunning.value = false
-                runCatching { recorder?.stop() }
-                runCatching { recorder?.release() }
-                audioRecord = null
+                activeRecorderRef = null
+                _isMicActive.value = false
                 runCatching { recognizer?.close() }
                 runCatching { voskModel?.close() }
-                stopSelf()
+
+                // Emit wake event AFTER AudioRecord & Vosk have completely released hardware mic!
+                if (wakeTimestampToEmit > 0L) {
+                    _wakeEvents.tryEmit(wakeTimestampToEmit)
+                }
+
+                if (!_isPaused.value) {
+                    _isRunning.value = false
+                    stopSelf()
+                }
             }
         }, "SolMicForegroundLoop").also { it.start() }
     }
 
-    @SuppressLint("MissingPermission")
-    private fun createMicServiceAudioRecord(sampleRate: Int, bufferBytes: Int): AudioRecord {
-        for (source in listOf(MediaRecorder.AudioSource.VOICE_RECOGNITION, MediaRecorder.AudioSource.MIC)) {
-            val candidate = AudioRecord(
-                source,
-                sampleRate,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                bufferBytes,
-            )
-            if (candidate.state == AudioRecord.STATE_INITIALIZED) {
-                return candidate
-            }
-            runCatching { candidate.release() }
-        }
-        return AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            sampleRate,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT,
-            bufferBytes,
-        )
-    }
-
     private fun findValidVoskDir(root: File): File? {
         if (!root.exists()) return null
-        if (File(root, "am").isDirectory && File(root, "conf").isDirectory) return root
-        return root.listFiles()?.firstOrNull {
-            it.isDirectory && File(it, "am").isDirectory && File(it, "conf").isDirectory
-        }
+        if (hasVoskSignature(root)) return root
+        return root.listFiles()?.firstOrNull { it.isDirectory && hasVoskSignature(it) }
     }
+
+    private fun hasVoskSignature(dir: File): Boolean =
+        File(dir, "am").isDirectory &&
+            File(dir, "conf").isDirectory &&
+            File(dir, "graph").isDirectory
 
     private fun extractText(jsonStr: String?, key: String): String {
         if (jsonStr.isNullOrBlank()) return ""
@@ -238,10 +257,13 @@ class MicForegroundService : Service() {
 
     override fun onDestroy() {
         running.set(false)
-        _isRunning.value = false
-        runCatching { audioRecord?.stop() }
-        runCatching { audioRecord?.release() }
-        audioRecord = null
+        _isMicActive.value = false
+        if (!_isPaused.value) {
+            _isRunning.value = false
+        }
+        runCatching { activeRecorderRef?.stop() }
+        runCatching { activeRecorderRef?.release() }
+        activeRecorderRef = null
         workerThread?.interrupt()
         workerThread = null
         super.onDestroy()
@@ -252,9 +274,17 @@ class MicForegroundService : Service() {
         private const val CHANNEL_ID = "sol_mic"
         private const val NOTIFICATION_ID = 1001
         const val ACTION_STOP = "com.example.sol.voice.STOP_MIC"
+        const val ACTION_PAUSE = "com.example.sol.voice.PAUSE_MIC"
+        const val ACTION_RESUME = "com.example.sol.voice.RESUME_MIC"
 
         private val _isRunning = MutableStateFlow(false)
         val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
+
+        private val _isPaused = MutableStateFlow(false)
+        val isPaused: StateFlow<Boolean> = _isPaused.asStateFlow()
+
+        private val _isMicActive = MutableStateFlow(false)
+        val isMicActive: StateFlow<Boolean> = _isMicActive.asStateFlow()
 
         private val _wakeEvents = MutableSharedFlow<Long>(extraBufferCapacity = 4)
         val wakeEvents: SharedFlow<Long> = _wakeEvents.asSharedFlow()
@@ -267,18 +297,54 @@ class MicForegroundService : Service() {
             if (!hasMic) {
                 return Result.failure(SecurityException("مجوز میکروفون هنوز صادر نشده است."))
             }
-            return runCatching {
+            return try {
                 val intent = Intent(context, MicForegroundService::class.java)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(intent)
                 } else {
                     context.startService(intent)
                 }
+                Result.success(Unit)
+            } catch (t: Throwable) {
+                val msg = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    t is ForegroundServiceStartNotAllowedException
+                ) {
+                    "اندروید اجازهٔ شروع سرویس پس‌زمینهٔ میکروفون را از حالت بسته نداد؛ برنامه را باز نگه دارید یا باتری Sol را روی نامحدود بگذارید."
+                } else {
+                    t.localizedMessage ?: "شروع سرویس شنود پس‌زمینه ناموفق بود."
+                }
+                Result.failure(IllegalStateException(msg, t))
             }
         }
 
+        fun pause(context: Context) {
+            if (!_isRunning.value && !_isMicActive.value) return
+            _isPaused.value = true
+            runCatching {
+                context.startService(
+                    Intent(context, MicForegroundService::class.java).setAction(ACTION_PAUSE)
+                )
+            }
+        }
+
+        suspend fun pauseAndAwaitRelease(context: Context, maxWaitMs: Long = 800L) {
+            if (!_isRunning.value && !_isMicActive.value) return
+            pause(context)
+            val deadline = System.currentTimeMillis() + maxWaitMs
+            while (_isMicActive.value && System.currentTimeMillis() < deadline) {
+                delay(25L)
+            }
+        }
+
+        fun resume(context: Context): Result<Unit> {
+            _isPaused.value = false
+            return start(context)
+        }
+
         fun stop(context: Context) {
+            _isPaused.value = false
             _isRunning.value = false
+            _isMicActive.value = false
             runCatching {
                 context.stopService(Intent(context, MicForegroundService::class.java))
             }

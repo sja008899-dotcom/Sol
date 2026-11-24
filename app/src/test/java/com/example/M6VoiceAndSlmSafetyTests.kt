@@ -214,6 +214,7 @@ class M6VoiceAndSlmSafetyTests {
 
             File(voskDir, "am").mkdirs()
             File(voskDir, "conf").mkdirs()
+            File(voskDir, "graph").mkdirs()
             assertEquals(ActiveAsrBackend.VOSK_OFFLINE, engine.resolvePreferredBackend(preferVosk = true))
             assertEquals(ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER, engine.resolvePreferredBackend(preferVosk = false))
 

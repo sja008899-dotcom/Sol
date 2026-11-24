@@ -47,21 +47,74 @@ class SolAppContainer(private val application: Application) {
     val historyRepository by lazy { HistoryRepository(dao) }
     val knowledgeRepository by lazy { KnowledgeRepository(dao) }
     val noteTodoRepository by lazy { NoteTodoRepository(dao) }
-    val preferencesRepository by lazy { PreferencesRepository(application) }
+    val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(application) }
 
-    val memoryOptimizer by lazy { SolMemoryOptimizer(application) }
+    val memoryOptimizer: SolMemoryOptimizer by lazy { SolMemoryOptimizer(application) }
 
-    val audioManager by lazy { SolAudioManager(application) }
-    val persianTts by lazy { PersianTTS(application, audioManager) }
-    val ttsManager by lazy { com.example.sol.tts.TtsManager(application, persianTts, audioManager) }
-    val speakerIdManager by lazy { com.example.sol.speaker.SpeakerIdManager(application) }
-    val voiceEngine by lazy {
+    val micArbiter: com.example.sol.voice.MicArbiter by lazy {
+        com.example.sol.voice.MicArbiter(
+            pauseForegroundMic = {
+                com.example.sol.voice.MicForegroundService.pauseAndAwaitRelease(application)
+            },
+            resumeForegroundMic = {
+                val shouldResume = preferencesRepository.getSnapshot().screenOffMicEnabled &&
+                    voskEngine.isModelInstalled() &&
+                    com.example.sol.voice.MicForegroundService.isPaused.value
+                if (shouldResume) {
+                    com.example.sol.voice.MicForegroundService.resume(application)
+                }
+            },
+        )
+    }
+
+    val voskEngine: com.example.sol.voice.VoskVoiceEngine by lazy {
+        com.example.sol.voice.VoskVoiceEngine(
+            context = application,
+            trustedSha256Provider = { preferencesRepository.getSnapshot().trustedVoskSha256.ifBlank { null } },
+            onTofuSha256Pinned = { sha, bytes -> preferencesRepository.setTrustedVoskModel(sha, bytes) },
+            onClearTofuPin = { preferencesRepository.clearTrustedVoskModel() },
+            micArbiter = micArbiter,
+        )
+    }
+
+    val audioManager: SolAudioManager by lazy { SolAudioManager(application) }
+    val persianTts: PersianTTS by lazy { PersianTTS(application, audioManager) }
+    val ttsManager: com.example.sol.tts.TtsManager by lazy {
+        com.example.sol.tts.TtsManager(
+            context = application,
+            systemTts = persianTts,
+            audioManager = audioManager,
+            trustedCustomHashesProvider = {
+                val p = preferencesRepository.getSnapshot()
+                if (p.trustedPiperOnnxSha256.isNotBlank() && p.trustedPiperConfigSha256.isNotBlank()) {
+                    p.trustedPiperOnnxSha256 to p.trustedPiperConfigSha256
+                } else {
+                    null
+                }
+            },
+            onSaveTrustedCustomHashes = { onnxSha, cfgSha ->
+                preferencesRepository.setTrustedPiperHashes(onnxSha, cfgSha)
+            },
+            onClearTrustedCustomHashes = {
+                preferencesRepository.clearTrustedPiperHashes()
+            },
+        )
+    }
+    val speakerIdManager: com.example.sol.speaker.SpeakerIdManager by lazy {
+        com.example.sol.speaker.SpeakerIdManager(
+            context = application,
+            micArbiter = micArbiter,
+        )
+    }
+    val voiceEngine: VoiceEngine by lazy {
         VoiceEngine(
             context = application,
+            voskEngine = voskEngine,
             audioManager = audioManager,
             persianTts = persianTts,
             isExternalSpeaking = { ttsManager.isPiperSpeaking.value },
             onStopExternalSpeech = { ttsManager.stop() },
+            micArbiter = micArbiter,
         )
     }
 
@@ -266,6 +319,7 @@ class SolApplication : Application() {
                 evictRagCache = { container.bookRagEngine.evictCache() },
                 unloadVoskIfIdle = { container.voiceEngine.voskEngine.unloadModelFromRam() },
                 releaseSlmCache = { container.localSlmEngine.releaseSessionMemory() },
+                unloadPiperIfIdle = { container.ttsManager.unloadFromRamIfIdle() },
             )
         }
     }

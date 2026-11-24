@@ -89,6 +89,7 @@ internal class InferenceEngine(
                 activeBackend = activeBackend,
                 availableRamMb = availMb,
                 lastFallbackNoteFa = lastFallbackNote,
+                sha256Hex = modelStore.readSha256Sidecar(loadedFile),
             )
             return
         }
@@ -106,6 +107,7 @@ internal class InferenceEngine(
                 minRamMb = minRam,
                 availableRamMb = availMb,
                 lastNoteFa = noteFa,
+                sha256Hex = modelStore.readSha256Sidecar(file),
             )
         }
     }

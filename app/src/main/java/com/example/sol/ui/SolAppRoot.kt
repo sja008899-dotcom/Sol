@@ -23,12 +23,15 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -136,6 +139,8 @@ fun SolAppRoot(
     val pendingBookFetch by memoryViewModel.pendingBookFetch.collectAsStateWithLifecycle()
     val voiceRoleSession by memoryViewModel.voiceRoleSession.collectAsStateWithLifecycle()
     val pendingBackupRequest by backupViewModel.pendingBackupRequest.collectAsStateWithLifecycle()
+    val pendingVoskTierBConfirm by settingsViewModel.pendingVoskTierBConfirm.collectAsStateWithLifecycle()
+    val pendingSlmTierBConfirm by slmViewModel.pendingSlmTierBConfirm.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -391,6 +396,58 @@ fun SolAppRoot(
                     mode = req.mode,
                     onConfirm = backupViewModel::executeEncryptedBackup,
                     onDismiss = backupViewModel::dismissBackupPasswordDialog,
+                )
+            }
+
+            if (pendingVoskTierBConfirm) {
+                AlertDialog(
+                    onDismissRequest = settingsViewModel::dismissVoskTierBDownload,
+                    title = { Text("تأیید دریافت مدل گفتار Vosk") },
+                    text = {
+                        Text(
+                            "این فایل از منبع رسمی Alpha Cephei دریافت می‌شود ولی اثر انگشت از پیش تأییدشده ندارد " +
+                                "(حجم فایل در بازهٔ ۲۰ تا ۲۰۰ مگابایت بررسی و اثر انگشت پس از نصب ذخیره و قفل می‌شود). ادامه؟"
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = settingsViewModel::confirmVoskTierBDownload,
+                            modifier = Modifier.testTag("confirm_vosk_tier_b_button"),
+                        ) {
+                            Text("ادامه و دانلود")
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(onClick = settingsViewModel::dismissVoskTierBDownload) {
+                            Text("لغو")
+                        }
+                    },
+                )
+            }
+
+            pendingSlmTierBConfirm?.let { spec ->
+                AlertDialog(
+                    onDismissRequest = slmViewModel::dismissSlmTierBDownload,
+                    title = { Text("تأیید دریافت مدل زبانی آفلاین") },
+                    text = {
+                        Text(
+                            "فایل «${spec.titleFa}» از منبع رسمی Hugging Face دریافت می‌شود ولی اثر انگشت از پیش تأییدشده ندارد " +
+                                "(هش LFS و حجم اعلامی سرور پیش از ذخیره بررسی می‌شود). ادامه؟"
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = slmViewModel::confirmSlmTierBDownload,
+                            modifier = Modifier.testTag("confirm_slm_tier_b_button"),
+                        ) {
+                            Text("ادامه و دانلود")
+                        }
+                    },
+                    dismissButton = {
+                        OutlinedButton(onClick = slmViewModel::dismissSlmTierBDownload) {
+                            Text("لغو")
+                        }
+                    },
                 )
             }
 
@@ -687,6 +744,8 @@ fun SolAppRoot(
                                             piperFilesPickerLauncher.launch(arrayOf("*/*"))
                                         },
                                         onDeletePiperModel = settingsViewModel::deletePiperModel,
+                                        onAcceptPiperRisk = settingsViewModel::acceptCustomPiperWithRisk,
+                                        onRejectPiperRisk = settingsViewModel::rejectCustomPiperWithRisk,
                                         speakerIdState = speakerIdState,
                                         onRecordOwnerVoice = {
                                             if (hasMicPermission) {
@@ -727,7 +786,7 @@ fun SolAppRoot(
                                         onMaxVoiceListenSecondsChange = settingsViewModel::setMaxVoiceListenSeconds,
                                         onWakeWordTimeoutMinutesChange = settingsViewModel::setWakeWordTimeoutMinutes,
                                         onVoiceCueFeedbackChange = settingsViewModel::setVoiceCueFeedbackEnabled,
-                                        onDownloadVoskModel = settingsViewModel::downloadVoskPersianModel,
+                                        onDownloadVoskModel = settingsViewModel::requestDownloadVoskModel,
                                         onPickVoskZip = {
                                             voskZipPickerLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
                                         },
@@ -735,7 +794,7 @@ fun SolAppRoot(
                                         onDeleteVoskModel = settingsViewModel::deleteVoskModel,
                                         onSlmToggle = slmViewModel::setSlmSynthesisEnabled,
                                         onSlmPreferGpuToggle = slmViewModel::setSlmPreferGpu,
-                                        onDownloadSlmModel = slmViewModel::downloadSlmModel,
+                                        onDownloadSlmModel = slmViewModel::requestDownloadSlmModel,
                                         onCancelSlmDownload = slmViewModel::cancelSlmDownload,
                                         onPickSlmFile = {
                                             slmModelPickerLauncher.launch(arrayOf("application/octet-stream", "*/*"))

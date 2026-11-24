@@ -118,6 +118,8 @@ fun SettingsScreen(
     onRecheckSystemTts: () -> Unit,
     onPickPiperFiles: () -> Unit,
     onDeletePiperModel: () -> Unit,
+    onAcceptPiperRisk: () -> Unit = {},
+    onRejectPiperRisk: () -> Unit = {},
     speakerIdState: com.example.sol.speaker.SpeakerIdUiState,
     onRecordOwnerVoice: () -> Unit,
     onClearOwnerVoice: () -> Unit,
@@ -267,6 +269,14 @@ fun SettingsScreen(
                                     text = "${voskModelStatus.lastNoteFa}\nلغت‌نامه تقویتی (Grammar/Bias): $vocabularyTermsCount واژهٔ شخصی از مخاطبین و مکان‌ها",
                                     style = MaterialTheme.typography.bodySmall,
                                 )
+                                if (voskModelStatus.sha256Hex.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "اثر انگشت فایل (SHA-256): ${voskModelStatus.sha256Hex.take(16)}…",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
@@ -402,6 +412,40 @@ fun SettingsScreen(
                     onValueChange = { onWakeWordTimeoutMinutesChange(it.roundToInt()) },
                     valueRange = 1f..10f,
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("samsung_mic_guidance_card"),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(
+                            text = "راهنمای میکروفون و باتری در گوشی‌های سامسونگ (One UI Core)",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                        Text(
+                            text = "۱. دسترسی میکروفون را از نوار بالای گوشی (Quick Panel) روشن نگه دارید.\n۲. در تنظیمات باتری گوشی، Sol را در بخش «Never sleeping apps» قرار دهید.\n۳. اگر ضبط ناگهانی قطع شد، دکمه «تست سلامت میکروفون» را در بخش N5 بزنید.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                        OutlinedButton(
+                            onClick = onOpenBattery,
+                            modifier = Modifier.testTag("samsung_mic_battery_button"),
+                        ) {
+                            Icon(Icons.Default.BatteryChargingFull, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("باز کردن تنظیمات باتری گوشی")
+                        }
+                    }
+                }
             }
         }
 
@@ -626,6 +670,7 @@ fun SettingsScreen(
                         val modelName = if (state is SlmRuntimeState.Ready) state.modelName else (state as SlmRuntimeState.Generating).modelName
                         val backend = if (state is SlmRuntimeState.Ready) state.activeBackend else (state as SlmRuntimeState.Generating).activeBackend
                         val fallbackNote = (state as? SlmRuntimeState.Ready)?.lastFallbackNoteFa.orEmpty()
+                        val sha256Hex = (state as? SlmRuntimeState.Ready)?.sha256Hex.orEmpty()
                         Surface(
                             color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f),
                             shape = RoundedCornerShape(12.dp),
@@ -642,6 +687,13 @@ fun SettingsScreen(
                                     text = "موتور اجرا: ${backend.labelFa} • RAM آزاد فعلی: ${ramSnapshot.availableDeviceRamMb}MB",
                                     style = MaterialTheme.typography.labelSmall,
                                 )
+                                if (sha256Hex.isNotBlank()) {
+                                    Text(
+                                        text = "اثر انگشت فایل (SHA-256): ${sha256Hex.take(16)}…",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                                 if (fallbackNote.isNotBlank()) {
                                     Text(
                                         text = fallbackNote,
@@ -681,6 +733,13 @@ fun SettingsScreen(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
+                                if (state.sha256Hex.isNotBlank()) {
+                                    Text(
+                                        text = "اثر انگشت فایل (SHA-256): ${state.sha256Hex.take(16)}…",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                                 if (state.lastNoteFa.isNotBlank()) {
                                     Text(
                                         text = state.lastNoteFa,
@@ -1036,9 +1095,38 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.primary,
                                 )
                             }
-                            is com.example.sol.tts.PiperTtsStatus.Ready -> {
+                            is com.example.sol.tts.PiperTtsStatus.NeedsRiskConfirmation -> {
                                 Text(
-                                    text = "✅ موتور خودکفای Piper فعال است (${piperStatus.sampleRate} Hz • ${piperStatus.sizeMb} MB) و اثر انگشت SHA-256 هر دو فایل تأیید شد.",
+                                    text = "⚠️ ${piperStatus.reasonFa}\n• SHA-256 مدل ONNX: ${piperStatus.onnxSha256.take(20)}…\n• SHA-256 تنظیمات JSON: ${piperStatus.configSha256.take(20)}…",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Button(
+                                        onClick = onAcceptPiperRisk,
+                                        modifier = Modifier.testTag("accept_piper_risk_button"),
+                                    ) {
+                                        Text("با ریسک خودم قبول کن")
+                                    }
+                                    OutlinedButton(
+                                        onClick = onRejectPiperRisk,
+                                        modifier = Modifier.testTag("reject_piper_risk_button"),
+                                    ) {
+                                        Text("حذف")
+                                    }
+                                }
+                            }
+                            is com.example.sol.tts.PiperTtsStatus.Ready -> {
+                                val fpText = if (piperStatus.sha256Summary.isNotBlank()) {
+                                    "\nاثر انگشت فایل (SHA-256): ${piperStatus.sha256Summary}…"
+                                } else {
+                                    ""
+                                }
+                                Text(
+                                    text = "✅ موتور خودکفای Piper فعال است (${piperStatus.sampleRate} Hz • ${piperStatus.sizeMb} MB).$fpText",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.tertiary,
                                     fontWeight = FontWeight.SemiBold,
@@ -1065,7 +1153,8 @@ fun SettingsScreen(
                                 Text("انتخاب فایل‌های Piper (.onnx و .json)")
                             }
                             if (piperStatus is com.example.sol.tts.PiperTtsStatus.Ready ||
-                                piperStatus is com.example.sol.tts.PiperTtsStatus.PartialSelection
+                                piperStatus is com.example.sol.tts.PiperTtsStatus.PartialSelection ||
+                                piperStatus is com.example.sol.tts.PiperTtsStatus.NeedsRiskConfirmation
                             ) {
                                 OutlinedButton(
                                     onClick = onDeletePiperModel,
@@ -1099,6 +1188,43 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (speakerIdState.isRecordingOwner) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("speaker_enrollment_progress_card"),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(
+                                    text = "سطح دریافت صدای میکروفون",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Text(
+                                    text = "${speakerIdState.remainingSeconds} ثانیه باقی‌مانده",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                            LinearProgressIndicator(
+                                progress = { speakerIdState.liveRmsLevel.coerceIn(0f, 1f) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("speaker_enrollment_rms_bar"),
+                            )
+                        }
+                    }
+                }
                 if (speakerIdState.feedbackMessageFa.isNotBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Surface(

@@ -39,7 +39,12 @@ import kotlin.math.sqrt
 sealed interface VoskModelStatus {
     data object NotInstalled : VoskModelStatus
     data class Downloading(val progressPercent: Int, val stageFa: String) : VoskModelStatus
-    data class Installed(val modelSizeMb: Int, val isLoadedInRam: Boolean, val lastNoteFa: String) : VoskModelStatus
+    data class Installed(
+        val modelSizeMb: Int,
+        val isLoadedInRam: Boolean,
+        val lastNoteFa: String,
+        val sha256Hex: String = "",
+    ) : VoskModelStatus
     data class Error(val messageFa: String) : VoskModelStatus
 }
 
@@ -101,6 +106,10 @@ class VoskVoiceEngine(
     private val context: Context,
     private val httpClient: SolHttpClient = SolHttpClient(),
     private val availableBytesProvider: (File) -> Long = SolStorageGuard::readAvailableBytes,
+    private val trustedSha256Provider: suspend () -> String? = { null },
+    private val onTofuSha256Pinned: suspend (sha256: String, totalBytes: Long) -> Unit = { _, _ -> },
+    private val onClearTofuPin: suspend () -> Unit = {},
+    private val micArbiter: MicArbiter? = null,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -110,6 +119,9 @@ class VoskVoiceEngine(
 
     private val modelRootDir: File
         get() = File(context.filesDir, MODEL_DIR_NAME)
+
+    private val modelShaSidecarFile: File
+        get() = File(context.filesDir, "$MODEL_DIR_NAME.sha256")
 
     private val _modelStatus = MutableStateFlow<VoskModelStatus>(VoskModelStatus.NotInstalled)
     val modelStatus: StateFlow<VoskModelStatus> = _modelStatus.asStateFlow()
@@ -134,6 +146,17 @@ class VoskVoiceEngine(
 
     fun isModelLoadedInRam(): Boolean = voskModel != null
 
+    private fun saveVoskShaSidecar(sha256Hex: String) {
+        if (!SolHttpClient.isValidSha256Hex(sha256Hex)) return
+        runCatching { modelShaSidecarFile.writeText(sha256Hex.trim().lowercase()) }
+    }
+
+    private fun readVoskShaSidecar(): String {
+        if (!modelShaSidecarFile.isFile) return ""
+        val text = runCatching { modelShaSidecarFile.readText().trim().lowercase() }.getOrDefault("")
+        return if (SolHttpClient.isValidSha256Hex(text)) text else ""
+    }
+
     fun refreshInstalledStatus(note: String = "مدل آفلاین فارسی آماده اجراست") {
         val dir = findValidModelDir()
         if (dir != null) {
@@ -142,6 +165,7 @@ class VoskVoiceEngine(
                 modelSizeMb = sizeMb,
                 isLoadedInRam = voskModel != null,
                 lastNoteFa = note,
+                sha256Hex = readVoskShaSidecar(),
             )
         } else if (_modelStatus.value !is VoskModelStatus.Downloading) {
             _modelStatus.value = VoskModelStatus.NotInstalled
@@ -160,6 +184,8 @@ class VoskVoiceEngine(
         stopListening()
         unloadModelFromRam("حذف مدل")
         runCatching { modelRootDir.deleteRecursively() }
+        runCatching { modelShaSidecarFile.delete() }
+        scope.launch { runCatching { onClearTofuPin() } }
         _modelStatus.value = VoskModelStatus.NotInstalled
     }
 
@@ -175,6 +201,7 @@ class VoskVoiceEngine(
         expectedBytes: Long = VOSK_FA_SMALL_EXPECTED_BYTES,
         expectedSha256: String = VOSK_FA_SMALL_SHA256,
         allowHttpsWithoutPinnedHash: Boolean = false,
+        enforceSizeBounds: Boolean = true,
     ): Result<Unit> = withContext(Dispatchers.IO) {
         val partFile = File(context.cacheDir, "vosk-fa-small.zip.part")
         try {
@@ -184,7 +211,7 @@ class VoskVoiceEngine(
                 throw SolNetworkException.IntegrityMetadataMissingException()
             }
 
-            if (hasPinnedMetadata) {
+            val downloadedShaAndSize: Pair<String, Long> = if (hasPinnedMetadata) {
                 val diskCheck = SolStorageGuard.checkFreeSpace(
                     targetPath = context.filesDir,
                     payloadBytes = expectedBytes,
@@ -211,18 +238,37 @@ class VoskVoiceEngine(
                         )
                     },
                 )
+                expectedSha256.lowercase() to expectedBytes
             } else {
-                downloadVoskFromMirrorsWithFallback(
+                val pinnedTofuSha = runCatching { trustedSha256Provider() }
+                    .getOrNull()
+                    ?.trim()
+                    ?.takeIf { SolHttpClient.isValidSha256Hex(it) }
+                val res = downloadVoskFromMirrorsWithFallback(
                     primaryUrl = downloadUrl,
                     partFile = partFile,
+                    tofuExpectedSha256 = pinnedTofuSha,
+                    enforceSizeBounds = enforceSizeBounds,
                 )
+                res.sha256Hex to res.totalBytes
             }
 
             _modelStatus.value = VoskModelStatus.Downloading(90, "در حال استخراج امن فایل‌های مدل…")
             partFile.inputStream().use { extractZipSafely(it) }
             require(isModelInstalled()) { "آرشیو دانلودشده فاقد ساختار معتبر مدل Vosk است." }
             partFile.delete()
-            refreshInstalledStatus("مدل آفلاین فارسی Vosk با موفقیت دانلود و نصب شد")
+
+            val (actualSha, actualBytes) = downloadedShaAndSize
+            saveVoskShaSidecar(actualSha)
+            if (SolHttpClient.isValidSha256Hex(actualSha)) {
+                runCatching { onTofuSha256Pinned(actualSha, actualBytes) }
+            }
+            val fingerprintNote = if (actualSha.isNotBlank()) {
+                " • اثر انگشت فایل: ${actualSha.take(16)}…"
+            } else {
+                ""
+            }
+            refreshInstalledStatus("مدل آفلاین فارسی Vosk با موفقیت دانلود و نصب شد$fingerprintNote")
             Result.success(Unit)
         } catch (err: Throwable) {
             if (err is SolNetworkException.IntegrityMismatchException ||
@@ -243,19 +289,26 @@ class VoskVoiceEngine(
     private fun downloadVoskFromMirrorsWithFallback(
         primaryUrl: String,
         partFile: File,
-    ) {
+        tofuExpectedSha256: String?,
+        enforceSizeBounds: Boolean,
+    ): com.example.sol.network.DownloadedFileResult {
         val candidates = (listOf(primaryUrl) + VOSK_FA_SMALL_FALLBACK_URLS).distinct()
         var lastError: Throwable? = null
+        val minBytes = if (enforceSizeBounds) VOSK_FA_SMALL_MIN_BYTES else -1L
+        val maxBytes = if (enforceSizeBounds) VOSK_FA_SMALL_MAX_BYTES else -1L
         for ((idx, candidateUrl) in candidates.withIndex()) {
             _modelStatus.value = VoskModelStatus.Downloading(
                 progressPercent = 2,
                 stageFa = "در حال اتصال امن به مخزن رسمی Vosk Persian…",
             )
             try {
-                httpClient.downloadOfficialHttpsFile(
+                return httpClient.downloadOfficialHttpsFileResult(
                     urlString = candidateUrl,
                     partFile = partFile,
                     estimatedBytes = VOSK_FA_SMALL_ESTIMATED_BYTES,
+                    tofuExpectedSha256 = tofuExpectedSha256,
+                    minAllowedBytes = minBytes,
+                    maxAllowedBytes = maxBytes,
                     allowedHostSuffixes = setOf("alphacephei.com"),
                     redirectAllowedHostSuffixes = setOf("alphacephei.com"),
                     onProgress = { pct, doneBytes, totalBytes ->
@@ -267,7 +320,6 @@ class VoskVoiceEngine(
                         )
                     },
                 )
-                return
             } catch (err: SolNetworkException.HttpStatusException) {
                 lastError = err
                 val canFallback = (err.statusCode == 404 || err.statusCode == 410) && idx < candidates.lastIndex
@@ -284,17 +336,37 @@ class VoskVoiceEngine(
     fun importLocalModelZip(uri: Uri) {
         if (_modelStatus.value is VoskModelStatus.Downloading) return
         scope.launch {
-            runCatching {
+            val tempZip = File(context.cacheDir, "vosk_import_${System.nanoTime()}.zip")
+            try {
                 _modelStatus.value = VoskModelStatus.Downloading(20, "در حال خواندن فایل ZIP مدل Vosk…")
+                val digest = java.security.MessageDigest.getInstance("SHA-256")
+                var totalBytes = 0L
                 context.contentResolver.openInputStream(uri)?.use { stream ->
-                    extractZipSafely(stream)
+                    tempZip.outputStream().use { out ->
+                        val buf = ByteArray(16 * 1024)
+                        var len: Int
+                        while (stream.read(buf).also { len = it } != -1) {
+                            out.write(buf, 0, len)
+                            digest.update(buf, 0, len)
+                            totalBytes += len
+                        }
+                    }
                 } ?: error("دسترسی به فایل انتخاب‌شده ممکن نشد.")
+
+                _modelStatus.value = VoskModelStatus.Downloading(70, "در حال استخراج فایل‌های مدل Vosk…")
+                tempZip.inputStream().use { extractZipSafely(it) }
                 require(isModelInstalled()) { "فایل ZIP انتخاب‌شده شامل پوشه معتبر مدل Vosk نیست." }
-                refreshInstalledStatus("مدل آفلاین Vosk از حافظه گوشی نصب شد")
-            }.onFailure { err ->
+
+                val shaHex = digest.digest().joinToString("") { "%02x".format(it) }
+                saveVoskShaSidecar(shaHex)
+                runCatching { onTofuSha256Pinned(shaHex, totalBytes) }
+                refreshInstalledStatus("مدل آفلاین Vosk از حافظه گوشی نصب شد • اثر انگشت فایل: ${shaHex.take(16)}…")
+            } catch (err: Throwable) {
                 _modelStatus.value = VoskModelStatus.Error(
                     err.localizedMessage ?: "وارد کردن فایل مدل ناموفق بود."
                 )
+            } finally {
+                tempZip.delete()
             }
         }
     }
@@ -324,9 +396,11 @@ class VoskVoiceEngine(
         autoUnloadJob?.cancel()
         isRecording.set(true)
 
+        val micOwner = if (isWakeWordMode) MicOwner.WAKE_WORD_UI else MicOwner.VOICE_COMMAND
         activeListeningJob = scope.launch {
-            var recorder: AudioRecord? = null
+            var activeRecorderRef: AudioRecord? = null
             var recognizer: Recognizer? = null
+            micArbiter?.acquire(owner = micOwner)
             try {
                 val model = voskModel ?: Model(modelDir.absolutePath).also {
                     voskModel = it
@@ -339,19 +413,6 @@ class VoskVoiceEngine(
                     Recognizer(model, SAMPLE_RATE.toFloat())
                 }
 
-                val minBuf = AudioRecord.getMinBufferSize(
-                    SAMPLE_RATE,
-                    AudioFormat.CHANNEL_IN_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT,
-                ).coerceAtLeast(4096)
-
-                recorder = createAudioRecorder(minBuf * 2)
-                if (recorder.state != AudioRecord.STATE_INITIALIZED) {
-                    throw IllegalStateException("میکروفون دستگاه آماده نشد")
-                }
-
-                recorder.startRecording()
-                val shortBuf = ShortArray(2048)
                 val maxCaptureSamples = SAMPLE_RATE * 4
                 val pcmRing = FloatArray(maxCaptureSamples)
                 var pcmTotalWritten = 0
@@ -359,117 +420,126 @@ class VoskVoiceEngine(
                 var hasHeardSpeech = false
                 var lastVoiceActivityAt = startedAt
                 var lastPartialSent = ""
+                val activeRec = recognizer
 
-                while (isRecording.get()) {
-                    val read = recorder.read(shortBuf, 0, shortBuf.size)
-                    if (read <= 0) continue
-
-                    if (!isWakeWordMode) {
-                        for (i in 0 until read) {
-                            pcmRing[pcmTotalWritten % maxCaptureSamples] = shortBuf[i] / 32768f
-                            pcmTotalWritten++
-                        }
-                    }
-
-                    val rmsNorm = computeNormalizedRms(shortBuf, read)
-                    mainHandler.post { onRmsChanged(rmsNorm) }
-
-                    val now = System.currentTimeMillis()
-                    if (rmsNorm > VAD_SPEECH_THRESHOLD) {
-                        hasHeardSpeech = true
-                        lastVoiceActivityAt = now
-                    }
-
-                    val isEndOfUtterance = recognizer.acceptWaveForm(shortBuf, read)
-                    if (isEndOfUtterance) {
-                        val txt = extractVoskText(recognizer.result, "text")
-                        if (txt.isNotBlank()) {
-                            val corrected = vocabularyBias.applyBiasCorrection(txt)
-                            if (isWakeWordMode) {
-                                val norm = PersianNormalizer.normalize(corrected)
-                                if (norm.contains("سول") || norm.contains("sol")) {
-                                    isRecording.set(false)
-                                    mainHandler.post { onFinalResult(corrected) }
-                                    break
-                                }
-                            } else {
-                                saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
-                                isRecording.set(false)
-                                mainHandler.post { onFinalResult(corrected) }
-                                break
+                val captureOutcome = SafeAudioCapture.runCaptureLoop(
+                    sampleRate = SAMPLE_RATE,
+                    chunkSize = 2048,
+                    shouldContinue = { isRecording.get() },
+                    onRecorderSwap = { activeRecorderRef = it },
+                    onSamples = { shortBuf, read ->
+                        if (!isWakeWordMode) {
+                            for (i in 0 until read) {
+                                pcmRing[pcmTotalWritten % maxCaptureSamples] = shortBuf[i] / 32768f
+                                pcmTotalWritten++
                             }
                         }
-                    } else {
-                        val partial = extractVoskText(recognizer.partialResult, "partial")
-                        if (partial.isNotBlank() && partial != lastPartialSent) {
-                            lastPartialSent = partial
+
+                        val rmsNorm = computeNormalizedRms(shortBuf, read)
+                        mainHandler.post { onRmsChanged(rmsNorm) }
+
+                        val now = System.currentTimeMillis()
+                        if (rmsNorm > VAD_SPEECH_THRESHOLD) {
                             hasHeardSpeech = true
                             lastVoiceActivityAt = now
-                            if (isWakeWordMode) {
-                                val norm = PersianNormalizer.normalize(partial)
-                                if (norm.contains("سول") || norm.contains("sol")) {
+                        }
+
+                        val isEndOfUtterance = activeRec.acceptWaveForm(shortBuf, read)
+                        if (isEndOfUtterance) {
+                            val txt = extractVoskText(activeRec.result, "text")
+                            if (txt.isNotBlank()) {
+                                val corrected = vocabularyBias.applyBiasCorrection(txt)
+                                if (isWakeWordMode) {
+                                    val norm = PersianNormalizer.normalize(corrected)
+                                    if (norm.contains("سول") || norm.contains("sol")) {
+                                        isRecording.set(false)
+                                        mainHandler.post { onFinalResult(corrected) }
+                                        return@runCaptureLoop false
+                                    }
+                                } else {
+                                    saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
                                     isRecording.set(false)
-                                    mainHandler.post { onFinalResult(partial) }
-                                    break
-                                }
-                            } else {
-                                val correctedPartial = vocabularyBias.applyBiasCorrection(partial)
-                                mainHandler.post { onPartial(correctedPartial) }
-                            }
-                        }
-                    }
-
-                    when (
-                        evaluateEndPointing(
-                            isWakeWordMode = isWakeWordMode,
-                            hasHeardSpeech = hasHeardSpeech,
-                            nowMs = now,
-                            startedAtMs = startedAt,
-                            lastVoiceActivityAtMs = lastVoiceActivityAt,
-                            vadSilenceMs = safeVadSilenceMs,
-                            maxDurationMs = safeMaxDurationMs,
-                        )
-                    ) {
-                        EndPointingAction.FINALIZE_SPEECH -> {
-                            val finalTxt = extractVoskText(recognizer.finalResult, "text")
-                                .ifBlank { lastPartialSent }
-                            isRecording.set(false)
-                            if (finalTxt.isNotBlank()) {
-                                saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
-                                val corrected = vocabularyBias.applyBiasCorrection(finalTxt)
-                                mainHandler.post { onFinalResult(corrected) }
-                            } else {
-                                mainHandler.post { onError("صدایی تشخیص داده نشد؛ لطفاً دوباره بگو") }
-                            }
-                            break
-                        }
-
-                        EndPointingAction.TIMEOUT_NO_SPEECH -> {
-                            val fallbackTxt = extractVoskText(recognizer.finalResult, "text")
-                                .ifBlank { lastPartialSent }
-                            isRecording.set(false)
-                            if (fallbackTxt.isNotBlank()) {
-                                saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
-                                val corrected = vocabularyBias.applyBiasCorrection(fallbackTxt)
-                                mainHandler.post { onFinalResult(corrected) }
-                            } else {
-                                val timeoutMsg = "زمان شنود به پایان رسید؛ صدایی تشخیص داده نشد"
-                                mainHandler.post {
-                                    if (onTimeout != null) onTimeout(timeoutMsg) else onError(timeoutMsg)
+                                    mainHandler.post { onFinalResult(corrected) }
+                                    return@runCaptureLoop false
                                 }
                             }
-                            break
+                        } else {
+                            val partial = extractVoskText(activeRec.partialResult, "partial")
+                            if (partial.isNotBlank() && partial != lastPartialSent) {
+                                lastPartialSent = partial
+                                hasHeardSpeech = true
+                                lastVoiceActivityAt = now
+                                if (isWakeWordMode) {
+                                    val norm = PersianNormalizer.normalize(partial)
+                                    if (norm.contains("سول") || norm.contains("sol")) {
+                                        isRecording.set(false)
+                                        mainHandler.post { onFinalResult(partial) }
+                                        return@runCaptureLoop false
+                                    }
+                                } else {
+                                    val correctedPartial = vocabularyBias.applyBiasCorrection(partial)
+                                    mainHandler.post { onPartial(correctedPartial) }
+                                }
+                            }
                         }
 
-                        EndPointingAction.WAKE_TIMEOUT -> {
-                            isRecording.set(false)
-                            val timeoutMsg = "گوش‌به‌زنگ واژه «Sol» پس از سکوت خودکار متوقف شد."
-                            mainHandler.post { onTimeout?.invoke(timeoutMsg) }
-                            break
-                        }
+                        when (
+                            evaluateEndPointing(
+                                isWakeWordMode = isWakeWordMode,
+                                hasHeardSpeech = hasHeardSpeech,
+                                nowMs = now,
+                                startedAtMs = startedAt,
+                                lastVoiceActivityAtMs = lastVoiceActivityAt,
+                                vadSilenceMs = safeVadSilenceMs,
+                                maxDurationMs = safeMaxDurationMs,
+                            )
+                        ) {
+                            EndPointingAction.FINALIZE_SPEECH -> {
+                                val finalTxt = extractVoskText(activeRec.finalResult, "text")
+                                    .ifBlank { lastPartialSent }
+                                isRecording.set(false)
+                                if (finalTxt.isNotBlank()) {
+                                    saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
+                                    val corrected = vocabularyBias.applyBiasCorrection(finalTxt)
+                                    mainHandler.post { onFinalResult(corrected) }
+                                } else {
+                                    mainHandler.post { onError("صدایی تشخیص داده نشد؛ لطفاً دوباره بگو") }
+                                }
+                                false
+                            }
 
-                        EndPointingAction.CONTINUE -> Unit
-                    }
+                            EndPointingAction.TIMEOUT_NO_SPEECH -> {
+                                val fallbackTxt = extractVoskText(activeRec.finalResult, "text")
+                                    .ifBlank { lastPartialSent }
+                                isRecording.set(false)
+                                if (fallbackTxt.isNotBlank()) {
+                                    saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
+                                    val corrected = vocabularyBias.applyBiasCorrection(fallbackTxt)
+                                    mainHandler.post { onFinalResult(corrected) }
+                                } else {
+                                    val timeoutMsg = "زمان شنود به پایان رسید؛ صدایی تشخیص داده نشد"
+                                    mainHandler.post {
+                                        if (onTimeout != null) onTimeout(timeoutMsg) else onError(timeoutMsg)
+                                    }
+                                }
+                                false
+                            }
+
+                            EndPointingAction.WAKE_TIMEOUT -> {
+                                isRecording.set(false)
+                                val timeoutMsg = "گوش‌به‌زنگ واژه «Sol» پس از سکوت خودکار متوقف شد."
+                                mainHandler.post { onTimeout?.invoke(timeoutMsg) }
+                                false
+                            }
+
+                            EndPointingAction.CONTINUE -> true
+                        }
+                    },
+                )
+
+                if (captureOutcome is SafeAudioCaptureStop.Failed && isRecording.get()) {
+                    isRecording.set(false)
+                    mainHandler.post { onError(captureOutcome.messageFa) }
                 }
             } catch (sec: SecurityException) {
                 if (isRecording.get()) {
@@ -483,9 +553,12 @@ class VoskVoiceEngine(
                 }
             } finally {
                 isRecording.set(false)
-                runCatching { recorder?.stop() }
-                runCatching { recorder?.release() }
+                runCatching { activeRecorderRef?.stop() }
+                runCatching { activeRecorderRef?.release() }
                 runCatching { recognizer?.close() }
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    micArbiter?.release(owner = micOwner)
+                }
                 mainHandler.post { onRmsChanged(0f) }
                 scheduleAutoUnloadAfterIdle()
             }
@@ -559,43 +632,14 @@ class VoskVoiceEngine(
     private fun hasVoskSignature(dir: File): Boolean {
         val am = File(dir, "am")
         val conf = File(dir, "conf")
-        return am.isDirectory && conf.isDirectory
+        val graph = File(dir, "graph")
+        return am.isDirectory && conf.isDirectory && graph.isDirectory
     }
 
     private fun dirSizeBytes(file: File): Long {
         if (!file.exists()) return 0L
         if (file.isFile) return file.length()
         return file.listFiles()?.sumOf { dirSizeBytes(it) } ?: 0L
-    }
-
-    // Legacy direct HttpURLConnection downloader removed; SolHttpClient handles HTTPS redirects, Range resume & SHA-256.
-
-    @SuppressLint("MissingPermission")
-    private fun createAudioRecorder(bufferBytes: Int): AudioRecord {
-        val sources = listOf(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
-            MediaRecorder.AudioSource.MIC,
-        )
-        for (source in sources) {
-            val candidate = AudioRecord(
-                source,
-                SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                bufferBytes,
-            )
-            if (candidate.state == AudioRecord.STATE_INITIALIZED) {
-                return candidate
-            }
-            runCatching { candidate.release() }
-        }
-        return AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_MONO,
-            AudioFormat.ENCODING_PCM_16BIT,
-            bufferBytes,
-        )
     }
 
     private fun extractZipSafely(inputStream: InputStream) {
@@ -643,7 +687,7 @@ class VoskVoiceEngine(
             require(entryCount > 0) { "فایل انتخاب‌شده یک آرشیو معتبر ZIP مدل Vosk نیست." }
             val hasValid = hasVoskSignature(staging) ||
                 staging.listFiles()?.any { it.isDirectory && hasVoskSignature(it) } == true
-            require(hasValid) { "فایل ZIP انتخاب‌شده شامل پوشه معتبر مدل Vosk (am و conf) نیست." }
+            require(hasValid) { "فایل ZIP انتخاب‌شده شامل پوشه معتبر مدل Vosk (am، conf و graph) نیست." }
 
             val root = modelRootDir
             if (root.exists()) root.deleteRecursively()
@@ -674,6 +718,8 @@ class VoskVoiceEngine(
             "https://alphacephei.com/vosk/models/vosk-model-small-fa-0.4.zip",
         )
         const val VOSK_FA_SMALL_ESTIMATED_BYTES = 60L * 1024L * 1024L
+        const val VOSK_FA_SMALL_MIN_BYTES = 20L * 1024L * 1024L
+        const val VOSK_FA_SMALL_MAX_BYTES = 200L * 1024L * 1024L
         // TODO(verify): Alpha Cephei repository index does not publish raw SHA-256 / byte length.
         const val VOSK_FA_SMALL_SHA256 = "TODO(verify)"
         const val VOSK_FA_SMALL_EXPECTED_BYTES = -1L

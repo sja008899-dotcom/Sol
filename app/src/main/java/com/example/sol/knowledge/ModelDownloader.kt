@@ -83,7 +83,7 @@ internal class ModelDownloader(
                 totalMb = (estimatedBytes / (1024L * 1024L)).coerceAtLeast(1L),
             )
 
-            if (hasPinnedMetadata) {
+            val resolvedSha256 = if (hasPinnedMetadata) {
                 httpClient.downloadVerifiedFile(
                     urlString = spec.downloadUrl,
                     partFile = partFile,
@@ -100,6 +100,7 @@ internal class ModelDownloader(
                         )
                     },
                 )
+                spec.sha256.lowercase()
             } else {
                 downloadOfficialSlmWithFallback(spec, partFile, estimatedBytes)
             }
@@ -120,11 +121,17 @@ internal class ModelDownloader(
                 partFile.copyTo(finalFile, overwrite = true)
                 partFile.delete()
             }
+            modelStore.saveSha256Sidecar(finalFile, resolvedSha256)
 
             onSavedPath(finalFile.absolutePath)
+            val fingerprintNote = if (resolvedSha256.isNotBlank()) {
+                " • اثر انگشت فایل: ${resolvedSha256.take(16)}…"
+            } else {
+                ""
+            }
             onRefreshStatus(
                 finalFile.absolutePath,
-                "مدل «${spec.titleFa}» دانلود و آمادهٔ اجراست.",
+                "مدل «${spec.titleFa}» دانلود و آمادهٔ اجراست$fingerprintNote",
             )
             Result.success(finalFile)
         } catch (t: Throwable) {
@@ -158,15 +165,34 @@ internal class ModelDownloader(
         spec: SlmModelSpec,
         partFile: File,
         estimatedBytes: Long,
-    ) {
+    ): String {
         val candidates = (listOf(spec.downloadUrl) + spec.fallbackDownloadUrls).distinct()
         var lastError: Throwable? = null
         for ((idx, candidateUrl) in candidates.withIndex()) {
             try {
-                httpClient.downloadOfficialHttpsFile(
+                val headMeta = try {
+                    httpClient.preflightHeadMetadata(
+                        urlString = candidateUrl,
+                        allowedHostSuffixes = setOf("huggingface.co", "hf.co"),
+                    )
+                } catch (headErr: SolNetworkException.HttpStatusException) {
+                    if ((headErr.statusCode == 404 || headErr.statusCode == 410) && idx < candidates.lastIndex) {
+                        lastError = headErr
+                        partFile.delete()
+                        continue
+                    }
+                    null
+                } catch (_: SolNetworkException) {
+                    null
+                }
+
+                val result = httpClient.downloadOfficialHttpsFileResult(
                     urlString = candidateUrl,
                     partFile = partFile,
                     estimatedBytes = estimatedBytes,
+                    expectedSha256Override = headMeta?.sha256,
+                    expectedBytesOverride = headMeta?.contentLengthBytes ?: -1L,
+                    minAllowedBytes = ModelStore.MIN_VALID_MODEL_BYTES,
                     allowedHostSuffixes = setOf("huggingface.co", "hf.co"),
                     redirectAllowedHostSuffixes = SolHttpClient.DEFAULT_CDN_REDIRECT_HOSTS,
                     isCancelled = { downloadCancelled.get() },
@@ -179,7 +205,7 @@ internal class ModelDownloader(
                         )
                     },
                 )
-                return
+                return result.sha256Hex
             } catch (err: SolNetworkException.HttpStatusException) {
                 lastError = err
                 val canFallback = (err.statusCode == 404 || err.statusCode == 410) && idx < candidates.lastIndex

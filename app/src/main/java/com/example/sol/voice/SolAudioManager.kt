@@ -37,26 +37,23 @@ class SolAudioManager(context: Context) {
         private set
 
     /**
-     * Requests transient exclusive audio focus while listening via Vosk or Android SpeechRecognizer
-     * so background music/media pauses cleanly and avoids acoustic bleed into the mic.
+     * Requests assistant transient-may-duck audio focus while listening via Vosk or Android SpeechRecognizer
+     * so transient system chimes/UI sounds do not kill active speech capture.
      */
     fun requestListeningFocus(onFocusLost: () -> Unit): Boolean {
         abandonListeningFocus()
         val attrs = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+            .setUsage(AudioAttributes.USAGE_ASSISTANT)
             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
             .build()
         val listener = AudioManager.OnAudioFocusChangeListener { change ->
-            if (change == AudioManager.AUDIOFOCUS_LOSS ||
-                change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
-            ) {
-                hasListeningFocus = false
+            if (handleListeningFocusChange(change)) {
                 mainHandler.post { onFocusLost() }
             }
         }
-        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
             .setAudioAttributes(attrs)
-            .setWillPauseWhenDucked(true)
+            .setWillPauseWhenDucked(false)
             .setAcceptsDelayedFocusGain(false)
             .setOnAudioFocusChangeListener(listener, mainHandler)
             .build()
@@ -68,6 +65,15 @@ class SolAudioManager(context: Context) {
             hasListeningFocus = true
         }
         return granted
+    }
+
+    internal fun handleListeningFocusChange(change: Int): Boolean {
+        if (change == AudioManager.AUDIOFOCUS_LOSS) {
+            hasListeningFocus = false
+            return true
+        }
+        // Explicitly ignore AUDIOFOCUS_LOSS_TRANSIENT and AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK
+        return false
     }
 
     fun abandonListeningFocus() {
@@ -89,10 +95,7 @@ class SolAudioManager(context: Context) {
             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
             .build()
         val listener = AudioManager.OnAudioFocusChangeListener { change ->
-            if (change == AudioManager.AUDIOFOCUS_LOSS ||
-                change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
-            ) {
-                hasSpeakingFocus = false
+            if (handleSpeakingFocusChange(change)) {
                 mainHandler.post { onFocusLost() }
             }
         }
@@ -109,6 +112,14 @@ class SolAudioManager(context: Context) {
             hasSpeakingFocus = true
         }
         return granted
+    }
+
+    internal fun handleSpeakingFocusChange(change: Int): Boolean {
+        if (change == AudioManager.AUDIOFOCUS_LOSS) {
+            hasSpeakingFocus = false
+            return true
+        }
+        return false
     }
 
     fun abandonSpeakingFocus() {

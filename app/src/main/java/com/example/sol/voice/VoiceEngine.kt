@@ -44,6 +44,7 @@ class VoiceEngine(
     private val persianTts: PersianTTS? = null,
     private val isExternalSpeaking: () -> Boolean = { false },
     private val onStopExternalSpeech: () -> Unit = {},
+    private val micArbiter: MicArbiter? = null,
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
@@ -108,8 +109,8 @@ class VoiceEngine(
     ) {
         stopSpeechForBargeIn()
         stopListening()
-        if (MicForegroundService.isRunning.value) {
-            MicForegroundService.stop(context)
+        if (MicForegroundService.isRunning.value || MicForegroundService.isMicActive.value) {
+            MicForegroundService.pause(context)
         }
         _partialText.value = ""
         _rmsDb.value = 0f
@@ -327,8 +328,8 @@ class VoiceEngine(
             stopSpeechForBargeIn()
         }
         stopListening()
-        if (MicForegroundService.isRunning.value) {
-            MicForegroundService.stop(context)
+        if (MicForegroundService.isRunning.value || MicForegroundService.isMicActive.value) {
+            MicForegroundService.pause(context)
         }
         _activeBackend.value = ActiveAsrBackend.VOSK_OFFLINE
         audioManager.requestListeningFocus { stopListening() }

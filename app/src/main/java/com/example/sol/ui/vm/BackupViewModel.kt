@@ -79,8 +79,9 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
                 evictRagCache = { c.bookRagEngine.evictCache() },
                 unloadVoskIfIdle = { c.voiceEngine.voskEngine.unloadModelFromRam("آزادسازی دستی RAM") },
                 releaseSlmCache = { c.localSlmEngine.releaseSessionMemory() },
+                unloadPiperIfIdle = { c.ttsManager.unloadFromRamIfIdle() },
             )
-            c.uiBridge.postBanner("کش کتاب‌ها، حافظهٔ صوتی و SLM برای گوشی ۴ گیگابایتی آزاد شد.")
+            c.uiBridge.postBanner("کش کتاب‌ها، حافظهٔ صوتی، Piper و SLM برای گوشی ۴ گیگابایتی آزاد شد.")
         }
     }
 

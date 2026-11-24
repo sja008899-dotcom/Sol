@@ -360,6 +360,9 @@ class M2SecurityNetworkTests {
                 zos.putNextEntry(ZipEntry("vosk-model-small-fa-0.4/conf/mfcc.conf"))
                 zos.write("--use-energy=false".toByteArray())
                 zos.closeEntry()
+                zos.putNextEntry(ZipEntry("vosk-model-small-fa-0.4/graph/HCLr.fst"))
+                zos.write("FST".toByteArray())
+                zos.closeEntry()
             }
             baos.toByteArray()
         }
@@ -421,6 +424,9 @@ class M2SecurityNetworkTests {
                 zos.putNextEntry(ZipEntry("vosk-model-small-fa-0.42/conf/mfcc.conf"))
                 zos.write("--use-energy=false".toByteArray())
                 zos.closeEntry()
+                zos.putNextEntry(ZipEntry("vosk-model-small-fa-0.42/graph/HCLr.fst"))
+                zos.write("FST".toByteArray())
+                zos.closeEntry()
             }
             baos.toByteArray()
         }
@@ -443,7 +449,10 @@ class M2SecurityNetworkTests {
             availableBytesProvider = { 4L * 1024L * 1024L * 1024L },
         )
         voskEngine.deleteInstalledModel()
-        val voskRes = voskEngine.downloadPersianSmallModelSync(allowHttpsWithoutPinnedHash = true)
+        val voskRes = voskEngine.downloadPersianSmallModelSync(
+            allowHttpsWithoutPinnedHash = true,
+            enforceSizeBounds = false,
+        )
         assertTrue("Expected Vosk 404 fallback download to succeed: ${voskRes.exceptionOrNull()}", voskRes.isSuccess)
         assertTrue(requestedUrls.any { it.contains("0.5.zip") })
         assertTrue(requestedUrls.any { it.contains("0.42.zip") })

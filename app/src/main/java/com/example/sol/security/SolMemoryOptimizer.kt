@@ -31,17 +31,20 @@ class SolMemoryOptimizer(private val context: Context) {
         evictRagCache: () -> Unit,
         unloadVoskIfIdle: () -> Unit,
         releaseSlmCache: () -> Unit,
+        unloadPiperIfIdle: () -> Unit = {},
     ) {
         val actionLabel = when {
             level >= ComponentCallbacks2.TRIM_MEMORY_BACKGROUND ||
                 level == ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> {
                 evictRagCache()
                 unloadVoskIfIdle()
+                unloadPiperIfIdle()
                 releaseSlmCache()
                 "آزادسازی خودکار کش کتاب‌ها و مدل صوتی هنگام رفتن به پس‌زمینه"
             }
             level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW -> {
                 evictRagCache()
+                unloadPiperIfIdle()
                 releaseSlmCache()
                 "آزادسازی کش موقت در وضعیت فشار حافظه RAM"
             }
@@ -56,11 +59,13 @@ class SolMemoryOptimizer(private val context: Context) {
         evictRagCache: () -> Unit,
         unloadVoskIfIdle: () -> Unit,
         releaseSlmCache: () -> Unit,
+        unloadPiperIfIdle: () -> Unit = {},
     ): RamUsageSnapshot {
         evictRagCache()
         unloadVoskIfIdle()
+        unloadPiperIfIdle()
         releaseSlmCache()
-        return refresh("آزادسازی دستی کش کتاب، مدل صوتی و حافظه انجام شد")
+        return refresh("آزادسازی دستی کش کتاب، مدل صوتی، Piper و حافظه انجام شد")
     }
 
     private fun captureSnapshot(note: String): RamUsageSnapshot {
