@@ -139,9 +139,15 @@ class SolAudioManager(context: Context) {
         val toneType = if (isStart) ToneGenerator.TONE_PROP_BEEP else ToneGenerator.TONE_PROP_ACK
         runCatching {
             val tg = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 40)
-            tg.startTone(toneType, 90)
-            mainHandler.postDelayed({ runCatching { tg.release() } }, 160L)
+            tg.startTone(toneType, 80)
+            mainHandler.postDelayed({ runCatching { tg.release() } }, 120L)
         }
+    }
+
+    suspend fun playVoiceCueAndSettle(isStart: Boolean) {
+        if (audioManager.ringerMode == AudioManager.RINGER_MODE_SILENT) return
+        playVoiceCue(isStart)
+        kotlinx.coroutines.delay(130L)
     }
 
     fun getVolumeStatus(): AudioVolumeStatus {

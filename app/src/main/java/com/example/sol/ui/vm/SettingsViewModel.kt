@@ -19,8 +19,6 @@ import com.example.sol.memory.VoicePersona
 import com.example.sol.security.RamUsageSnapshot
 import com.example.sol.security.SecurityAuditItem
 import com.example.sol.voice.AudioVolumeStatus
-import com.example.sol.voice.TtsEngineInfo
-import com.example.sol.voice.TtsVoiceInfo
 import com.example.sol.widget.SolQuickSettingsTileService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,9 +47,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val piperStatus: StateFlow<com.example.sol.tts.PiperTtsStatus> = c.ttsManager.piperStatus
     val speakerIdState: StateFlow<com.example.sol.speaker.SpeakerIdUiState> = c.speakerIdManager.uiState
     val isMicServiceRunning: StateFlow<Boolean> = com.example.sol.voice.MicForegroundService.isRunning
-    val persianVoices: StateFlow<List<TtsVoiceInfo>> = c.persianTts.persianVoices
-    val availableTtsEngines: StateFlow<List<TtsEngineInfo>> = c.persianTts.availableEngines
-    val activeTtsEngineLabel: StateFlow<String> = c.persianTts.activeEngineLabel
 
     private val _batteryStatus = MutableStateFlow(c.deviceController.getBatteryStatus())
     val batteryStatus: StateFlow<BatteryStatus> = _batteryStatus.asStateFlow()
@@ -86,9 +81,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     )
     val recommendedSlmModel: StateFlow<SlmModelSpec> = _recommendedSlmModel.asStateFlow()
 
-    private val _pendingVoskTierBConfirm = MutableStateFlow(false)
-    val pendingVoskTierBConfirm: StateFlow<Boolean> = _pendingVoskTierBConfirm.asStateFlow()
-
     init {
         refreshSettingsSnapshots()
         viewModelScope.launch {
@@ -109,14 +101,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             c.voiceEngine.voskEngine.refreshInstalledStatus()
             _vocabularyTermsCount.value = c.voiceEngine.voskEngine.vocabularyBias.currentTermsCount()
             val prefs = c.preferencesRepository.getSnapshot()
-            val ttsNeedsNet = c.persianTts.persianVoices.value
-                .firstOrNull { it.name == prefs.preferredTtsVoiceName }
-                ?.isOffline == false
             _securityAudit.value = c.privacyManager.getSecurityAudit(
                 alwaysConfirmCommunication = prefs.confirmationPolicy == ConfirmationPolicy.ALWAYS_COMMUNICATION,
                 activeAsrBackend = c.voiceEngine.activeBackend.value,
                 voskInstalled = c.voiceEngine.voskEngine.isModelInstalled(),
-                ttsRequiresNetwork = ttsNeedsNet,
+                piperTtsReady = c.ttsManager.isInstalledAndReady,
                 historyRetentionMode = prefs.historyRetentionMode,
                 privateModeEnabled = prefs.privateModeEnabled,
             )
@@ -158,20 +147,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     // --- Vosk Offline Voice ---
     fun requestDownloadVoskModel() {
-        if (com.example.sol.voice.VoskVoiceEngine.hasVerifiedDownloadMetadata()) {
-            downloadVoskPersianModel()
-        } else {
-            _pendingVoskTierBConfirm.value = true
-        }
-    }
-
-    fun confirmVoskTierBDownload() {
-        _pendingVoskTierBConfirm.value = false
         downloadVoskPersianModel()
     }
 
-    fun dismissVoskTierBDownload() {
-        _pendingVoskTierBConfirm.value = false
+    fun installAllVoiceModelsNow() {
+        viewModelScope.launch(Dispatchers.IO) {
+            c.autoEnsureEssentialModelsIfOnline(forceRetryOnError = true)
+        }
     }
 
     fun downloadVoskPersianModel() = c.voiceEngine.voskEngine.downloadPersianSmallModel()
@@ -256,6 +238,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun downloadPiperModel() {
+        c.ttsManager.downloadOfficialPiperModel {
+            c.uiBridge.triggerRefreshSnapshots()
+            c.uiBridge.postBanner("صدای فارسی خودکفای Piper با موفقیت نصب و فعال شد.")
+        }
+    }
+
+    fun downloadSpeakerModel() {
+        viewModelScope.launch {
+            c.speakerIdManager.ensureAndDownloadSpeakerModel().fold(
+                onSuccess = { msg -> c.uiBridge.postBanner(msg) },
+                onFailure = { err -> c.uiBridge.postBanner(err.message ?: "دانلود مدل CAM++ ناموفق بود.") },
+            )
+        }
+    }
+
     fun testVoiceSample() {
         viewModelScope.launch {
             val prefs = c.preferencesRepository.getSnapshot()
@@ -263,30 +261,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 text = "سلام ${prefs.ownerName}. من Sol دستیار شخصی شما هستم.",
                 speechRate = prefs.speechRate,
                 persona = prefs.voicePersona,
-                preferredVoiceName = prefs.preferredTtsVoiceName,
             )
-        }
-    }
-
-    fun openSystemTtsSettings() = c.persianTts.openSystemTtsSettings()
-
-    fun recheckSystemTts() {
-        viewModelScope.launch(Dispatchers.IO) {
-            c.ttsManager.refreshInstalledPiper()
-            val prefs = c.preferencesRepository.getSnapshot()
-            c.persianTts.recheckSystemVoices(prefs.preferredTtsEnginePackage)
-            c.uiBridge.postBanner("در حال بررسی موتورهای صدای گوشی و Piper…")
-        }
-    }
-
-    fun setPreferredTtsEngine(packageName: String) {
-        viewModelScope.launch {
-            c.preferencesRepository.setPreferredTtsEnginePackage(packageName)
-            c.preferencesRepository.setPreferredTtsVoiceName("")
-            c.persianTts.connectToPhoneTts(packageName)
-            val label = availableTtsEngines.value.firstOrNull { it.packageName == packageName }?.label
-                ?: if (packageName.isBlank()) "تشخیص خودکار (SherpaTTS / پیش‌فرض گوشی)" else packageName
-            c.uiBridge.postBanner("موتور صدای Sol به «$label» متصل شد.")
         }
     }
 
@@ -328,7 +303,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     // --- Preferences ---
     fun setOwnerName(name: String) = viewModelScope.launch(Dispatchers.IO) { c.preferencesRepository.setOwnerName(name) }
     fun setVoicePersona(p: VoicePersona) = viewModelScope.launch(Dispatchers.IO) { c.preferencesRepository.setVoicePersona(p) }
-    fun setPreferredTtsVoice(name: String) = viewModelScope.launch(Dispatchers.IO) { c.preferencesRepository.setPreferredTtsVoiceName(name) }
     fun setSpeechRate(rate: Float) = viewModelScope.launch(Dispatchers.IO) { c.preferencesRepository.setSpeechRate(rate) }
     fun setAutoSpeak(enabled: Boolean) = viewModelScope.launch(Dispatchers.IO) { c.preferencesRepository.setAutoSpeak(enabled) }
     fun setInvocationMode(m: InvocationMode) = viewModelScope.launch(Dispatchers.IO) { c.preferencesRepository.setInvocationMode(m) }

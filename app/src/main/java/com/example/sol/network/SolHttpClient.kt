@@ -444,8 +444,8 @@ class SolHttpClient(
                 }
             }
 
-            val serverSha256 = safeConn.linkedSha256
-                ?: expectedSha256Override?.takeIf { isValidSha256Hex(it) }
+            val serverSha256 = expectedSha256Override?.takeIf { isValidSha256Hex(it) }
+                ?: safeConn.linkedSha256
                 ?: parseSha256Header(conn.getHeaderField("X-Linked-Etag"))
                 ?: parseSha256Header(conn.getHeaderField("ETag"))
 

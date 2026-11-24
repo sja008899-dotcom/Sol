@@ -133,6 +133,9 @@ class SpeakerEmbedder(private val modelFile: File) {
     }
 
     companion object {
+        const val CAMPP_MODEL_URL =
+            "https://huggingface.co/Luigi/campplus-zh-en-onnx/resolve/main/campplus_zh_en_int8.onnx"
+        const val CAMPP_APPROX_BYTES = 8_595_767L
         const val EXPECTED_CAMPP_SHA256 =
             "27bbb97acd182a8d16aff8e8743d2a54b66450773b84cae140483fe8049bd67d"
 

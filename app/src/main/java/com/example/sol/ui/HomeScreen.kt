@@ -85,8 +85,8 @@ import com.example.sol.memory.LocationEntity
 import com.example.sol.memory.SolPreferences
 import com.example.sol.memory.SolRoleEntity
 import com.example.sol.tasks.ActiveTaskState
+import com.example.sol.tts.PiperTtsStatus
 import com.example.sol.voice.ActiveAsrBackend
-import com.example.sol.voice.TtsAvailability
 import com.example.sol.voice.VoiceErrorAction
 import com.example.sol.voice.VoiceListeningState
 import com.example.sol.voice.VoskModelStatus
@@ -113,7 +113,7 @@ fun HomeScreen(
     micRms: Float,
     activeAsrBackend: ActiveAsrBackend,
     voskModelStatus: VoskModelStatus,
-    ttsAvailability: TtsAvailability,
+    piperStatus: PiperTtsStatus,
     isSpeaking: Boolean,
     isFetchingBook: Boolean,
     slmRuntimeState: SlmRuntimeState,
@@ -133,7 +133,7 @@ fun HomeScreen(
     onClearVoiceError: () -> Unit,
     onSpeakMessage: (String) -> Unit,
     onStopSpeaking: () -> Unit,
-    onOpenSystemTtsSettings: () -> Unit,
+    onDownloadPiperModel: () -> Unit,
     onStopSlmGeneration: () -> Unit,
     onResetSlmConversation: () -> Unit,
     onConfirmCurrentLocation: (String) -> Unit,
@@ -575,49 +575,78 @@ fun HomeScreen(
                 }
             }
 
-            if (ttsAvailability == TtsAvailability.MISSING_PERSIAN_DATA ||
-                ttsAvailability == TtsAvailability.UNAVAILABLE
-            ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                        .testTag("tts_missing_guide_card"),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
+            when (piperStatus) {
+                is PiperTtsStatus.Downloading -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .testTag("tts_downloading_card"),
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f),
+                        Column(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.RecordVoiceOver,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = stringResource(R.string.home_tts_missing_guide),
+                                text = piperStatus.stageFa,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis,
                             )
-                        }
-                        TextButton(
-                            onClick = onOpenSystemTtsSettings,
-                            modifier = Modifier.heightIn(min = 48.dp),
-                        ) {
-                            Text(stringResource(R.string.home_sound_settings), style = MaterialTheme.typography.labelSmall)
+                            LinearProgressIndicator(
+                                progress = { piperStatus.progressPercent / 100f },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                         }
                     }
                 }
+
+                is PiperTtsStatus.NotInstalled, is PiperTtsStatus.Error -> {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .testTag("tts_missing_guide_card"),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.RecordVoiceOver,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = (piperStatus as? PiperTtsStatus.Error)?.messageFa
+                                        ?: stringResource(R.string.home_tts_missing_guide),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            TextButton(
+                                onClick = onDownloadPiperModel,
+                                modifier = Modifier.heightIn(min = 48.dp),
+                            ) {
+                                Text(stringResource(R.string.home_download_piper_voice), style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
+
+                else -> Unit
             }
 
             if (activeAsrBackend == ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER || preferences.privateModeEnabled) {

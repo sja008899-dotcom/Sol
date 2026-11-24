@@ -16,8 +16,8 @@ import com.example.sol.tasks.CommunicationChannel
 import com.example.sol.tasks.PendingCommunicationConfirmation
 import com.example.sol.ui.ChatMessageItem
 import com.example.sol.ui.PendingWebSearchConfirmation
+import com.example.sol.tts.PiperTtsStatus
 import com.example.sol.voice.ActiveAsrBackend
-import com.example.sol.voice.TtsAvailability
 import com.example.sol.voice.VoiceListeningState
 import com.example.sol.voice.VoskModelStatus
 import kotlinx.coroutines.Dispatchers
@@ -53,12 +53,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val micRms: StateFlow<Float> = c.voiceEngine.rmsDb
     val activeAsrBackend: StateFlow<ActiveAsrBackend> = c.voiceEngine.activeBackend
     val voskModelStatus: StateFlow<VoskModelStatus> = c.voiceEngine.voskEngine.modelStatus
-    val ttsAvailability: StateFlow<TtsAvailability> = c.persianTts.availability
-    val isSpeaking: StateFlow<Boolean> = combine(
-        c.persianTts.isSpeaking,
-        c.ttsManager.isPiperSpeaking,
-    ) { sys, piper -> sys || piper }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val piperStatus: StateFlow<PiperTtsStatus> = c.ttsManager.piperStatus
+    val isSpeaking: StateFlow<Boolean> = c.ttsManager.isPiperSpeaking
 
     val activeTask: StateFlow<ActiveTaskState?> = c.taskManager.activeTask
     val pendingConfirmation: StateFlow<PendingCommunicationConfirmation?> = c.confirmationManager.pending
@@ -403,6 +399,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             c.refreshVocabularyBias()
+            if (!c.voiceEngine.voskEngine.isModelInstalled() &&
+                c.voiceEngine.voskEngine.modelStatus.value !is VoskModelStatus.Downloading &&
+                c.hasInternetConnection()
+            ) {
+                withContext(Dispatchers.IO) {
+                    c.voiceEngine.voskEngine.downloadPersianSmallModelSync(allowHttpsWithoutPinnedHash = true)
+                    c.voiceEngine.refreshBackend(preferences.value.voskOfflineEnabled)
+                }
+            }
         }
         val prefs = preferences.value
         c.voiceEngine.startListening(
@@ -496,7 +501,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             text = text,
             speechRate = prefs.speechRate,
             persona = prefs.voicePersona,
-            preferredVoiceName = prefs.preferredTtsVoiceName,
         )
     }
 
@@ -631,7 +635,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         c.voiceEngine.stopListening()
-        c.persianTts.stop()
+        c.ttsManager.stop()
         c.localSlmEngine.releaseSessionMemory()
         super.onCleared()
     }

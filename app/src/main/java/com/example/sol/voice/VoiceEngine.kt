@@ -9,16 +9,25 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import com.example.sol.memory.PersianNormalizer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 enum class VoiceErrorAction(val labelFa: String) {
     OPEN_MIC_PERMISSION_SETTINGS("تنظیمات مجوز"),
     OPEN_VOSK_SETTINGS("نصب مدل آفلاین"),
     RETRY_LISTENING("تلاش مجدد"),
     SWITCH_TO_TEXT_INPUT("تایپ فرمان"),
-    OPEN_TTS_OR_SYSTEM_SETTINGS("تنظیمات سیستم"),
 }
 
 sealed interface VoiceListeningState {
@@ -41,13 +50,22 @@ class VoiceEngine(
     private val context: Context,
     val voskEngine: VoskVoiceEngine = VoskVoiceEngine(context),
     private val audioManager: SolAudioManager = SolAudioManager(context),
-    private val persianTts: PersianTTS? = null,
     private val isExternalSpeaking: () -> Boolean = { false },
     private val onStopExternalSpeech: () -> Unit = {},
     private val micArbiter: MicArbiter? = null,
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val sessionToken = AtomicLong(0L)
+    private val hasSystemMicLease = AtomicBoolean(false)
+
+    @Volatile
+    private var launchJob: Job? = null
+
+    @Volatile
     private var recognizer: SpeechRecognizer? = null
+
+    @Volatile
     private var maxDurationRunnable: Runnable? = null
 
     private val _state = MutableStateFlow<VoiceListeningState>(VoiceListeningState.Idle)
@@ -84,9 +102,6 @@ class VoiceEngine(
      * Barge-in: user starting to speak immediately stops Sol's TTS playback and releases speaking focus.
      */
     fun stopSpeechForBargeIn() {
-        if (persianTts?.isSpeaking?.value == true) {
-            persianTts.stop()
-        }
         onStopExternalSpeech()
         audioManager.abandonSpeakingFocus()
     }
@@ -94,8 +109,7 @@ class VoiceEngine(
     /**
      * Prevents automated wake-word listeners from triggering on Sol's own voice output.
      */
-    fun canStartAutomatedWakeWord(): Boolean =
-        persianTts?.isSpeaking?.value != true && !isExternalSpeaking()
+    fun canStartAutomatedWakeWord(): Boolean = !isExternalSpeaking()
 
     fun consumeLastCapturedPcm16k(): FloatArray? = voskEngine.consumeLastCapturedPcm16k()
 
@@ -108,57 +122,18 @@ class VoiceEngine(
         onFinalResult: (String) -> Unit,
     ) {
         stopSpeechForBargeIn()
-        stopListening()
-        if (MicForegroundService.isRunning.value || MicForegroundService.isMicActive.value) {
-            MicForegroundService.pause(context)
-        }
+        val myToken = sessionToken.incrementAndGet()
+        teardownActiveSession(preserveState = true)
+
         _partialText.value = ""
         _rmsDb.value = 0f
 
         val safeVadMs = vadSilenceMs.coerceIn(VoskVoiceEngine.MIN_VAD_SILENCE_MS, VoskVoiceEngine.MAX_VAD_SILENCE_MS)
         val safeMaxDurationMs = maxDurationMs.coerceIn(5_000L, 45_000L)
-
         val useVosk = preferVosk && voskEngine.isModelInstalled()
-        if (useVosk) {
-            _activeBackend.value = ActiveAsrBackend.VOSK_OFFLINE
-            audioManager.requestListeningFocus { stopListening() }
-            if (playCue) audioManager.playVoiceCue(isStart = true)
-            _state.value = VoiceListeningState.Listening
-            voskEngine.startListening(
-                grammarJson = grammarJson,
-                isWakeWordMode = false,
-                vadSilenceMs = safeVadMs,
-                maxDurationMs = safeMaxDurationMs,
-                onPartial = { partial -> _partialText.value = partial },
-                onRmsChanged = { rms -> _rmsDb.value = rms },
-                onFinalResult = { finalTxt ->
-                    audioManager.abandonListeningFocus()
-                    if (playCue) audioManager.playVoiceCue(isStart = false)
-                    _rmsDb.value = 0f
-                    _partialText.value = ""
-                    _state.value = VoiceListeningState.Idle
-                    onFinalResult(finalTxt)
-                },
-                onTimeout = { timeoutMsg ->
-                    audioManager.abandonListeningFocus()
-                    if (playCue) audioManager.playVoiceCue(isStart = false)
-                    _rmsDb.value = 0f
-                    _state.value = VoiceListeningState.Error(
-                        messageFa = timeoutMsg,
-                        action = VoiceErrorAction.RETRY_LISTENING,
-                    )
-                },
-                onError = { errMsg ->
-                    audioManager.abandonListeningFocus()
-                    _rmsDb.value = 0f
-                    _state.value = classifyVoskError(errMsg)
-                },
-            )
-            return
-        }
 
-        _activeBackend.value = ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER
-        if (!SpeechRecognizer.isRecognitionAvailable(context)) {
+        if (!useVosk && !SpeechRecognizer.isRecognitionAvailable(context)) {
+            _activeBackend.value = ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER
             _state.value = VoiceListeningState.Error(
                 messageFa = "گفتار سیستم در دسترس نیست؛ مدل آفلاین Vosk را نصب کنید.",
                 action = VoiceErrorAction.OPEN_VOSK_SETTINGS,
@@ -166,25 +141,104 @@ class VoiceEngine(
             return
         }
 
-        startSystemSpeechRecognizer(
-            safeVadMs = safeVadMs,
-            safeMaxDurationMs = safeMaxDurationMs,
-            playCue = playCue,
-            preferOfflineInSystem = true,
-            onFinalResult = onFinalResult,
-        )
+        _activeBackend.value = if (useVosk) ActiveAsrBackend.VOSK_OFFLINE else ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER
+        _state.value = VoiceListeningState.Listening
+
+        launchJob = scope.launch {
+            withContext(Dispatchers.IO) {
+                if (MicForegroundService.isRunning.value || MicForegroundService.isMicActive.value) {
+                    MicForegroundService.pauseAndAwaitRelease(context)
+                }
+            }
+            if (sessionToken.get() != myToken) return@launch
+
+            if (playCue) {
+                audioManager.playVoiceCueAndSettle(isStart = true)
+            }
+            if (sessionToken.get() != myToken) return@launch
+
+            if (useVosk) {
+                audioManager.requestListeningFocus { stopListening() }
+                voskEngine.startListening(
+                    grammarJson = grammarJson,
+                    isWakeWordMode = false,
+                    vadSilenceMs = safeVadMs,
+                    maxDurationMs = safeMaxDurationMs,
+                    onPartial = { partial ->
+                        if (sessionToken.get() == myToken) {
+                            _partialText.value = partial
+                        }
+                    },
+                    onRmsChanged = { rms ->
+                        if (sessionToken.get() == myToken) {
+                            _rmsDb.value = rms
+                        }
+                    },
+                    onFinalResult = { finalTxt ->
+                        if (sessionToken.get() == myToken) {
+                            audioManager.abandonListeningFocus()
+                            if (playCue) audioManager.playVoiceCue(isStart = false)
+                            _rmsDb.value = 0f
+                            _partialText.value = ""
+                            _state.value = VoiceListeningState.Idle
+                            onFinalResult(finalTxt)
+                        }
+                    },
+                    onTimeout = { timeoutMsg ->
+                        if (sessionToken.get() == myToken) {
+                            audioManager.abandonListeningFocus()
+                            if (playCue) audioManager.playVoiceCue(isStart = false)
+                            _rmsDb.value = 0f
+                            _state.value = VoiceListeningState.Error(
+                                messageFa = timeoutMsg,
+                                action = VoiceErrorAction.RETRY_LISTENING,
+                            )
+                        }
+                    },
+                    onError = { errMsg ->
+                        if (sessionToken.get() == myToken) {
+                            audioManager.abandonListeningFocus()
+                            _rmsDb.value = 0f
+                            _state.value = classifyVoskError(errMsg)
+                        }
+                    },
+                )
+            } else {
+                startSystemSpeechRecognizer(
+                    token = myToken,
+                    safeVadMs = safeVadMs,
+                    safeMaxDurationMs = safeMaxDurationMs,
+                    playCue = playCue,
+                    preferOfflineInSystem = true,
+                    onFinalResult = onFinalResult,
+                )
+            }
+        }
     }
 
-    private fun startSystemSpeechRecognizer(
+    private suspend fun startSystemSpeechRecognizer(
+        token: Long,
         safeVadMs: Long,
         safeMaxDurationMs: Long,
         playCue: Boolean,
         preferOfflineInSystem: Boolean,
         onFinalResult: (String) -> Unit,
     ) {
-        audioManager.requestListeningFocus { stopListening() }
-        if (playCue && preferOfflineInSystem) audioManager.playVoiceCue(isStart = true)
+        if (sessionToken.get() != token) return
+        if (!hasSystemMicLease.get() && micArbiter != null) {
+            withContext(Dispatchers.IO) {
+                micArbiter.acquire(MicOwner.VOICE_COMMAND)
+            }
+            if (sessionToken.get() != token) {
+                withContext(NonCancellable + Dispatchers.IO) {
+                    micArbiter.release(MicOwner.VOICE_COMMAND)
+                }
+                return
+            }
+            hasSystemMicLease.set(true)
+        }
 
+        audioManager.requestListeningFocus { stopListening() }
         val instance = SpeechRecognizer.createSpeechRecognizer(context.applicationContext)
         recognizer = instance
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -202,49 +256,63 @@ class VoiceEngine(
 
         instance.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
-                _state.value = VoiceListeningState.Listening
+                if (sessionToken.get() == token) {
+                    _state.value = VoiceListeningState.Listening
+                }
             }
 
             override fun onBeginningOfSpeech() {
-                _state.value = VoiceListeningState.Listening
+                if (sessionToken.get() == token) {
+                    _state.value = VoiceListeningState.Listening
+                }
             }
 
             override fun onRmsChanged(rmsdB: Float) {
-                _rmsDb.value = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+                if (sessionToken.get() == token) {
+                    _rmsDb.value = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+                }
             }
 
-            override fun onBufferReceived(buffer: ByteArray?) {
-                // Intentionally unused; final and partial speech results arrive via callbacks below.
-            }
+            override fun onBufferReceived(buffer: ByteArray?) = Unit
 
             override fun onEndOfSpeech() {
-                _state.value = VoiceListeningState.Processing
-                _rmsDb.value = 0f
+                if (sessionToken.get() == token) {
+                    _state.value = VoiceListeningState.Processing
+                    _rmsDb.value = 0f
+                }
             }
 
             override fun onError(error: Int) {
+                if (sessionToken.get() != token) return
                 cancelMaxDurationTimer()
                 cleanupRecognizer()
                 val isLangUnavailable = error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
                     error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE
                 if (preferOfflineInSystem && isLangUnavailable) {
-                    mainHandler.post {
-                        startSystemSpeechRecognizer(
-                            safeVadMs = safeVadMs,
-                            safeMaxDurationMs = safeMaxDurationMs,
-                            playCue = playCue,
-                            preferOfflineInSystem = false,
-                            onFinalResult = onFinalResult,
-                        )
+                    launchJob = scope.launch {
+                        // Brief teardown pause avoids Android SpeechRecognizer ERROR_RECOGNIZER_BUSY
+                        delay(140L)
+                        if (sessionToken.get() == token) {
+                            startSystemSpeechRecognizer(
+                                token = token,
+                                safeVadMs = safeVadMs,
+                                safeMaxDurationMs = safeMaxDurationMs,
+                                playCue = playCue,
+                                preferOfflineInSystem = false,
+                                onFinalResult = onFinalResult,
+                            )
+                        }
                     }
                     return
                 }
                 audioManager.abandonListeningFocus()
+                releaseSystemMicLeaseAsync()
                 _state.value = classifySpeechRecognizerError(error)
                 _rmsDb.value = 0f
             }
 
             override fun onResults(results: Bundle?) {
+                if (sessionToken.get() != token) return
                 cancelMaxDurationTimer()
                 audioManager.abandonListeningFocus()
                 if (playCue) audioManager.playVoiceCue(isStart = false)
@@ -262,12 +330,14 @@ class VoiceEngine(
                 _partialText.value = ""
                 _state.value = VoiceListeningState.Idle
                 cleanupRecognizer()
+                releaseSystemMicLeaseAsync()
                 if (best.isNotBlank()) {
                     onFinalResult(best)
                 }
             }
 
             override fun onPartialResults(partialResults: Bundle?) {
+                if (sessionToken.get() != token) return
                 val partial = partialResults
                     ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     ?.firstOrNull()
@@ -277,13 +347,13 @@ class VoiceEngine(
                 }
             }
 
-            override fun onEvent(eventType: Int, params: Bundle?) {
-                // Intentionally unused; no vendor-specific SpeechRecognizer events handled.
-            }
+            override fun onEvent(eventType: Int, params: Bundle?) = Unit
         })
 
         scheduleMaxDurationTimer(safeMaxDurationMs) {
-            if (_state.value is VoiceListeningState.Listening || _state.value is VoiceListeningState.Processing) {
+            if (sessionToken.get() == token &&
+                (_state.value is VoiceListeningState.Listening || _state.value is VoiceListeningState.Processing)
+            ) {
                 stopListening()
                 if (playCue) audioManager.playVoiceCue(isStart = false)
             }
@@ -295,17 +365,17 @@ class VoiceEngine(
         }.onFailure { err ->
             cancelMaxDurationTimer()
             audioManager.abandonListeningFocus()
+            cleanupRecognizer()
+            releaseSystemMicLeaseAsync()
             _state.value = VoiceListeningState.Error(
                 messageFa = "شروع شنود ناموفق بود: ${err.localizedMessage ?: "خطای ناشناخته"}",
                 action = VoiceErrorAction.SWITCH_TO_TEXT_INPUT,
             )
-            cleanupRecognizer()
         }
     }
 
     /**
      * Dedicated lightweight wake-word ("Sol" / "سول") listener using Vosk grammar mode ONLY.
-     * Explicitly active only while the app is open; stops cleanly on silence timeout or onStop().
      */
     fun startWakeWordListening(
         wakeTimeoutMs: Long = VoskVoiceEngine.DEFAULT_WAKE_TIMEOUT_MS,
@@ -327,36 +397,59 @@ class VoiceEngine(
         if (allowBargeIn) {
             stopSpeechForBargeIn()
         }
-        stopListening()
-        if (MicForegroundService.isRunning.value || MicForegroundService.isMicActive.value) {
-            MicForegroundService.pause(context)
-        }
+        val myToken = sessionToken.incrementAndGet()
+        teardownActiveSession(preserveState = true)
+
         _activeBackend.value = ActiveAsrBackend.VOSK_OFFLINE
-        audioManager.requestListeningFocus { stopListening() }
-        if (playCue) audioManager.playVoiceCue(isStart = true)
         _state.value = VoiceListeningState.WakeWordArmed
-        voskEngine.startListening(
-            grammarJson = voskEngine.vocabularyBias.buildWakeWordGrammarJson(),
-            isWakeWordMode = true,
-            maxDurationMs = wakeTimeoutMs.coerceAtLeast(60_000L),
-            onPartial = {},
-            onRmsChanged = { rms -> _rmsDb.value = rms * 0.4f },
-            onFinalResult = {
-                audioManager.abandonListeningFocus()
-                _state.value = VoiceListeningState.Idle
-                onWakeDetected()
-            },
-            onTimeout = { msg ->
-                audioManager.abandonListeningFocus()
-                _rmsDb.value = 0f
-                _state.value = VoiceListeningState.Idle
-                onTimeout?.invoke(msg)
-            },
-            onError = { err ->
-                audioManager.abandonListeningFocus()
-                _state.value = classifyVoskError(err)
-            },
-        )
+
+        launchJob = scope.launch {
+            withContext(Dispatchers.IO) {
+                if (MicForegroundService.isRunning.value || MicForegroundService.isMicActive.value) {
+                    MicForegroundService.pauseAndAwaitRelease(context)
+                }
+            }
+            if (sessionToken.get() != myToken) return@launch
+
+            if (playCue) {
+                audioManager.playVoiceCueAndSettle(isStart = true)
+            }
+            if (sessionToken.get() != myToken) return@launch
+
+            audioManager.requestListeningFocus { stopListening() }
+            voskEngine.startListening(
+                grammarJson = voskEngine.vocabularyBias.buildWakeWordGrammarJson(),
+                isWakeWordMode = true,
+                maxDurationMs = wakeTimeoutMs.coerceAtLeast(60_000L),
+                onPartial = {},
+                onRmsChanged = { rms ->
+                    if (sessionToken.get() == myToken) {
+                        _rmsDb.value = rms * 0.4f
+                    }
+                },
+                onFinalResult = {
+                    if (sessionToken.get() == myToken) {
+                        audioManager.abandonListeningFocus()
+                        _state.value = VoiceListeningState.Idle
+                        onWakeDetected()
+                    }
+                },
+                onTimeout = { msg ->
+                    if (sessionToken.get() == myToken) {
+                        audioManager.abandonListeningFocus()
+                        _rmsDb.value = 0f
+                        _state.value = VoiceListeningState.Idle
+                        onTimeout?.invoke(msg)
+                    }
+                },
+                onError = { err ->
+                    if (sessionToken.get() == myToken) {
+                        audioManager.abandonListeningFocus()
+                        _state.value = classifyVoskError(err)
+                    }
+                },
+            )
+        }
     }
 
     /**
@@ -383,17 +476,34 @@ class VoiceEngine(
     }
 
     fun stopListening() {
+        sessionToken.incrementAndGet()
+        teardownActiveSession(preserveState = false)
+    }
+
+    private fun teardownActiveSession(preserveState: Boolean) {
+        launchJob?.cancel()
+        launchJob = null
         cancelMaxDurationTimer()
         voskEngine.stopListening()
         runCatching { recognizer?.stopListening() }
         cleanupRecognizer()
+        releaseSystemMicLeaseAsync()
         audioManager.abandonListeningFocus()
         _rmsDb.value = 0f
-        if (_state.value is VoiceListeningState.Listening ||
-            _state.value is VoiceListeningState.Processing ||
-            _state.value is VoiceListeningState.WakeWordArmed
+        if (!preserveState &&
+            (_state.value is VoiceListeningState.Listening ||
+                _state.value is VoiceListeningState.Processing ||
+                _state.value is VoiceListeningState.WakeWordArmed)
         ) {
             _state.value = VoiceListeningState.Idle
+        }
+    }
+
+    private fun releaseSystemMicLeaseAsync() {
+        if (hasSystemMicLease.compareAndSet(true, false) && micArbiter != null) {
+            scope.launch(NonCancellable + Dispatchers.IO) {
+                micArbiter.release(MicOwner.VOICE_COMMAND)
+            }
         }
     }
 

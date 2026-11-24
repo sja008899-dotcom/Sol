@@ -37,7 +37,7 @@ class PrivacyManager(private val permissionManager: PermissionManager) {
         alwaysConfirmCommunication: Boolean,
         activeAsrBackend: ActiveAsrBackend = ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER,
         voskInstalled: Boolean = false,
-        ttsRequiresNetwork: Boolean = false,
+        piperTtsReady: Boolean = true,
         historyRetentionMode: HistoryRetentionMode = HistoryRetentionMode.TWO_HUNDRED_ITEMS,
         privateModeEnabled: Boolean = false,
     ): List<SecurityAuditItem> {
@@ -51,10 +51,10 @@ class PrivacyManager(private val permissionManager: PermissionManager) {
                 "تشخیص گفتار سیستم اندروید فعال است (با EXTRA_PREFER_OFFLINE). روی بیشتر گوشی‌ها اگر بستهٔ آفلاین فارسی سیستم نصب نباشد، سرویس گفتار سیستم ممکن است صدا را برای پردازش به اینترنت بفرستد. برای ۱۰۰٪ آفلاین، مدل Vosk را نصب کنید."
         }
 
-        val ttsDetail = if (ttsRequiresNetwork) {
-            "صدای انتخاب‌شدهٔ TTS در تنظیمات گوشی نیازمند شبکه است؛ برای گفتار کاملاً آفلاین از SherpaTTS یا صدای آفلاین سیستم استفاده کنید."
+        val ttsDetail = if (piperTtsReady) {
+            "سنتز گفتار ۱۰۰٪ مستقل و آفلاین Sol (موتور داخلی Piper ONNX) فعال است و هیچ وابستگی به موتورهای صدای گوشی یا اینترنت ندارد."
         } else {
-            "خروجی صوتی به موتور صدای محلی گوشی (مانند SherpaTTS یا صدای آفلاین سیستم) متصل است."
+            "موتور گفتار داخلی و مستقل Piper ONNX هنوز نصب نشده است؛ با اولین اتصال به اینترنت به‌صورت خودکار و تأییدشده با SHA-256 دانلود می‌شود."
         }
 
         val retentionDetail = if (privateModeEnabled) {
@@ -74,9 +74,13 @@ class PrivacyManager(private val permissionManager: PermissionManager) {
                 isCompliant = asrOffline,
             ),
             SecurityAuditItem(
-                titleFa = "سنتز گفتار (TTS) گوشی",
+                titleFa = if (piperTtsReady) {
+                    "سنتز گفتار (TTS): خودکفا و آفلاین (Piper ONNX)"
+                } else {
+                    "سنتز گفتار (TTS): در انتظار دریافت مدل داخلی Piper"
+                },
                 detailFa = ttsDetail,
-                isCompliant = !ttsRequiresNetwork,
+                isCompliant = piperTtsReady,
             ),
             SecurityAuditItem(
                 titleFa = "دانلودها و دسترسی وب با تأیید صریح HTTPS",

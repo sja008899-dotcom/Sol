@@ -1,5 +1,7 @@
 package com.example
 
+import android.Manifest
+import android.app.Application
 import android.content.Context
 import android.speech.SpeechRecognizer
 import androidx.test.core.app.ApplicationProvider
@@ -13,10 +15,12 @@ import com.example.sol.knowledge.SlmPromptBuilder
 import com.example.sol.memory.BookChunkEntity
 import com.example.sol.memory.PreferencesRepository
 import com.example.sol.memory.SolPreferences
+import com.example.sol.network.SolHttpClient
+import com.example.sol.speaker.SpeakerIdManager
 import com.example.sol.text.PersianNumbers
+import com.example.sol.tts.TtsManager
 import com.example.sol.voice.ActiveAsrBackend
 import com.example.sol.voice.EndPointingAction
-import com.example.sol.voice.PersianTTS
 import com.example.sol.voice.SolAudioManager
 import com.example.sol.voice.VoiceEngine
 import com.example.sol.voice.VoiceErrorAction
@@ -31,8 +35,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import java.io.File
+import java.io.IOException
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [31])
@@ -291,8 +297,13 @@ class M6VoiceAndSlmSafetyTests {
     fun `part c audio focus lifecycle and tts barge-in prevent self triggering`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val audioManager = SolAudioManager(context)
-        val tts = PersianTTS(context, audioManager)
-        val voiceEngine = VoiceEngine(context, audioManager = audioManager, persianTts = tts)
+        val ttsManager = TtsManager(context, audioManager)
+        val voiceEngine = VoiceEngine(
+            context = context,
+            audioManager = audioManager,
+            isExternalSpeaking = { ttsManager.isPiperSpeaking.value },
+            onStopExternalSpeech = { ttsManager.stop() },
+        )
 
         assertTrue(audioManager.requestListeningFocus {})
         assertTrue(audioManager.hasListeningFocus)
@@ -305,10 +316,10 @@ class M6VoiceAndSlmSafetyTests {
         // Barge-in releases speaking focus & stops TTS immediately
         voiceEngine.stopSpeechForBargeIn()
         assertFalse(audioManager.hasSpeakingFocus)
-        assertFalse(tts.isSpeaking.value)
+        assertFalse(ttsManager.isSpeaking.value)
         assertTrue(voiceEngine.canStartAutomatedWakeWord())
 
-        tts.shutdown()
+        ttsManager.release()
     }
 
     @Test
@@ -327,7 +338,7 @@ class M6VoiceAndSlmSafetyTests {
         assertTrue("5+ digit phone must remain verbatim", prepared.contains("09123456789"))
 
         val longText = "امروز هوا خیلی خوب است و برنامه کارها را مرور می‌کنیم! آیا جلسه ساعت 1.5 آماده است؟ یادآوری ثبت شد؛ موفق باشید."
-        val sentences = PersianTTS.splitIntoSentences(longText, maxChunkChars = 80)
+        val sentences = TtsManager.splitIntoSentences(longText, maxChunkChars = 80)
         assertTrue("Expected multi-sentence chunks, got $sentences", sentences.size >= 2)
         assertTrue("Decimal 1.5 must not break mid-number", sentences.any { it.contains("1.5") })
     }
@@ -362,15 +373,27 @@ class M6VoiceAndSlmSafetyTests {
     }
 
     @Test
-    fun `part c speaker id manager sets inline feedback when recording without speaker model`() = runBlocking {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val manager = com.example.sol.speaker.SpeakerIdManager(context)
+    fun `part c speaker id manager auto-attempts download when model absent and reports inline feedback on failure`() = runBlocking {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        Shadows.shadowOf(app).grantPermissions(Manifest.permission.RECORD_AUDIO)
+        val offlineClient = SolHttpClient(
+            dnsResolver = { throw IOException("offline test") },
+            availableBytesProvider = { 4L * 1024L * 1024L * 1024L },
+        )
+        val manager = SpeakerIdManager(
+            context = app,
+            httpClient = offlineClient,
+            availableBytesProvider = { 4L * 1024L * 1024L * 1024L },
+        )
         manager.deleteAllSpeakerData()
         val res = manager.recordAndEnrollOwner()
         assertTrue(res.isFailure)
         val ui = manager.uiState.value
         assertTrue(ui.feedbackIsError)
-        assertTrue(ui.feedbackMessageFa.contains("Piper") || ui.feedbackMessageFa.contains("گوینده"))
+        assertTrue(
+            "Expected auto-download error message, got: ${ui.feedbackMessageFa}",
+            ui.feedbackMessageFa.contains("دانلود خودکار") || ui.feedbackMessageFa.contains("اینترنت"),
+        )
     }
 
     @Test

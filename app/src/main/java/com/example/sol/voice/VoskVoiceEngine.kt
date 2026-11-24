@@ -31,6 +31,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.ZipInputStream
 import kotlin.math.abs
 import kotlin.math.min
@@ -133,8 +134,12 @@ class VoskVoiceEngine(
     private var activeListeningJob: Job? = null
 
     @Volatile
+    private var activeSessionStop: AtomicBoolean? = null
+
+    @Volatile
     private var autoUnloadJob: Job? = null
 
+    private val sessionCounter = AtomicLong(0L)
     private val isRecording = AtomicBoolean(false)
 
     init {
@@ -271,9 +276,7 @@ class VoskVoiceEngine(
             refreshInstalledStatus("مدل آفلاین فارسی Vosk با موفقیت دانلود و نصب شد$fingerprintNote")
             Result.success(Unit)
         } catch (err: Throwable) {
-            if (err is SolNetworkException.IntegrityMismatchException ||
-                err is SolNetworkException.IntegrityMetadataMissingException
-            ) {
+            if (err !is SolNetworkException.TransportException && err !is SolNetworkException.CancelledException) {
                 partFile.delete()
             }
             val msg = if (err is SolNetworkException) {
@@ -322,7 +325,7 @@ class VoskVoiceEngine(
                 )
             } catch (err: SolNetworkException.HttpStatusException) {
                 lastError = err
-                val canFallback = (err.statusCode == 404 || err.statusCode == 410) && idx < candidates.lastIndex
+                val canFallback = err.statusCode in setOf(403, 404, 410, 416) && idx < candidates.lastIndex
                 if (canFallback) {
                     partFile.delete()
                     continue
@@ -392,16 +395,39 @@ class VoskVoiceEngine(
         val safeVadSilenceMs = vadSilenceMs.coerceIn(MIN_VAD_SILENCE_MS, MAX_VAD_SILENCE_MS)
         val safeMaxDurationMs = maxDurationMs.coerceAtLeast(3_000L)
 
-        stopListening()
+        val prevJob = activeListeningJob
+        activeSessionStop?.set(false)
+        prevJob?.cancel()
         autoUnloadJob?.cancel()
+
+        val mySessionId = sessionCounter.incrementAndGet()
+        val sessionActive = AtomicBoolean(true)
+        activeSessionStop = sessionActive
         isRecording.set(true)
 
         val micOwner = if (isWakeWordMode) MicOwner.WAKE_WORD_UI else MicOwner.VOICE_COMMAND
         activeListeningJob = scope.launch {
+            if (prevJob != null) {
+                runCatching { prevJob.join() }
+            }
+            if (!sessionActive.get() || sessionCounter.get() != mySessionId) {
+                if (sessionCounter.get() == mySessionId) {
+                    isRecording.set(false)
+                }
+                return@launch
+            }
+
             var activeRecorderRef: AudioRecord? = null
             var recognizer: Recognizer? = null
-            micArbiter?.acquire(owner = micOwner)
+            var leased = false
             try {
+                micArbiter?.acquire(owner = micOwner)
+                leased = micArbiter != null
+
+                if (!sessionActive.get() || sessionCounter.get() != mySessionId) {
+                    return@launch
+                }
+
                 val model = voskModel ?: Model(modelDir.absolutePath).also {
                     voskModel = it
                     refreshInstalledStatus("مدل Vosk در RAM بارگذاری شد")
@@ -425,7 +451,7 @@ class VoskVoiceEngine(
                 val captureOutcome = SafeAudioCapture.runCaptureLoop(
                     sampleRate = SAMPLE_RATE,
                     chunkSize = 2048,
-                    shouldContinue = { isRecording.get() },
+                    shouldContinue = { sessionActive.get() && sessionCounter.get() == mySessionId },
                     onRecorderSwap = { activeRecorderRef = it },
                     onSamples = { shortBuf, read ->
                         if (!isWakeWordMode) {
@@ -452,13 +478,13 @@ class VoskVoiceEngine(
                                 if (isWakeWordMode) {
                                     val norm = PersianNormalizer.normalize(corrected)
                                     if (norm.contains("سول") || norm.contains("sol")) {
-                                        isRecording.set(false)
+                                        sessionActive.set(false)
                                         mainHandler.post { onFinalResult(corrected) }
                                         return@runCaptureLoop false
                                     }
                                 } else {
                                     saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
-                                    isRecording.set(false)
+                                    sessionActive.set(false)
                                     mainHandler.post { onFinalResult(corrected) }
                                     return@runCaptureLoop false
                                 }
@@ -472,7 +498,7 @@ class VoskVoiceEngine(
                                 if (isWakeWordMode) {
                                     val norm = PersianNormalizer.normalize(partial)
                                     if (norm.contains("سول") || norm.contains("sol")) {
-                                        isRecording.set(false)
+                                        sessionActive.set(false)
                                         mainHandler.post { onFinalResult(partial) }
                                         return@runCaptureLoop false
                                     }
@@ -497,7 +523,7 @@ class VoskVoiceEngine(
                             EndPointingAction.FINALIZE_SPEECH -> {
                                 val finalTxt = extractVoskText(activeRec.finalResult, "text")
                                     .ifBlank { lastPartialSent }
-                                isRecording.set(false)
+                                sessionActive.set(false)
                                 if (finalTxt.isNotBlank()) {
                                     saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
                                     val corrected = vocabularyBias.applyBiasCorrection(finalTxt)
@@ -511,7 +537,7 @@ class VoskVoiceEngine(
                             EndPointingAction.TIMEOUT_NO_SPEECH -> {
                                 val fallbackTxt = extractVoskText(activeRec.finalResult, "text")
                                     .ifBlank { lastPartialSent }
-                                isRecording.set(false)
+                                sessionActive.set(false)
                                 if (fallbackTxt.isNotBlank()) {
                                     saveCapturedPcmFromRing(pcmRing, pcmTotalWritten, maxCaptureSamples)
                                     val corrected = vocabularyBias.applyBiasCorrection(fallbackTxt)
@@ -526,7 +552,7 @@ class VoskVoiceEngine(
                             }
 
                             EndPointingAction.WAKE_TIMEOUT -> {
-                                isRecording.set(false)
+                                sessionActive.set(false)
                                 val timeoutMsg = "گوش‌به‌زنگ واژه «Sol» پس از سکوت خودکار متوقف شد."
                                 mainHandler.post { onTimeout?.invoke(timeoutMsg) }
                                 false
@@ -537,29 +563,36 @@ class VoskVoiceEngine(
                     },
                 )
 
-                if (captureOutcome is SafeAudioCaptureStop.Failed && isRecording.get()) {
-                    isRecording.set(false)
+                if (captureOutcome is SafeAudioCaptureStop.Failed && sessionActive.get()) {
+                    sessionActive.set(false)
                     mainHandler.post { onError(captureOutcome.messageFa) }
                 }
-            } catch (sec: SecurityException) {
-                if (isRecording.get()) {
+            } catch (_: SecurityException) {
+                if (sessionActive.get()) {
                     mainHandler.post { onError("مجوز میکروفون صادر نشده است") }
                 }
             } catch (t: Throwable) {
-                if (isRecording.get()) {
+                if (sessionActive.get() && t !is kotlinx.coroutines.CancellationException) {
                     mainHandler.post {
                         onError("خطا در موتور آفلاین Vosk: ${t.localizedMessage ?: "نامشخص"}")
                     }
                 }
             } finally {
-                isRecording.set(false)
+                sessionActive.set(false)
+                if (sessionCounter.get() == mySessionId) {
+                    isRecording.set(false)
+                }
                 runCatching { activeRecorderRef?.stop() }
                 runCatching { activeRecorderRef?.release() }
                 runCatching { recognizer?.close() }
-                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                    micArbiter?.release(owner = micOwner)
+                if (leased) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                        micArbiter?.release(owner = micOwner)
+                    }
                 }
-                mainHandler.post { onRmsChanged(0f) }
+                if (sessionCounter.get() == mySessionId) {
+                    mainHandler.post { onRmsChanged(0f) }
+                }
                 scheduleAutoUnloadAfterIdle()
             }
         }
@@ -589,6 +622,9 @@ class VoskVoiceEngine(
     }
 
     fun stopListening() {
+        sessionCounter.incrementAndGet()
+        activeSessionStop?.set(false)
+        activeSessionStop = null
         isRecording.set(false)
         activeListeningJob?.cancel()
         activeListeningJob = null
@@ -704,7 +740,7 @@ class VoskVoiceEngine(
     companion object {
         private const val MODEL_DIR_NAME = "vosk-model-fa"
         private const val SAMPLE_RATE = 16000
-        private const val VAD_SPEECH_THRESHOLD = 0.08f
+        private const val VAD_SPEECH_THRESHOLD = 0.022f
         private const val IDLE_UNLOAD_DELAY_MS = 90_000L
         const val MIN_VAD_SILENCE_MS = 700L
         const val MAX_VAD_SILENCE_MS = 3_500L

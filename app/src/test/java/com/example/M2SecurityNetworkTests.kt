@@ -695,7 +695,7 @@ class M2SecurityNetworkTests {
                 alwaysConfirmCommunication = true,
                 activeAsrBackend = ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER,
                 voskInstalled = false,
-                ttsRequiresNetwork = true,
+                piperTtsReady = false,
                 historyRetentionMode = HistoryRetentionMode.TWO_HUNDRED_ITEMS,
                 privateModeEnabled = false,
             )
@@ -708,7 +708,7 @@ class M2SecurityNetworkTests {
                 alwaysConfirmCommunication = true,
                 activeAsrBackend = ActiveAsrBackend.VOSK_OFFLINE,
                 voskInstalled = true,
-                ttsRequiresNetwork = false,
+                piperTtsReady = true,
                 historyRetentionMode = HistoryRetentionMode.SEVEN_DAYS,
                 privateModeEnabled = true,
             )

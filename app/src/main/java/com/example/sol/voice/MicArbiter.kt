@@ -1,6 +1,7 @@
 package com.example.sol.voice
 
 import kotlinx.coroutines.sync.Mutex
+import java.util.concurrent.atomic.AtomicInteger
 
 enum class MicOwner(val labelFa: String) {
     FOREGROUND_WAKE("شنود پس‌زمینه (صفحه خاموش)"),
@@ -19,6 +20,7 @@ class MicArbiter(
     private val resumeForegroundMic: suspend () -> Unit = {},
 ) {
     private val mutex = Mutex()
+    private val waitersCount = AtomicInteger(0)
 
     @Volatile
     private var currentOwner: MicOwner? = null
@@ -32,27 +34,34 @@ class MicArbiter(
         owner: MicOwner,
         pauseForegroundIfNeeded: Boolean = owner != MicOwner.FOREGROUND_WAKE,
     ): Boolean {
-        if (!mutex.tryLock()) {
-            // Wait if another owner is wrapping up; wait cleanly with lock() after notifying foreground pause.
-            if (pauseForegroundIfNeeded && currentOwner == MicOwner.FOREGROUND_WAKE) {
+        waitersCount.incrementAndGet()
+        try {
+            if (!mutex.tryLock()) {
+                if (pauseForegroundIfNeeded && currentOwner == MicOwner.FOREGROUND_WAKE) {
+                    runCatching { pauseForegroundMic() }
+                    pausedForegroundForLease = true
+                }
+                mutex.lock()
+            }
+            if (pauseForegroundIfNeeded) {
                 runCatching { pauseForegroundMic() }
                 pausedForegroundForLease = true
             }
-            mutex.lock()
-        } else if (pauseForegroundIfNeeded) {
-            runCatching { pauseForegroundMic() }
-            pausedForegroundForLease = true
+            currentOwner = owner
+            return true
+        } finally {
+            waitersCount.decrementAndGet()
         }
-        currentOwner = owner
-        return true
     }
 
     suspend fun release(
         owner: MicOwner,
         resumeForegroundIfPaused: Boolean = true,
     ) {
+        val noQueuedWaiters = waitersCount.get() == 0
         val shouldResume = pausedForegroundForLease &&
             resumeForegroundIfPaused &&
+            noQueuedWaiters &&
             owner != MicOwner.FOREGROUND_WAKE
         if (currentOwner == owner) {
             currentOwner = null

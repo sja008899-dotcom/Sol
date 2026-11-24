@@ -214,15 +214,27 @@ object SafeAudioCapture {
             }
         }
 
-        val initial = attachAndStart()
+        var initial = attachAndStart()
         if (initial.isFailure) {
-            return SafeAudioCaptureStop.Failed(
-                initial.exceptionOrNull()?.localizedMessage ?: SILENCED_MESSAGE_FA
-            )
+            try {
+                Thread.sleep(120L)
+            } catch (_: InterruptedException) {
+                return SafeAudioCaptureStop.StoppedNormally
+            }
+            if (!shouldContinue() || Thread.currentThread().isInterrupted) {
+                return SafeAudioCaptureStop.StoppedNormally
+            }
+            initial = attachAndStart()
+            if (initial.isFailure) {
+                return SafeAudioCaptureStop.Failed(
+                    initial.exceptionOrNull()?.localizedMessage ?: SILENCED_MESSAGE_FA
+                )
+            }
         }
 
         val tracker = SafeAudioReadTracker()
         val buf = ShortArray(chunkSize)
+        val loopStartedAt = System.currentTimeMillis()
         return try {
             while (shouldContinue() && !Thread.currentThread().isInterrupted) {
                 val now = System.currentTimeMillis()
@@ -230,10 +242,13 @@ object SafeAudioCapture {
                     break
                 }
                 val activeRecorder = recorder ?: break
-                val isApiSilenced = silencedBySystem.get() ||
-                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                        runCatching { activeRecorder.activeRecordingConfiguration?.isClientSilenced == true }
-                            .getOrDefault(false))
+                val pastWarmup = (now - loopStartedAt) >= 250L
+                val isApiSilenced = pastWarmup && (
+                    silencedBySystem.get() ||
+                        (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                            runCatching { activeRecorder.activeRecordingConfiguration?.isClientSilenced == true }
+                                .getOrDefault(false))
+                    )
 
                 val read = activeRecorder.read(buf, 0, buf.size)
                 when (

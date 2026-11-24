@@ -8,8 +8,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.R
@@ -19,21 +17,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-class SolBackgroundService : Service(), TextToSpeech.OnInitListener {
+/**
+ * Foreground mediaPlayback service for reading messages/books aloud using Sol's
+ * 100% self-contained Piper TTS engine (zero dependency on external phone TTS engines).
+ */
+class SolBackgroundService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private var tts: TextToSpeech? = null
-    private var pendingSpeakText: String? = null
-    private var ttsReady = false
-    private var ttsInitializing = false
-
-    private var backgroundTtsProbeQueue: ArrayDeque<String> = ArrayDeque()
-    private var bindingPackage: String = ""
-    private var triedAltEngine = false
-    private var watchdogJob: Job? = null
+    private var speakJob: Job? = null
     private var activeStartId: Int = -1
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -62,17 +54,10 @@ class SolBackgroundService : Service(), TextToSpeech.OnInitListener {
                     title = title,
                     body = text.take(120),
                 )
-                pendingSpeakText = text
-                val extraPkg = intent.getStringExtra(EXTRA_TTS_PACKAGE).orEmpty()
-                if (ttsReady && tts != null) {
-                    speakAndAwaitCompletion(text)
-                } else if (!ttsInitializing) {
-                    initializeTtsAsync(extraPkg)
-                }
+                speakWithSelfContainedPiper(text, startId)
             }
 
             else -> {
-                // Only mediaPlayback voice reader action is valid; stop cleanly without faking work.
                 stopSelf(startId)
                 return START_NOT_STICKY
             }
@@ -80,118 +65,19 @@ class SolBackgroundService : Service(), TextToSpeech.OnInitListener {
         return START_NOT_STICKY
     }
 
-    private fun initializeTtsAsync(passedPackage: String) {
-        ttsInitializing = true
-        serviceScope.launch {
-            val preferredPkg = passedPackage.ifBlank {
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        (application as? SolApplication)?.container?.preferencesRepository
-                            ?.getSnapshot()?.preferredTtsEnginePackage.orEmpty()
-                    }.getOrDefault("")
-                }
-            }
-            bindingPackage = preferredPkg
-            triedAltEngine = false
-            backgroundTtsProbeQueue.clear()
-            ttsReady = false
-            tts = runCatching {
-                if (preferredPkg.isNotBlank()) {
-                    TextToSpeech(this@SolBackgroundService, this@SolBackgroundService, preferredPkg)
-                } else {
-                    TextToSpeech(this@SolBackgroundService, this@SolBackgroundService)
-                }
-            }.getOrNull()
-            if (tts == null) {
-                ttsInitializing = false
-                stopCleanly()
-            }
-        }
-    }
-
-    override fun onInit(status: Int) {
-        ttsInitializing = false
-        val engine = tts
-        if (status == TextToSpeech.SUCCESS && engine != null) {
-            val activePkg = bindingPackage.ifBlank { runCatching { engine.defaultEngine.orEmpty() }.getOrDefault("") }
-            if (!triedAltEngine && backgroundTtsProbeQueue.isEmpty()) {
-                val others = com.example.sol.voice.PersianTTS.snapshotEngines(engine)
-                    .map { it.packageName }
-                    .filter { it.isNotBlank() && it != activePkg }
-                backgroundTtsProbeQueue.addAll(others)
-            }
-            val persianOk = com.example.sol.voice.PersianTTS.configurePersianLanguageAndVoices(engine)
-            val isSherpa = com.example.sol.voice.PersianTTS.isSherpaEngine(packageName = activePkg)
-            if (persianOk || isSherpa) {
-                attachUtteranceListener(engine)
-                ttsReady = true
-                val text = pendingSpeakText
-                if (!text.isNullOrBlank()) {
-                    speakAndAwaitCompletion(text)
-                }
-                return
-            }
-        }
-
-        if (backgroundTtsProbeQueue.isNotEmpty()) {
-            triedAltEngine = true
-            ttsInitializing = true
-            val nextPkg = backgroundTtsProbeQueue.removeFirst()
-            bindingPackage = nextPkg
-            runCatching {
-                tts?.stop()
-                tts?.shutdown()
-            }
-            tts = runCatching {
-                TextToSpeech(this, this, nextPkg)
-            }.getOrNull()
-            if (tts == null) {
-                ttsInitializing = false
-                stopCleanly()
-            }
+    private fun speakWithSelfContainedPiper(text: String, startId: Int) {
+        speakJob?.cancel()
+        val ttsManager = (application as? SolApplication)?.container?.ttsManager
+        if (ttsManager == null) {
+            stopCleanly(startId)
             return
         }
-
-        // All engines failed to initialize Persian TTS; stop cleanly right away.
-        stopCleanly()
-    }
-
-    private fun attachUtteranceListener(engine: TextToSpeech) {
-        engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) = Unit
-
-            override fun onDone(utteranceId: String?) {
-                serviceScope.launch { stopCleanly() }
+        speakJob = serviceScope.launch {
+            try {
+                ttsManager.speakBlocking(text)
+            } finally {
+                stopCleanly(startId)
             }
-
-            @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String?) {
-                serviceScope.launch { stopCleanly() }
-            }
-
-            override fun onError(utteranceId: String?, errorCode: Int) {
-                serviceScope.launch { stopCleanly() }
-            }
-
-            override fun onStop(utteranceId: String?, interrupted: Boolean) {
-                serviceScope.launch { stopCleanly() }
-            }
-        })
-    }
-
-    private fun speakAndAwaitCompletion(text: String) {
-        watchdogJob?.cancel()
-        val utteranceId = "sol_fgs_read_${System.currentTimeMillis()}"
-        val speakResult = tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId) ?: TextToSpeech.ERROR
-        if (speakResult != TextToSpeech.SUCCESS) {
-            stopCleanly()
-            return
-        }
-        // Watchdog only guards against a hung third-party TTS engine failing to emit UtteranceProgressListener.
-        watchdogJob = serviceScope.launch {
-            val watchdogMs = (text.length * 140L).coerceIn(15_000L, 120_000L)
-            delay(watchdogMs)
-            stopCleanly()
         }
     }
 
@@ -233,10 +119,9 @@ class SolBackgroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun stopCleanly(startId: Int = activeStartId) {
-        watchdogJob?.cancel()
-        watchdogJob = null
-        pendingSpeakText = null
-        runCatching { tts?.stop() }
+        speakJob?.cancel()
+        speakJob = null
+        runCatching { (application as? SolApplication)?.container?.ttsManager?.stop() }
         runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
         if (startId >= 0) {
             stopSelf(startId)
@@ -253,12 +138,7 @@ class SolBackgroundService : Service(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
-        watchdogJob?.cancel()
-        runCatching {
-            tts?.stop()
-            tts?.shutdown()
-        }
-        tts = null
+        speakJob?.cancel()
         serviceScope.cancel()
         super.onDestroy()
     }
@@ -268,7 +148,6 @@ class SolBackgroundService : Service(), TextToSpeech.OnInitListener {
         const val ACTION_STOP = "com.example.sol.action.STOP"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_TEXT = "extra_text"
-        const val EXTRA_TTS_PACKAGE = "extra_tts_package"
         private const val FOREGROUND_ID = 4100
         private const val FALLBACK_NOTIFICATION_ID = 4101
 
@@ -276,16 +155,12 @@ class SolBackgroundService : Service(), TextToSpeech.OnInitListener {
             context: Context,
             title: String,
             text: String,
-            preferredTtsPackage: String = "",
         ): Boolean {
             if (text.isBlank()) return false
             val intent = Intent(context, SolBackgroundService::class.java).apply {
                 action = ACTION_SPEAK_TEXT
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_TEXT, text)
-                if (preferredTtsPackage.isNotBlank()) {
-                    putExtra(EXTRA_TTS_PACKAGE, preferredTtsPackage)
-                }
             }
             return try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

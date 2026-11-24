@@ -16,11 +16,12 @@ import com.example.sol.tts.PiperTtsStatus
 import com.example.sol.tts.TtsManager
 import com.example.sol.voice.MicArbiter
 import com.example.sol.voice.MicOwner
-import com.example.sol.voice.PersianTTS
 import com.example.sol.voice.SafeAudioReadTracker
 import com.example.sol.voice.SafeReadAction
 import com.example.sol.voice.SolAudioManager
 import com.example.sol.voice.VoskVoiceEngine
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -274,6 +275,32 @@ class M9ReliabilityAndAudioTests {
     }
 
     @Test
+    fun `mic arbiter suppresses intermediate foreground resume while another owner is waiting`(): Unit = runBlocking {
+        val events = mutableListOf<String>()
+        val arbiter = MicArbiter(
+            pauseForegroundMic = { events.add("pause_fg") },
+            resumeForegroundMic = { events.add("resume_fg") },
+        )
+        arbiter.acquire(MicOwner.VOICE_COMMAND)
+        events.add("voice_start")
+
+        val waiter = async {
+            arbiter.withMicLease(MicOwner.OWNER_ENROLLMENT) {
+                events.add("enroll_capture")
+            }
+        }
+        delay(40L)
+        events.add("voice_end")
+        arbiter.release(MicOwner.VOICE_COMMAND)
+        waiter.await()
+
+        assertEquals(null, arbiter.activeOwner())
+        // Foreground mic must only resume ONCE at the very end when waitersCount == 0
+        assertEquals(1, events.count { it == "resume_fg" })
+        assertEquals("resume_fg", events.last())
+    }
+
+    @Test
     fun `speaker embedder computes 80-bin cmvn fbank and detects quiet enrollment rms`() {
         val sampleRate = 16_000
         val sineWave = FloatArray(sampleRate) { i ->
@@ -352,8 +379,7 @@ class M9ReliabilityAndAudioTests {
         val onnxFile = File(piperDir, "fa_IR.onnx")
         val jsonFile = File(piperDir, "fa_IR.onnx.json")
         val audioManager = SolAudioManager(context)
-        val systemTts = PersianTTS(context, audioManager)
-        val ttsManager = TtsManager(context, systemTts, audioManager)
+        val ttsManager = TtsManager(context, audioManager)
 
         try {
             onnxFile.writeBytes("FAKE_ONNX_MODEL".toByteArray())
@@ -384,9 +410,41 @@ class M9ReliabilityAndAudioTests {
             assertNotNull(status)
         } finally {
             ttsManager.release()
-            systemTts.shutdown()
             onnxFile.delete()
             jsonFile.delete()
         }
+    }
+
+    @Test
+    fun `official piper and campp downloads reject tampered sha256 payloads even without matching headers`(): Unit = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val fakeClient = SolHttpClient(
+            dnsResolver = publicDns(),
+            connectionOpener = { url -> FakeHeadHttpURLConnection(url, 200, "TAMPERED_PAYLOAD".toByteArray()) },
+            availableBytesProvider = { 4L * 1024L * 1024L * 1024L },
+        )
+
+        val audioManager = SolAudioManager(context)
+        val ttsManager = TtsManager(
+            context = context,
+            audioManager = audioManager,
+            httpClient = fakeClient,
+            availableBytesProvider = { 4L * 1024L * 1024L * 1024L },
+        )
+        ttsManager.disableAndDeletePiper()
+        val piperRes = ttsManager.downloadOfficialPiperModelSync()
+        assertTrue(piperRes.isFailure)
+        assertTrue(piperRes.exceptionOrNull() is SolNetworkException.IntegrityMismatchException)
+        ttsManager.release()
+
+        val speakerManager = SpeakerIdManager(
+            context = context,
+            httpClient = fakeClient,
+            availableBytesProvider = { 4L * 1024L * 1024L * 1024L },
+        )
+        speakerManager.deleteAllSpeakerData()
+        val speakerRes = speakerManager.ensureAndDownloadSpeakerModel()
+        assertTrue(speakerRes.isFailure)
+        assertTrue(speakerRes.exceptionOrNull() is SolNetworkException.IntegrityMismatchException)
     }
 }

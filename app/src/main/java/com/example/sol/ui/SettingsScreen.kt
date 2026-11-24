@@ -80,9 +80,6 @@ import com.example.sol.memory.VoicePersona
 import com.example.sol.security.RamUsageSnapshot
 import com.example.sol.security.SecurityAuditItem
 import com.example.sol.voice.AudioVolumeStatus
-import com.example.sol.voice.TtsAvailability
-import com.example.sol.voice.TtsEngineInfo
-import com.example.sol.voice.TtsVoiceInfo
 import com.example.sol.voice.VoskModelStatus
 import kotlin.math.roundToInt
 
@@ -90,11 +87,7 @@ import kotlin.math.roundToInt
 @Composable
 fun SettingsScreen(
     preferences: SolPreferences,
-    ttsAvailability: TtsAvailability,
     piperStatus: com.example.sol.tts.PiperTtsStatus,
-    availableTtsEngines: List<TtsEngineInfo>,
-    activeTtsEngineLabel: String,
-    persianVoices: List<TtsVoiceInfo>,
     voskModelStatus: VoskModelStatus,
     vocabularyTermsCount: Int,
     bookChunkCount: Int,
@@ -109,22 +102,21 @@ fun SettingsScreen(
     securityAudit: List<SecurityAuditItem>,
     onOwnerNameChange: (String) -> Unit,
     onVoicePersonaChange: (VoicePersona) -> Unit,
-    onSelectTtsEngine: (String) -> Unit,
-    onSelectTtsVoice: (String) -> Unit,
     onSpeechRateChange: (Float) -> Unit,
     onAutoSpeakChange: (Boolean) -> Unit,
     onTestVoice: () -> Unit,
-    onOpenSystemTtsSettings: () -> Unit,
-    onRecheckSystemTts: () -> Unit,
+    onDownloadPiperModel: () -> Unit,
     onPickPiperFiles: () -> Unit,
     onDeletePiperModel: () -> Unit,
     onAcceptPiperRisk: () -> Unit = {},
     onRejectPiperRisk: () -> Unit = {},
     speakerIdState: com.example.sol.speaker.SpeakerIdUiState,
+    onDownloadSpeakerModel: () -> Unit,
     onRecordOwnerVoice: () -> Unit,
     onClearOwnerVoice: () -> Unit,
     onPickSpeakerModel: () -> Unit,
     onTestSpeakerMic: () -> Unit = {},
+    onInstallAllVoiceModelsNow: () -> Unit = {},
     isMicServiceRunning: Boolean,
     onScreenOffMicToggle: (Boolean) -> Unit,
     onContinuousListeningToggle: (Boolean) -> Unit,
@@ -230,7 +222,13 @@ fun SettingsScreen(
                             ) {
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("دانلود یک‌باره مدل فارسی (~60MB)")
+                                Text("دانلود مدل فارسی (~53MB)")
+                            }
+                            OutlinedButton(
+                                onClick = onInstallAllVoiceModelsNow,
+                                modifier = Modifier.testTag("install_all_voice_models_button"),
+                            ) {
+                                Text("نصب خودکار همهٔ بخش‌های صوتی")
                             }
                             OutlinedButton(onClick = onPickVoskZip) {
                                 Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -936,136 +934,16 @@ fun SettingsScreen(
             }
         }
 
-        // 6. Voice & Speech Engine Settings (Phone System TTS / SherpaTTS)
+        // 6. Self-Contained Offline Persian Voice (Piper ONNX — zero system TTS dependency)
         item(key = "settings_tts_piper") {
-            SectionCard(title = "صدای Sol و اتصال به موتور گفتار گوشی (SherpaTTS / سیستم)") {
-                val engineSuffix = if (activeTtsEngineLabel.isNotBlank()) " — موتور فعال: $activeTtsEngineLabel" else ""
+            SectionCard(title = "صدای کاملاً خودکفا و آفلاین Sol (Piper ONNX)") {
                 Text(
-                    text = "${ttsAvailability.labelFa}$engineSuffix",
+                    text = "Sol دارای موتور صدای مستقل و کاملاً آفلاین است و به هیچ‌یک از موتورهای صدای گوشی یا اینترنت نیازی ندارد.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (ttsAvailability == TtsAvailability.READY_PERSIAN) {
-                        MaterialTheme.colorScheme.tertiary
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
 
-                if (ttsAvailability == TtsAvailability.MISSING_PERSIAN_DATA ||
-                    ttsAvailability == TtsAvailability.UNAVAILABLE
-                ) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text = "راهنما: Sol برای حفظ حجم سبک و حریم خصوصی موتور TTS داخلی ندارد. برای شنیدن پاسخ‌های فارسی، اپلیکیشن آزاد SherpaTTS (یا بسته صدای فارسی در تنظیمات صدای اندروید) را نصب و انتخاب کنید.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.padding(10.dp),
-                        )
-                    }
-                }
-
                 Spacer(modifier = Modifier.height(8.dp))
-                Text("انتخاب موتور صدای نصب‌شده روی گوشی:", style = MaterialTheme.typography.labelMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = preferences.preferredTtsEnginePackage.isBlank(),
-                        onClick = { onSelectTtsEngine("") },
-                        label = { Text("خودکار (SherpaTTS / پیش‌فرض)") },
-                    )
-                    availableTtsEngines.forEach { engineInfo ->
-                        FilterChip(
-                            selected = preferences.preferredTtsEnginePackage == engineInfo.packageName,
-                            onClick = { onSelectTtsEngine(engineInfo.packageName) },
-                            label = {
-                                val badge = when {
-                                    engineInfo.isSherpa -> " ★"
-                                    engineInfo.isDefault -> " (پیش‌فرض)"
-                                    else -> ""
-                                }
-                                Text("${engineInfo.label}$badge")
-                            },
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("سبک صدای Sol:", style = MaterialTheme.typography.labelMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    VoicePersona.entries.forEach { persona ->
-                        FilterChip(
-                            selected = preferences.voicePersona == persona,
-                            onClick = { onVoicePersonaChange(persona) },
-                            label = { Text(persona.labelFa) },
-                        )
-                    }
-                }
-
-                if (persianVoices.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text("صداهای فارسی در دسترس روی موتور فعلی:", style = MaterialTheme.typography.labelMedium)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        persianVoices.forEach { v ->
-                            FilterChip(
-                                selected = preferences.preferredTtsVoiceName == v.name,
-                                onClick = { onSelectTtsVoice(v.name) },
-                                label = {
-                                    val tag = if (v.isOffline) "آفلاین" else "شبکه"
-                                    Text("${v.localeTag} ($tag)")
-                                },
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text("سرعت گفتار", style = MaterialTheme.typography.bodyMedium)
-                    Text("${(preferences.speechRate * 100).roundToInt()}%", style = MaterialTheme.typography.labelMedium)
-                }
-                Slider(
-                    value = preferences.speechRate,
-                    onValueChange = onSpeechRateChange,
-                    valueRange = 0.65f..1.4f,
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("پاسخ صوتی خودکار", style = MaterialTheme.typography.bodyMedium)
-                    Switch(checked = preferences.autoSpeak, onCheckedChange = onAutoSpeakChange)
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(
-                        onClick = onTestVoice,
-                        modifier = Modifier.testTag("test_voice_button"),
-                    ) {
-                        Icon(Icons.Default.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("تست صدای Sol")
-                    }
-                    OutlinedButton(onClick = onRecheckSystemTts) {
-                        Text("بررسی مجدد صداهای گوشی")
-                    }
-                    OutlinedButton(onClick = onOpenSystemTtsSettings) {
-                        Text("تنظیمات صدای سیستم")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(12.dp),
@@ -1075,17 +953,24 @@ fun SettingsScreen(
                         modifier = Modifier.padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text(
-                            text = "موتور خودکفای Piper ONNX (آفلاین و بی‌نیاز از موتور سیستم)",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
                         when (piperStatus) {
                             is com.example.sol.tts.PiperTtsStatus.NotInstalled -> {
                                 Text(
-                                    text = "برای صدای فارسی کاملاً مستقل روی گوشی، دو فایل مدل (.onnx) و تنظیمات (.json) تأییدشده را انتخاب کنید.",
+                                    text = "صدای فارسی خودکفای Mana Piper (~۶۳ مگابایت) هنوز دریافت نشده است. با اولین نیاز به صحبت یا با لمس دکمه زیر، به‌صورت خودکار دانلود و با SHA-256 تأیید می‌شود.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            is com.example.sol.tts.PiperTtsStatus.Downloading -> {
+                                Text(
+                                    text = piperStatus.stageFa,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                LinearProgressIndicator(
+                                    progress = { piperStatus.progressPercent / 100f },
+                                    modifier = Modifier.fillMaxWidth(),
                                 )
                             }
                             is com.example.sol.tts.PiperTtsStatus.PartialSelection -> {
@@ -1140,21 +1025,43 @@ fun SettingsScreen(
                                 )
                             }
                         }
+
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
+                            if (piperStatus !is com.example.sol.tts.PiperTtsStatus.Ready &&
+                                piperStatus !is com.example.sol.tts.PiperTtsStatus.Downloading
+                            ) {
+                                Button(
+                                    onClick = onDownloadPiperModel,
+                                    modifier = Modifier.testTag("download_piper_button"),
+                                ) {
+                                    Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("دانلود خودکار صدای فارسی (~63MB)")
+                                }
+                            }
                             Button(
+                                onClick = onTestVoice,
+                                modifier = Modifier.testTag("test_voice_button"),
+                            ) {
+                                Icon(Icons.Default.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("تست صدای Sol")
+                            }
+                            OutlinedButton(
                                 onClick = onPickPiperFiles,
                                 modifier = Modifier.testTag("pick_piper_files_button"),
                             ) {
                                 Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("انتخاب فایل‌های Piper (.onnx و .json)")
+                                Text("انتخاب دستی (.onnx و .json)")
                             }
                             if (piperStatus is com.example.sol.tts.PiperTtsStatus.Ready ||
                                 piperStatus is com.example.sol.tts.PiperTtsStatus.PartialSelection ||
-                                piperStatus is com.example.sol.tts.PiperTtsStatus.NeedsRiskConfirmation
+                                piperStatus is com.example.sol.tts.PiperTtsStatus.NeedsRiskConfirmation ||
+                                piperStatus is com.example.sol.tts.PiperTtsStatus.Error
                             ) {
                                 OutlinedButton(
                                     onClick = onDeletePiperModel,
@@ -1166,12 +1073,47 @@ fun SettingsScreen(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text("سبک صدای Sol:", style = MaterialTheme.typography.labelMedium)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    VoicePersona.entries.forEach { persona ->
+                        FilterChip(
+                            selected = preferences.voicePersona == persona,
+                            onClick = { onVoicePersonaChange(persona) },
+                            label = { Text(persona.labelFa) },
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("سرعت گفتار", style = MaterialTheme.typography.bodyMedium)
+                    Text("${(preferences.speechRate * 100).roundToInt()}%", style = MaterialTheme.typography.labelMedium)
+                }
+                Slider(
+                    value = preferences.speechRate,
+                    onValueChange = onSpeechRateChange,
+                    valueRange = 0.65f..1.4f,
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("پاسخ صوتی خودکار", style = MaterialTheme.typography.bodyMedium)
+                    Switch(checked = preferences.autoSpeak, onCheckedChange = onAutoSpeakChange)
+                }
             }
         }
 
-        // 6b. Owner Speaker Verification (N5)
+        // 6b. Owner Speaker Verification (N5 — Self-contained CAM++)
         item(key = "settings_speaker_id") {
-            SectionCard(title = "شناسایی صدای مالک (N5 — امنیت دستورات صوتی)") {
+            SectionCard(title = "شناسایی صدای مالک (N5 — مدل خودکفای CAM++)") {
                 Text(
                     text = speakerIdState.statusLabelFa,
                     style = MaterialTheme.typography.bodySmall,
@@ -1184,10 +1126,35 @@ fun SettingsScreen(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "نکته: فایل‌های .onnx و .json در بخش «صدای Sol (Piper)» فقط برای حرف‌زدن Sol هستند. برای شناسایی صدای مالک، یک مدل ONNX استخراج بردار گوینده (ورودی صوت ۱۶kHz) لازم است؛ بردار صدای شما با AES-256 فقط روی گوشی نگهداری می‌شود و تا زمان انتخاب مدل گوینده، N5 در حالت Fail-safe غیرفعال است.",
+                    text = "Sol از مدل سبک و تأییدشدهٔ CAM++ (~۸.۶ مگابایت، با اثر انگشت SHA-256) استفاده می‌کند. با زدن «ضبط صدای من»، در صورت نبود مدل ابتدا به‌صورت خودکار دانلود و سپس صدای شما با رمزنگاری AES-256 روی گوشی ثبت می‌شود.",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (speakerIdState.isDownloadingModel) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("speaker_model_downloading_card"),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = "در حال دانلود و تأیید مدل شناسایی صدا (CAM++ • ${speakerIdState.downloadProgressPercent}٪)…",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            LinearProgressIndicator(
+                                progress = { speakerIdState.downloadProgressPercent / 100f },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
                 if (speakerIdState.isRecordingOwner) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Surface(
@@ -1253,29 +1220,46 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedButton(
-                        onClick = onPickSpeakerModel,
-                        modifier = Modifier.testTag("pick_speaker_model_button"),
-                    ) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (speakerIdState.isModelInstalled) "تغییر مدل گوینده (.onnx)" else "۱. انتخاب مدل گوینده (.onnx)")
-                    }
                     Button(
                         onClick = onRecordOwnerVoice,
-                        enabled = !speakerIdState.isRecordingOwner,
+                        enabled = !speakerIdState.isRecordingOwner && !speakerIdState.isDownloadingModel,
                         modifier = Modifier.testTag("record_owner_voice_button"),
                     ) {
                         Icon(Icons.Default.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (speakerIdState.isRecordingOwner) "در حال ضبط…" else "۲. ضبط صدای من")
+                        Text(
+                            when {
+                                speakerIdState.isDownloadingModel -> "در حال دانلود مدل…"
+                                speakerIdState.isRecordingOwner -> "در حال ضبط…"
+                                else -> "ضبط صدای من (نصب خودکار در صورت نیاز)"
+                            }
+                        )
+                    }
+                    if (!speakerIdState.isModelInstalled && !speakerIdState.isDownloadingModel) {
+                        OutlinedButton(
+                            onClick = onDownloadSpeakerModel,
+                            modifier = Modifier.testTag("download_speaker_model_button"),
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("دانلود مستقیم مدل CAM++ (~8.6MB)")
+                        }
                     }
                     OutlinedButton(
                         onClick = onTestSpeakerMic,
-                        enabled = !speakerIdState.isRecordingOwner,
+                        enabled = !speakerIdState.isRecordingOwner && !speakerIdState.isDownloadingModel,
                         modifier = Modifier.testTag("test_speaker_mic_button"),
                     ) {
                         Text("تست سلامت میکروفون")
+                    }
+                    OutlinedButton(
+                        onClick = onPickSpeakerModel,
+                        enabled = !speakerIdState.isDownloadingModel,
+                        modifier = Modifier.testTag("pick_speaker_model_button"),
+                    ) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("انتخاب دستی (.onnx)")
                     }
                     if (speakerIdState.isOwnerEnrolled) {
                         OutlinedButton(

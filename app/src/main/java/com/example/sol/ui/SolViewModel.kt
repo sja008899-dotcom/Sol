@@ -47,12 +47,11 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
     private val _hasNotificationPermission = MutableStateFlow(c.permissionManager.hasNotificationPermission())
     val hasNotificationPermission: StateFlow<Boolean> = _hasNotificationPermission.asStateFlow()
 
-    private var initialTtsSyncDone = false
-
     init {
         viewModelScope.launch(Dispatchers.IO) {
             val prefs = c.preferencesRepository.getSnapshot()
             c.historyRepository.enforceRetention(prefs.historyRetentionMode)
+            c.autoEnsureEssentialModelsIfOnline(forceRetryOnError = false)
         }
         viewModelScope.launch {
             c.uiBridge.events.collect { ev ->
@@ -78,12 +77,6 @@ class SolViewModel(application: Application) : AndroidViewModel(application) {
                     activeRoleName = activeRole,
                 )
                 c.voiceEngine.refreshBackend(prefs.voskOfflineEnabled)
-                if (!initialTtsSyncDone) {
-                    initialTtsSyncDone = true
-                    if (prefs.preferredTtsEnginePackage.isNotBlank()) {
-                        c.persianTts.connectToPhoneTts(prefs.preferredTtsEnginePackage)
-                    }
-                }
             }
         }
     }

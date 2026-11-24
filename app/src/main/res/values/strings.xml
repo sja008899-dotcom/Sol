@@ -69,8 +69,8 @@
     <string name="home_sol_speaking">Sol در حال صحبت است…</string>
     <string name="home_voice_idle_fmt">موتور صوتی: %1$s • برای فرمان صوتی دایره را لمس کنید</string>
     <string name="home_stop_sound">توقف صدا</string>
-    <string name="home_tts_missing_guide">صدای فارسی نصب نیست؛ برای پاسخ صوتی در تنظیمات صدای گوشی SherpaTTS یا داده فارسی را فعال کنید.</string>
-    <string name="home_sound_settings">تنظیمات صدا</string>
+    <string name="home_tts_missing_guide">صدای فارسی خودکفای Sol هنوز دریافت نشده؛ با یک ضربه به‌صورت خودکار و آفلاین نصب می‌شود.</string>
+    <string name="home_download_piper_voice">دانلود صدا</string>
     <string name="home_online_asr_warning">تشخیص گفتار سیستم (ممکن است از اینترنت استفاده کند — برای ۱۰۰٪ آفلاین Vosk را نصب کنید)</string>
     <string name="home_private_mode_badge">حالت خصوصی</string>
     <string name="home_slm_writing">هوش آفلاین در حال نگارش پاسخ…</string>

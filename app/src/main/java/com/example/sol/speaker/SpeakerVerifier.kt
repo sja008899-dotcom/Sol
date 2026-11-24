@@ -6,6 +6,9 @@ import android.content.pm.PackageManager
 import android.media.AudioRecord
 import android.net.Uri
 import androidx.core.content.ContextCompat
+import com.example.sol.network.SolHttpClient
+import com.example.sol.network.SolNetworkException
+import com.example.sol.network.SolStorageGuard
 import com.example.sol.voice.MicArbiter
 import com.example.sol.voice.MicOwner
 import com.example.sol.voice.SafeAudioCapture
@@ -15,6 +18,8 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.max
@@ -71,6 +76,8 @@ data class SpeakerIdUiState(
     val isModelInstalled: Boolean = false,
     val isOwnerEnrolled: Boolean = false,
     val isActive: Boolean = false,
+    val isDownloadingModel: Boolean = false,
+    val downloadProgressPercent: Int = 0,
     val isRecordingOwner: Boolean = false,
     val remainingSeconds: Int = 0,
     val liveRmsLevel: Float = 0f,
@@ -81,6 +88,7 @@ data class SpeakerIdUiState(
 
 /**
  * Coordinates N5 Speaker ID lifecycle cleanly:
+ * - Self-contained: automatically downloads & verifies CAM++ (campplus_zh_en_int8.onnx) when needed.
  * - Fail-safe: when either the speaker ONNX model or the encrypted owner profile is absent, N5 reports inactive and never blocks commands.
  * - Active gate: when both exist, voice audio is checked via [verifyVoicePcm] before executing commands in CommandBrain.
  */
@@ -91,8 +99,11 @@ class SpeakerIdManager(
     val embedder: SpeakerEmbedder = SpeakerEmbedder(modelFile),
     val verifier: SpeakerVerifier = SpeakerVerifier(),
     private val micArbiter: MicArbiter? = null,
+    private val httpClient: SolHttpClient = SolHttpClient(),
+    private val availableBytesProvider: (File) -> Long = SolStorageGuard::readAvailableBytes,
 ) {
     private val appContext = context.applicationContext
+    private val downloadMutex = Mutex()
 
     @Volatile
     private var lastFeedbackFa: String = ""
@@ -109,6 +120,8 @@ class SpeakerIdManager(
     fun refreshStatus() {
         val current = _uiState.value
         _uiState.value = computeStatus(
+            isDownloading = current.isDownloadingModel,
+            downloadPercent = current.downloadProgressPercent,
             isRecording = current.isRecordingOwner,
             remainingSeconds = current.remainingSeconds,
             liveRmsLevel = current.liveRmsLevel,
@@ -122,6 +135,8 @@ class SpeakerIdManager(
     }
 
     private fun computeStatus(
+        isDownloading: Boolean = false,
+        downloadPercent: Int = 0,
         isRecording: Boolean = false,
         remainingSeconds: Int = 0,
         liveRmsLevel: Float = 0f,
@@ -130,16 +145,19 @@ class SpeakerIdManager(
         val hasOwner = ownerProfile.exists()
         val active = hasModel && hasOwner
         val label = when {
+            isDownloading -> "در حال دانلود خودکار مدل شناسایی صدا (CAM++ • $downloadPercent٪)…"
             isRecording -> "در حال ضبط (${remainingSeconds.coerceAtLeast(1)} ثانیه باقی‌مانده — با صدای عادی صحبت کنید)…"
             active -> "✅ شناسایی صدای مالک (N5) فعال است؛ دستورات صوتی فقط برای صدای مالک اجرا می‌شوند."
-            hasModel && !hasOwner -> "N5 غیرفعال: مدل گوینده نصب است، اما هنوز نمونهٔ صدای مالک ضبط نشده است."
-            !hasModel && hasOwner -> "N5 غیرفعال: نمونهٔ صدای مالک ذخیره شده، اما مدل ONNX گوینده انتخاب نشده است."
-            else -> "N5 غیرفعال: مدل گوینده و نمونهٔ صدای مالک ثبت نشده‌اند (حالت Fail-safe بدون مسدودسازی)."
+            hasModel && !hasOwner -> "✅ مدل CAM++ آماده است؛ دکمه «ضبط صدای من» را بزنید تا N5 فعال شود."
+            !hasModel && hasOwner -> "نمونهٔ صدای مالک ذخیره شده؛ با اولین دانلود/ضبط، مدل CAM++ خودکار نصب می‌شود."
+            else -> "آمادهٔ راه‌اندازی خودکار: با زدن «ضبط صدای من»، مدل سبک CAM++ (~۸.۶MB) خودکار دانلود و صدای شما ثبت می‌شود."
         }
         return SpeakerIdUiState(
             isModelInstalled = hasModel,
             isOwnerEnrolled = hasOwner,
             isActive = active,
+            isDownloadingModel = isDownloading,
+            downloadProgressPercent = if (isDownloading) downloadPercent else 0,
             isRecordingOwner = isRecording,
             remainingSeconds = if (isRecording) remainingSeconds else 0,
             liveRmsLevel = if (isRecording) liveRmsLevel else 0f,
@@ -206,17 +224,111 @@ class SpeakerIdManager(
         Result.success(okMsg)
     }
 
+    suspend fun ensureAndDownloadSpeakerModel(
+        downloadUrl: String = SpeakerEmbedder.CAMPP_MODEL_URL,
+        expectedSha256: String = SpeakerEmbedder.EXPECTED_CAMPP_SHA256,
+        estimatedBytes: Long = SpeakerEmbedder.CAMPP_APPROX_BYTES,
+    ): Result<String> = withContext(Dispatchers.IO) {
+        downloadMutex.withLock {
+            if (embedder.isModelPresent && embedder.initialize()) {
+                val okMsg = "مدل شناسایی صدا (CAM++) آماده است."
+                setFeedback(okMsg, isError = false)
+                return@withLock Result.success(okMsg)
+            }
+            modelFile.parentFile?.mkdirs()
+            val partFile = File(modelFile.parentFile, "${modelFile.name}.part")
+            try {
+                lastFeedbackFa = ""
+                lastFeedbackIsError = false
+                _uiState.value = computeStatus(isDownloading = true, downloadPercent = 2)
+
+                val diskCheck = SolStorageGuard.checkFreeSpace(
+                    targetPath = modelFile.parentFile ?: modelFile,
+                    payloadBytes = estimatedBytes,
+                    availableBytesProvider = availableBytesProvider,
+                )
+                if (!diskCheck.hasEnoughSpace) {
+                    throw SolNetworkException.InsufficientDiskSpaceException(
+                        availableMb = diskCheck.availableMb,
+                        requiredMb = diskCheck.requiredMb,
+                    )
+                }
+
+                val headMeta = runCatching {
+                    httpClient.preflightHeadMetadata(downloadUrl, setOf("huggingface.co", "hf.co"))
+                }.getOrNull()
+
+                httpClient.downloadOfficialHttpsFileResult(
+                    urlString = downloadUrl,
+                    partFile = partFile,
+                    estimatedBytes = headMeta?.contentLengthBytes?.takeIf { it > 0L } ?: estimatedBytes,
+                    expectedSha256Override = expectedSha256,
+                    expectedBytesOverride = headMeta?.contentLengthBytes ?: -1L,
+                    allowedHostSuffixes = setOf("huggingface.co", "hf.co"),
+                    redirectAllowedHostSuffixes = SolHttpClient.DEFAULT_CDN_REDIRECT_HOSTS,
+                    onProgress = { pct, _, _ ->
+                        _uiState.value = computeStatus(
+                            isDownloading = true,
+                            downloadPercent = pct.coerceIn(5, 96),
+                        )
+                    },
+                )
+
+                val candidate = SpeakerEmbedder(partFile)
+                if (!candidate.initialize()) {
+                    val errFa = candidate.lastErrorFa.ifBlank { "فایل دانلودشده CAM++ معتبر نیست." }
+                    candidate.release()
+                    throw IllegalStateException(errFa)
+                }
+                candidate.release()
+
+                embedder.release()
+                if (modelFile.exists()) modelFile.delete()
+                if (!partFile.renameTo(modelFile)) {
+                    partFile.copyTo(modelFile, overwrite = true)
+                    partFile.delete()
+                }
+                check(embedder.initialize()) {
+                    embedder.lastErrorFa.ifBlank { "راه‌اندازی مدل شناسایی صدای CAM++ ناموفق بود." }
+                }
+
+                val okMsg = "مدل شناسایی صدای CAM++ با موفقیت دانلود و تأیید شد."
+                lastFeedbackFa = okMsg
+                lastFeedbackIsError = false
+                _uiState.value = computeStatus(isDownloading = false, downloadPercent = 0)
+                Result.success(okMsg)
+            } catch (t: Throwable) {
+                if (t !is SolNetworkException.TransportException && t !is SolNetworkException.CancelledException) {
+                    partFile.delete()
+                }
+                val msg = if (t is SolNetworkException) {
+                    "دانلود خودکار مدل شناسایی صدا ناموفق بود: ${t.userMessageFa}"
+                } else {
+                    t.localizedMessage ?: "دانلود خودکار مدل شناسایی صدای گوینده ناموفق بود."
+                }
+                lastFeedbackFa = msg
+                lastFeedbackIsError = true
+                _uiState.value = computeStatus(isDownloading = false, downloadPercent = 0)
+                Result.failure(t)
+            }
+        }
+    }
+
     @SuppressLint("MissingPermission")
     suspend fun recordAndEnrollOwner(durationMs: Long = DEFAULT_ENROLLMENT_DURATION_MS): Result<String> = withContext(Dispatchers.IO) {
-        if (!embedder.isModelPresent) {
-            val msg = "N5 غیرفعال است: فایل‌های Piper (.onnx و .json) فقط برای حرف‌زدن Sol هستند؛ برای ثبت صدای مالک ابتدا فایل مدل ONNX شناسایی گوینده را انتخاب کنید."
-            setFeedback(msg, isError = true)
-            return@withContext Result.failure(IllegalStateException(msg))
-        }
         if (!hasRecordAudioPermission()) {
             val msg = "مجوز میکروفون صادر نشده است؛ لطفاً ابتدا دسترسی ضبط صدا را بدهید."
             setFeedback(msg, isError = true)
             return@withContext Result.failure(SecurityException(msg))
+        }
+
+        if (!embedder.isModelPresent) {
+            val dlRes = ensureAndDownloadSpeakerModel()
+            if (dlRes.isFailure) {
+                return@withContext Result.failure(
+                    dlRes.exceptionOrNull() ?: IllegalStateException("دانلود خودکار مدل گوینده ناموفق بود.")
+                )
+            }
         }
 
         val wasMicServiceRunning = com.example.sol.voice.MicForegroundService.isRunning.value

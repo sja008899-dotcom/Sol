@@ -31,9 +31,10 @@ import com.example.sol.security.EncryptedBackupManager
 import com.example.sol.security.PermissionManager
 import com.example.sol.security.PrivacyManager
 import com.example.sol.security.SolMemoryOptimizer
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.example.sol.tasks.ConfirmationManager
 import com.example.sol.tasks.TaskManager
-import com.example.sol.voice.PersianTTS
 import com.example.sol.voice.SolAudioManager
 import com.example.sol.voice.VoiceEngine
 
@@ -78,11 +79,9 @@ class SolAppContainer(private val application: Application) {
     }
 
     val audioManager: SolAudioManager by lazy { SolAudioManager(application) }
-    val persianTts: PersianTTS by lazy { PersianTTS(application, audioManager) }
     val ttsManager: com.example.sol.tts.TtsManager by lazy {
         com.example.sol.tts.TtsManager(
             context = application,
-            systemTts = persianTts,
             audioManager = audioManager,
             trustedCustomHashesProvider = {
                 val p = preferencesRepository.getSnapshot()
@@ -111,7 +110,6 @@ class SolAppContainer(private val application: Application) {
             context = application,
             voskEngine = voskEngine,
             audioManager = audioManager,
-            persianTts = persianTts,
             isExternalSpeaking = { ttsManager.isPiperSpeaking.value },
             onStopExternalSpeech = { ttsManager.stop() },
             micArbiter = micArbiter,
@@ -282,6 +280,51 @@ class SolAppContainer(private val application: Application) {
         }
         voiceEngine.updateVocabularyBias(terms)
         voiceEngine.voskEngine.vocabularyBias.currentTermsCount()
+    }
+
+    fun hasInternetConnection(): Boolean {
+        val cm = application.getSystemService(ConnectivityManager::class.java) ?: return false
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    /**
+     * Self-contained voice bootstrap: whenever internet is reachable, automatically
+     * downloads and verifies Sol's internal Piper Persian TTS, CAM++ speaker embedder,
+     * and Vosk Persian offline ASR without requiring user file hunting or phone TTS engines.
+     */
+    suspend fun autoEnsureEssentialModelsIfOnline(
+        forceRetryOnError: Boolean = false,
+    ): Unit = withContext(Dispatchers.IO) {
+        if (!hasInternetConnection()) {
+            if (forceRetryOnError) {
+                uiBridge.postBanner("اینترنت متصل نیست؛ پس از اتصال، مدل‌های صوتی به‌صورت خودکار دانلود می‌شوند.")
+            }
+            return@withContext
+        }
+
+        val needsPiper = !ttsManager.isInstalledAndReady &&
+            (forceRetryOnError || ttsManager.piperStatus.value is com.example.sol.tts.PiperTtsStatus.NotInstalled)
+        if (needsPiper && ttsManager.piperStatus.value !is com.example.sol.tts.PiperTtsStatus.Downloading) {
+            ttsManager.downloadOfficialPiperModelSync()
+            uiBridge.triggerRefreshSnapshots()
+        }
+
+        val speakerState = speakerIdManager.uiState.value
+        val needsSpeaker = !speakerIdManager.embedder.isModelPresent && !speakerState.isDownloadingModel
+        if (needsSpeaker) {
+            speakerIdManager.ensureAndDownloadSpeakerModel()
+            uiBridge.triggerRefreshSnapshots()
+        }
+
+        val needsVosk = !voskEngine.isModelInstalled() &&
+            (forceRetryOnError || voskEngine.modelStatus.value is com.example.sol.voice.VoskModelStatus.NotInstalled)
+        if (needsVosk && voskEngine.modelStatus.value !is com.example.sol.voice.VoskModelStatus.Downloading) {
+            voskEngine.downloadPersianSmallModelSync(allowHttpsWithoutPinnedHash = true)
+            voiceEngine.refreshBackend(preferencesRepository.getSnapshot().voskOfflineEnabled)
+            uiBridge.triggerRefreshSnapshots()
+        }
     }
 }
 

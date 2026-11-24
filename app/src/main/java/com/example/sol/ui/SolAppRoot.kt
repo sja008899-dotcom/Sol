@@ -139,7 +139,6 @@ fun SolAppRoot(
     val pendingBookFetch by memoryViewModel.pendingBookFetch.collectAsStateWithLifecycle()
     val voiceRoleSession by memoryViewModel.voiceRoleSession.collectAsStateWithLifecycle()
     val pendingBackupRequest by backupViewModel.pendingBackupRequest.collectAsStateWithLifecycle()
-    val pendingVoskTierBConfirm by settingsViewModel.pendingVoskTierBConfirm.collectAsStateWithLifecycle()
     val pendingSlmTierBConfirm by slmViewModel.pendingSlmTierBConfirm.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -399,32 +398,6 @@ fun SolAppRoot(
                 )
             }
 
-            if (pendingVoskTierBConfirm) {
-                AlertDialog(
-                    onDismissRequest = settingsViewModel::dismissVoskTierBDownload,
-                    title = { Text("تأیید دریافت مدل گفتار Vosk") },
-                    text = {
-                        Text(
-                            "این فایل از منبع رسمی Alpha Cephei دریافت می‌شود ولی اثر انگشت از پیش تأییدشده ندارد " +
-                                "(حجم فایل در بازهٔ ۲۰ تا ۲۰۰ مگابایت بررسی و اثر انگشت پس از نصب ذخیره و قفل می‌شود). ادامه؟"
-                        )
-                    },
-                    confirmButton = {
-                        Button(
-                            onClick = settingsViewModel::confirmVoskTierBDownload,
-                            modifier = Modifier.testTag("confirm_vosk_tier_b_button"),
-                        ) {
-                            Text("ادامه و دانلود")
-                        }
-                    },
-                    dismissButton = {
-                        OutlinedButton(onClick = settingsViewModel::dismissVoskTierBDownload) {
-                            Text("لغو")
-                        }
-                    },
-                )
-            }
-
             pendingSlmTierBConfirm?.let { spec ->
                 AlertDialog(
                     onDismissRequest = slmViewModel::dismissSlmTierBDownload,
@@ -558,7 +531,7 @@ fun SolAppRoot(
                                     val micRms by chatViewModel.micRms.collectAsStateWithLifecycle()
                                     val activeAsrBackend by chatViewModel.activeAsrBackend.collectAsStateWithLifecycle()
                                     val voskModelStatus by chatViewModel.voskModelStatus.collectAsStateWithLifecycle()
-                                    val ttsAvailability by chatViewModel.ttsAvailability.collectAsStateWithLifecycle()
+                                    val piperStatus by chatViewModel.piperStatus.collectAsStateWithLifecycle()
                                     val isSpeaking by chatViewModel.isSpeaking.collectAsStateWithLifecycle()
                                     val isFetchingBook by memoryViewModel.isFetchingBook.collectAsStateWithLifecycle()
                                     val slmRuntimeState by chatViewModel.slmRuntimeState.collectAsStateWithLifecycle()
@@ -579,7 +552,7 @@ fun SolAppRoot(
                                         micRms = micRms,
                                         activeAsrBackend = activeAsrBackend,
                                         voskModelStatus = voskModelStatus,
-                                        ttsAvailability = ttsAvailability,
+                                        piperStatus = piperStatus,
                                         isSpeaking = isSpeaking,
                                         isFetchingBook = isFetchingBook,
                                         slmRuntimeState = slmRuntimeState,
@@ -604,13 +577,12 @@ fun SolAppRoot(
                                                     handleMicClick()
                                                 }
                                                 VoiceErrorAction.SWITCH_TO_TEXT_INPUT -> chatViewModel.clearVoiceError()
-                                                VoiceErrorAction.OPEN_TTS_OR_SYSTEM_SETTINGS -> settingsViewModel.openSystemTtsSettings()
                                             }
                                         },
                                         onClearVoiceError = chatViewModel::clearVoiceError,
                                         onSpeakMessage = chatViewModel::speakText,
                                         onStopSpeaking = chatViewModel::stopSpeaking,
-                                        onOpenSystemTtsSettings = settingsViewModel::openSystemTtsSettings,
+                                        onDownloadPiperModel = settingsViewModel::downloadPiperModel,
                                         onStopSlmGeneration = chatViewModel::stopSlmGeneration,
                                         onResetSlmConversation = chatViewModel::resetSlmConversation,
                                         onConfirmCurrentLocation = chatViewModel::confirmCurrentLocation,
@@ -692,12 +664,8 @@ fun SolAppRoot(
                                 }
 
                                 composable(ROUTE_SETTINGS) {
-                                    val ttsAvailability by chatViewModel.ttsAvailability.collectAsStateWithLifecycle()
                                     val voskModelStatus by chatViewModel.voskModelStatus.collectAsStateWithLifecycle()
                                     val piperStatus by settingsViewModel.piperStatus.collectAsStateWithLifecycle()
-                                    val availableTtsEngines by settingsViewModel.availableTtsEngines.collectAsStateWithLifecycle()
-                                    val activeTtsEngineLabel by settingsViewModel.activeTtsEngineLabel.collectAsStateWithLifecycle()
-                                    val persianVoices by settingsViewModel.persianVoices.collectAsStateWithLifecycle()
                                     val vocabularyTermsCount by settingsViewModel.vocabularyTermsCount.collectAsStateWithLifecycle()
                                     val bookChunkCount by settingsViewModel.bookChunkCount.collectAsStateWithLifecycle()
                                     val slmStatus by slmViewModel.slmStatus.collectAsStateWithLifecycle()
@@ -714,11 +682,7 @@ fun SolAppRoot(
 
                                     SettingsScreen(
                                         preferences = preferences,
-                                        ttsAvailability = ttsAvailability,
                                         piperStatus = piperStatus,
-                                        availableTtsEngines = availableTtsEngines,
-                                        activeTtsEngineLabel = activeTtsEngineLabel,
-                                        persianVoices = persianVoices,
                                         voskModelStatus = voskModelStatus,
                                         vocabularyTermsCount = vocabularyTermsCount,
                                         bookChunkCount = bookChunkCount,
@@ -733,13 +697,10 @@ fun SolAppRoot(
                                         securityAudit = securityAudit,
                                         onOwnerNameChange = settingsViewModel::setOwnerName,
                                         onVoicePersonaChange = settingsViewModel::setVoicePersona,
-                                        onSelectTtsEngine = settingsViewModel::setPreferredTtsEngine,
-                                        onSelectTtsVoice = settingsViewModel::setPreferredTtsVoice,
                                         onSpeechRateChange = settingsViewModel::setSpeechRate,
                                         onAutoSpeakChange = settingsViewModel::setAutoSpeak,
                                         onTestVoice = settingsViewModel::testVoiceSample,
-                                        onOpenSystemTtsSettings = settingsViewModel::openSystemTtsSettings,
-                                        onRecheckSystemTts = settingsViewModel::recheckSystemTts,
+                                        onDownloadPiperModel = settingsViewModel::downloadPiperModel,
                                         onPickPiperFiles = {
                                             piperFilesPickerLauncher.launch(arrayOf("*/*"))
                                         },
@@ -747,6 +708,7 @@ fun SolAppRoot(
                                         onAcceptPiperRisk = settingsViewModel::acceptCustomPiperWithRisk,
                                         onRejectPiperRisk = settingsViewModel::rejectCustomPiperWithRisk,
                                         speakerIdState = speakerIdState,
+                                        onDownloadSpeakerModel = settingsViewModel::downloadSpeakerModel,
                                         onRecordOwnerVoice = {
                                             if (hasMicPermission) {
                                                 settingsViewModel.recordOwnerVoice()
@@ -767,6 +729,7 @@ fun SolAppRoot(
                                         onPickSpeakerModel = {
                                             speakerModelPickerLauncher.launch(arrayOf("*/*"))
                                         },
+                                        onInstallAllVoiceModelsNow = settingsViewModel::installAllVoiceModelsNow,
                                         isMicServiceRunning = isMicServiceRunning,
                                         onScreenOffMicToggle = { enable ->
                                             if (enable && !hasMicPermission) {

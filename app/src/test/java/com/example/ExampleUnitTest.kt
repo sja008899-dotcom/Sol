@@ -8,10 +8,11 @@ import com.example.sol.knowledge.CapabilityCategory
 import com.example.sol.knowledge.LocalSlmEngine
 import com.example.sol.knowledge.SlmModelCatalog
 import com.example.sol.knowledge.SolCapabilitiesCatalog
-import com.example.sol.voice.PersianTTS
+import com.example.sol.speaker.SpeakerEmbedder
+import com.example.sol.tts.PiperConfig
+import com.example.sol.tts.TtsManager
 import com.example.sol.voice.VoiceEngine
 import com.example.sol.voice.VoiceVocabularyBias
-import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -94,16 +95,17 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun sherpaEngineAndPersianLocaleDetectionWorkCorrectly() {
-        assertTrue(PersianTTS.isSherpaEngine("org.woheller69.ttsengine", "SherpaTTS"))
-        assertTrue(PersianTTS.isSherpaEngine("com.k2fsa.sherpa.onnx.tts.engine", "Sherpa ONNX"))
-        assertFalse(PersianTTS.isSherpaEngine("com.samsung.SMT", "Samsung TTS"))
+    fun selfContainedPiperAndCampplusMetadataAndSentenceSplitWork() {
+        assertTrue(PiperConfig.OFFICIAL_ONNX_URL.startsWith("https://huggingface.co/MahtaFetrat/Mana-Persian-Piper/"))
+        assertTrue(PiperConfig.OFFICIAL_CONFIG_URL.endsWith(".onnx.json"))
+        assertEquals(64, PiperConfig.EXPECTED_ONNX_SHA256.length)
+        assertEquals(64, PiperConfig.EXPECTED_CONFIG_SHA256.length)
 
-        assertTrue(PersianTTS.isPersianLocale(Locale.forLanguageTag("fa-IR")))
-        assertTrue(PersianTTS.isPersianLocale(Locale.forLanguageTag("fa")))
-        assertTrue(PersianTTS.isPersianLocale(Locale.forLanguageTag("fas")))
-        assertTrue(PersianTTS.isPersianLocale(Locale.forLanguageTag("per")))
-        assertFalse(PersianTTS.isPersianLocale(Locale.forLanguageTag("en-US")))
+        assertTrue(SpeakerEmbedder.CAMPP_MODEL_URL.startsWith("https://huggingface.co/Luigi/campplus-zh-en-onnx/"))
+        assertEquals(64, SpeakerEmbedder.EXPECTED_CAMPP_SHA256.length)
+
+        val chunks = TtsManager.splitIntoSentences("سلام! حال شما چطور است؟ امروز ۱.۵ ساعت تمرین داریم.", maxChunkChars = 40)
+        assertTrue(chunks.size >= 2)
     }
 
     @Test

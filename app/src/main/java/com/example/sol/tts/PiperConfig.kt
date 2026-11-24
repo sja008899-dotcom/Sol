@@ -29,7 +29,10 @@ data class PiperConfig(
         phonemeIdMap.mapNotNull { (k, ids) -> ids.firstOrNull()?.let { k to it } }.toMap()
 
     companion object {
-        // User-confirmed SHA-256 checksums for Piper Persian model (.onnx) and config (.json)
+        // Verified SHA-256 checksums & official Hugging Face URLs for Mana Persian Piper model (.onnx + .onnx.json)
+        const val OFFICIAL_ONNX_URL = "https://huggingface.co/MahtaFetrat/Mana-Persian-Piper/resolve/main/fa_IR-mana-medium.onnx"
+        const val OFFICIAL_CONFIG_URL = "https://huggingface.co/MahtaFetrat/Mana-Persian-Piper/resolve/main/fa_IR-mana-medium.onnx.json"
+        const val OFFICIAL_APPROX_BYTES = 63_500_000L
         const val EXPECTED_ONNX_SHA256 = "e390c0e74ba71fd97c49ba662ee0c6e1724b462ba2d4561698af4f564840f126"
         const val EXPECTED_CONFIG_SHA256 = "d102276a05436613a05e1fbad8f125abcf8f56759aaf4fd36adf216653949997"
 

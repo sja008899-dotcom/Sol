@@ -134,16 +134,14 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `phone tts availability and sherpa engine preference persist alongside command brain memory lookup`() = runBlocking {
+    fun `self-contained piper tts status and voice persona persist alongside command brain memory lookup`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val app = context.applicationContext as SolApplication
         val c = app.container
 
-        assertTrue(com.example.sol.voice.TtsAvailability.READY_PERSIAN.labelFa.isNotBlank())
-        assertTrue(com.example.sol.voice.TtsAvailability.MISSING_PERSIAN_DATA.labelFa.contains("SherpaTTS"))
-
-        c.preferencesRepository.setPreferredTtsEnginePackage("org.woheller69.ttsengine")
-        assertEquals("org.woheller69.ttsengine", c.preferencesRepository.getSnapshot().preferredTtsEnginePackage)
+        assertFalse(c.ttsManager.isInstalledAndReady)
+        c.preferencesRepository.setVoicePersona(com.example.sol.memory.VoicePersona.MALE_FORMAL)
+        assertEquals(com.example.sol.memory.VoicePersona.MALE_FORMAL, c.preferencesRepository.getSnapshot().voicePersona)
 
         c.personRepository.savePerson(name = "رضا احمدی", phone = "09123456789", relation = "همکار")
         val personReply = c.commandBrain.process("شماره رضا احمدی چنده؟")

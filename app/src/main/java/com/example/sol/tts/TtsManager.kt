@@ -5,7 +5,10 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
 import com.example.sol.memory.VoicePersona
-import com.example.sol.voice.PersianTTS
+import com.example.sol.network.SolHttpClient
+import com.example.sol.network.SolNetworkException
+import com.example.sol.network.SolStorageGuard
+import com.example.sol.text.PersianNumbers
 import com.example.sol.voice.SolAudioManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,11 +18,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 
 sealed interface PiperTtsStatus {
     data object NotInstalled : PiperTtsStatus
+
+    data class Downloading(
+        val progressPercent: Int,
+        val stageFa: String,
+    ) : PiperTtsStatus
 
     data class PartialSelection(
         val noteFa: String,
@@ -44,14 +54,16 @@ sealed interface PiperTtsStatus {
 
 class TtsManager(
     context: Context,
-    private val systemTts: PersianTTS,
     private val audioManager: SolAudioManager,
+    private val httpClient: SolHttpClient = SolHttpClient(),
+    private val availableBytesProvider: (File) -> Long = SolStorageGuard::readAvailableBytes,
     private val trustedCustomHashesProvider: (suspend () -> Pair<String, String>?)? = null,
     private val onSaveTrustedCustomHashes: (suspend (onnxSha: String, configSha: String) -> Unit)? = null,
     private val onClearTrustedCustomHashes: (suspend () -> Unit)? = null,
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val downloadMutex = Mutex()
 
     private val piperDir = File(appContext.filesDir, "tts/piper")
     private val modelFile = File(piperDir, "fa_IR.onnx")
@@ -65,8 +77,22 @@ class TtsManager(
     @Volatile
     private var activeSpeakJob: Job? = null
 
+    @Volatile
+    private var activeDownloadJob: Job? = null
+
+    @Volatile
+    private var pendingAutoSpeakRequest: PendingAutoSpeak? = null
+
+    private data class PendingAutoSpeak(
+        val text: String,
+        val speechRate: Float,
+        val persona: VoicePersona,
+    )
+
     private val _isPiperSpeaking = MutableStateFlow(false)
     val isPiperSpeaking: StateFlow<Boolean> = _isPiperSpeaking.asStateFlow()
+
+    val isSpeaking: StateFlow<Boolean> = _isPiperSpeaking.asStateFlow()
 
     private val _piperStatus = MutableStateFlow<PiperTtsStatus>(PiperTtsStatus.NotInstalled)
     val piperStatus: StateFlow<PiperTtsStatus> = _piperStatus.asStateFlow()
@@ -75,6 +101,9 @@ class TtsManager(
         migrateLegacyPiperIfPresent()
         refreshInstalledPiper()
     }
+
+    val isInstalledAndReady: Boolean
+        get() = _piperStatus.value is PiperTtsStatus.Ready
 
     private fun migrateLegacyPiperIfPresent() {
         if (!legacyPiperDir.isDirectory) return
@@ -94,7 +123,9 @@ class TtsManager(
 
         if (!hasModel && !hasConfig) {
             piperEngine.release()
-            _piperStatus.value = PiperTtsStatus.NotInstalled
+            if (_piperStatus.value !is PiperTtsStatus.Downloading) {
+                _piperStatus.value = PiperTtsStatus.NotInstalled
+            }
             return false
         }
 
@@ -102,9 +133,9 @@ class TtsManager(
             piperEngine.release()
             _piperStatus.value = PiperTtsStatus.PartialSelection(
                 noteFa = if (hasModel) {
-                    "فایل مدل (.onnx) انتخاب شده؛ اکنون فایل تنظیمات JSON مربوط به همان مدل را نیز انتخاب کنید."
+                    "فایل مدل (.onnx) انتخاب شده؛ اکنون فایل تنظیمات JSON مربوط به همان مدل را نیز انتخاب کنید یا دانلود خودکار را بزنید."
                 } else {
-                    "فایل تنظیمات (.json) انتخاب شده؛ اکنون فایل مدل ONNX مربوط به همان صدا را نیز انتخاب کنید."
+                    "فایل تنظیمات (.json) انتخاب شده؛ اکنون فایل مدل ONNX مربوط به همان صدا را نیز انتخاب کنید یا دانلود خودکار را بزنید."
                 },
             )
             return false
@@ -166,10 +197,136 @@ class TtsManager(
         } else {
             _piperStatus.value = PiperTtsStatus.Error(
                 messageFa = piperEngine.lastErrorFa.ifBlank {
-                    "راه‌اندازی موتور Piper ناموفق بود؛ فایل ONNX و تنظیمات JSON را بررسی کنید."
+                    "راه‌اندازی موتور خودکفای Piper ناموفق بود؛ فایل ONNX و تنظیمات JSON را بررسی کنید."
                 },
             )
             false
+        }
+    }
+
+    fun downloadOfficialPiperModel(onReady: (() -> Unit)? = null) {
+        if (_piperStatus.value is PiperTtsStatus.Downloading || _piperStatus.value is PiperTtsStatus.Ready) {
+            if (_piperStatus.value is PiperTtsStatus.Ready) onReady?.invoke()
+            return
+        }
+        activeDownloadJob = scope.launch {
+            val res = downloadOfficialPiperModelSync()
+            if (res.isSuccess) {
+                onReady?.invoke()
+                val queued = pendingAutoSpeakRequest
+                pendingAutoSpeakRequest = null
+                if (queued != null) {
+                    speak(queued.text, queued.speechRate, queued.persona)
+                }
+            } else {
+                pendingAutoSpeakRequest = null
+            }
+        }
+    }
+
+    suspend fun downloadOfficialPiperModelSync(
+        onnxUrl: String = PiperConfig.OFFICIAL_ONNX_URL,
+        configUrl: String = PiperConfig.OFFICIAL_CONFIG_URL,
+        expectedOnnxSha256: String = PiperConfig.EXPECTED_ONNX_SHA256,
+        expectedConfigSha256: String = PiperConfig.EXPECTED_CONFIG_SHA256,
+        estimatedOnnxBytes: Long = PiperConfig.OFFICIAL_APPROX_BYTES,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        downloadMutex.withLock {
+            if (_piperStatus.value is PiperTtsStatus.Ready && piperEngine.isReady) {
+                return@withLock Result.success(Unit)
+            }
+            piperDir.mkdirs()
+            val configPart = File(piperDir, "fa_IR.onnx.json.part")
+            val onnxPart = File(piperDir, "fa_IR.onnx.part")
+            try {
+                _piperStatus.value = PiperTtsStatus.Downloading(
+                    progressPercent = 2,
+                    stageFa = "در حال دریافت تنظیمات صدای فارسی Piper (Mana)…",
+                )
+                val cfgHead = runCatching {
+                    httpClient.preflightHeadMetadata(configUrl, setOf("huggingface.co", "hf.co"))
+                }.getOrNull()
+                httpClient.downloadOfficialHttpsFileResult(
+                    urlString = configUrl,
+                    partFile = configPart,
+                    estimatedBytes = (cfgHead?.contentLengthBytes ?: 8_192L).coerceAtLeast(4_096L),
+                    expectedSha256Override = expectedConfigSha256,
+                    expectedBytesOverride = cfgHead?.contentLengthBytes ?: -1L,
+                    allowedHostSuffixes = setOf("huggingface.co", "hf.co"),
+                    redirectAllowedHostSuffixes = SolHttpClient.DEFAULT_CDN_REDIRECT_HOSTS,
+                )
+                PiperConfig.parse(configPart)
+
+                val diskCheck = SolStorageGuard.checkFreeSpace(
+                    targetPath = piperDir,
+                    payloadBytes = estimatedOnnxBytes,
+                    availableBytesProvider = availableBytesProvider,
+                )
+                if (!diskCheck.hasEnoughSpace) {
+                    throw SolNetworkException.InsufficientDiskSpaceException(
+                        availableMb = diskCheck.availableMb,
+                        requiredMb = diskCheck.requiredMb,
+                    )
+                }
+
+                _piperStatus.value = PiperTtsStatus.Downloading(
+                    progressPercent = 5,
+                    stageFa = "در حال دانلود صدای خودکفای فارسی Piper (~63MB)…",
+                )
+                val onnxHead = runCatching {
+                    httpClient.preflightHeadMetadata(onnxUrl, setOf("huggingface.co", "hf.co"))
+                }.getOrNull()
+                httpClient.downloadOfficialHttpsFileResult(
+                    urlString = onnxUrl,
+                    partFile = onnxPart,
+                    estimatedBytes = onnxHead?.contentLengthBytes?.takeIf { it > 0L } ?: estimatedOnnxBytes,
+                    expectedSha256Override = expectedOnnxSha256,
+                    expectedBytesOverride = onnxHead?.contentLengthBytes ?: -1L,
+                    allowedHostSuffixes = setOf("huggingface.co", "hf.co"),
+                    redirectAllowedHostSuffixes = SolHttpClient.DEFAULT_CDN_REDIRECT_HOSTS,
+                    onProgress = { pct, doneBytes, totalBytes ->
+                        val doneMb = (doneBytes / (1024L * 1024L)).coerceAtLeast(0L)
+                        val totalMb = (totalBytes / (1024L * 1024L)).coerceAtLeast(1L)
+                        _piperStatus.value = PiperTtsStatus.Downloading(
+                            progressPercent = pct.coerceIn(5, 96),
+                            stageFa = "در حال دانلود صدای فارسی Piper ($doneMb/$totalMb MB • $pct٪)…",
+                        )
+                    },
+                )
+
+                _piperStatus.value = PiperTtsStatus.Downloading(
+                    progressPercent = 98,
+                    stageFa = "در حال تأیید اثر انگشت SHA-256 و فعال‌سازی Piper…",
+                )
+                piperEngine.release()
+                if (configFile.exists()) configFile.delete()
+                if (!configPart.renameTo(configFile)) {
+                    configPart.copyTo(configFile, overwrite = true)
+                    configPart.delete()
+                }
+                if (modelFile.exists()) modelFile.delete()
+                if (!onnxPart.renameTo(modelFile)) {
+                    onnxPart.copyTo(modelFile, overwrite = true)
+                    onnxPart.delete()
+                }
+
+                check(refreshInstalledPiper()) {
+                    piperEngine.lastErrorFa.ifBlank { "راه‌اندازی موتور صدای Piper پس از دانلود ناموفق بود." }
+                }
+                Result.success(Unit)
+            } catch (err: Throwable) {
+                if (err !is SolNetworkException.TransportException && err !is SolNetworkException.CancelledException) {
+                    configPart.delete()
+                    onnxPart.delete()
+                }
+                val msg = if (err is SolNetworkException) {
+                    err.userMessageFa
+                } else {
+                    "دانلود صدای خودکفای Piper ناموفق بود: ${err.localizedMessage ?: "خطای شبکه یا فایل"}"
+                }
+                _piperStatus.value = PiperTtsStatus.Error(msg)
+                Result.failure(err)
+            }
         }
     }
 
@@ -200,7 +357,6 @@ class TtsManager(
         text: String,
         speechRate: Float = 1.0f,
         persona: VoicePersona = VoicePersona.FEMALE_CALM,
-        preferredVoiceName: String = "",
     ) {
         if (text.isBlank()) return
 
@@ -214,14 +370,57 @@ class TtsManager(
             )
 
         if (readyOrLazyInit) {
-            speakWithPiper(text, speechRate, persona, preferredVoiceName)
-        } else {
-            speakWithSystem(
-                text = text,
-                speechRate = speechRate,
-                persona = persona,
-                preferredVoiceName = preferredVoiceName,
-            )
+            val cleanText = PersianNumbers.prepareTextForTts(text).ifBlank { text }
+            speakWithPiper(cleanText, speechRate, persona)
+        } else if (_piperStatus.value is PiperTtsStatus.NotInstalled ||
+            _piperStatus.value is PiperTtsStatus.Error ||
+            _piperStatus.value is PiperTtsStatus.Downloading
+        ) {
+            // 100% self-contained: automatically download official verified Piper model and then speak!
+            pendingAutoSpeakRequest = PendingAutoSpeak(text, speechRate, persona)
+            if (_piperStatus.value !is PiperTtsStatus.Downloading) {
+                downloadOfficialPiperModel()
+            }
+        }
+    }
+
+    suspend fun speakBlocking(
+        text: String,
+        speechRate: Float = 1.0f,
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (text.isBlank()) return@withContext false
+        if (!piperEngine.isReady) {
+            val ready = refreshInstalledPiper()
+            if (!ready) {
+                val dl = downloadOfficialPiperModelSync()
+                if (dl.isFailure) return@withContext false
+            }
+        }
+        val cleanText = PersianNumbers.prepareTextForTts(text).ifBlank { text }
+        val grantedFocus = audioManager.requestSpeakingFocus {
+            piperEngine.stop()
+            _isPiperSpeaking.value = false
+        }
+        _isPiperSpeaking.value = true
+        return@withContext try {
+            val segments = splitForSynthesis(cleanText)
+            var ok = true
+            for (segment in segments) {
+                val pcm = piperEngine.synthesize(segment, speechRate = speechRate)
+                if (pcm == null || pcm.isEmpty() || !piperEngine.play(pcm, piperEngine.sampleRate)) {
+                    ok = false
+                    break
+                }
+            }
+            ok
+        } catch (t: Throwable) {
+            Log.e(TAG, "خطا در تولید یا پخش صدای پس‌زمینه Piper", t)
+            false
+        } finally {
+            _isPiperSpeaking.value = false
+            if (grantedFocus) {
+                audioManager.abandonSpeakingFocus()
+            }
         }
     }
 
@@ -229,14 +428,19 @@ class TtsManager(
         text: String,
         speechRate: Float,
         persona: VoicePersona,
-        preferredVoiceName: String,
     ) {
         activeSpeakJob?.cancel()
         piperEngine.stop()
         _isPiperSpeaking.value = true
 
+        val personaRateOffset = when (persona) {
+            VoicePersona.FEMALE_CALM -> 0.96f
+            VoicePersona.MALE_FORMAL -> 0.92f
+            VoicePersona.NEUTRAL_FRIENDLY -> 1.0f
+        }
+        val effectiveRate = (speechRate * personaRateOffset).coerceIn(0.65f, 1.5f)
+
         activeSpeakJob = scope.launch {
-            var shouldFallbackToSystem = false
             val grantedFocus = audioManager.requestSpeakingFocus {
                 piperEngine.stop()
                 _isPiperSpeaking.value = false
@@ -244,60 +448,34 @@ class TtsManager(
             try {
                 val segments = splitForSynthesis(text)
                 for (segment in segments) {
-                    val pcm = piperEngine.synthesize(segment, speechRate = speechRate)
+                    val pcm = piperEngine.synthesize(segment, speechRate = effectiveRate)
                     if (pcm == null || pcm.isEmpty() || !piperEngine.play(pcm, piperEngine.sampleRate)) {
-                        shouldFallbackToSystem = true
                         break
                     }
                 }
             } catch (t: Throwable) {
                 Log.e(TAG, "خطا در تولید یا پخش صدای Piper", t)
-                shouldFallbackToSystem = true
             } finally {
                 _isPiperSpeaking.value = false
                 if (grantedFocus) {
                     audioManager.abandonSpeakingFocus()
                 }
             }
-            if (shouldFallbackToSystem) {
-                withContext(Dispatchers.Main) {
-                    speakWithSystem(
-                        text = text,
-                        speechRate = speechRate,
-                        persona = persona,
-                        preferredVoiceName = preferredVoiceName,
-                    )
-                }
-            }
         }
     }
 
-    fun speakWithSystem(
-        text: String,
-        speechRate: Float = 1.0f,
-        persona: VoicePersona = VoicePersona.FEMALE_CALM,
-        preferredVoiceName: String = "",
-        onDone: (() -> Unit)? = null,
-    ) {
-        systemTts.speak(
-            text = text,
-            speechRate = speechRate,
-            persona = persona,
-            preferredVoiceName = preferredVoiceName,
-        )
-        onDone?.invoke()
-    }
-
     fun stop() {
+        pendingAutoSpeakRequest = null
         activeSpeakJob?.cancel()
         activeSpeakJob = null
         piperEngine.stop()
-        systemTts.stop()
         _isPiperSpeaking.value = false
         audioManager.abandonSpeakingFocus()
     }
 
     fun disableAndDeletePiper() {
+        activeDownloadJob?.cancel()
+        activeDownloadJob = null
         stop()
         piperEngine.release()
         runCatching { piperDir.deleteRecursively() }
@@ -345,7 +523,8 @@ class TtsManager(
 
             val activated = refreshInstalledPiper()
             when (val status = _piperStatus.value) {
-                is PiperTtsStatus.Ready -> Result.success("مدل Piper با موفقیت فعال شد.")
+                is PiperTtsStatus.Ready -> Result.success("مدل خودکفای Piper با موفقیت فعال شد.")
+                is PiperTtsStatus.Downloading -> Result.success(status.stageFa)
                 is PiperTtsStatus.PartialSelection -> Result.success(status.noteFa)
                 is PiperTtsStatus.NeedsRiskConfirmation -> Result.success(status.reasonFa)
                 is PiperTtsStatus.Error -> Result.failure(IllegalStateException(status.messageFa))
@@ -373,44 +552,64 @@ class TtsManager(
     }
 
     fun release() {
+        activeDownloadJob?.cancel()
+        activeDownloadJob = null
         stop()
         piperEngine.release()
     }
 
     companion object {
         private const val TAG = "TtsManager"
+        private val SENTENCE_SPLIT_REGEX = Regex("(?:(?<!\\d)\\.(?!\\d)|[؟?!؛;\\n])+")
 
-        internal fun splitForSynthesis(text: String, maxChunkChars: Int = 260): List<String> {
-            val cleaned = text.trim()
-            if (cleaned.length <= maxChunkChars) return listOf(cleaned)
-            val result = mutableListOf<String>()
-            val current = StringBuilder()
-            val parts = cleaned.split(Regex("(?<=[.؟!؛\\n])\\s*"))
-            for (part in parts) {
-                val trimmed = part.trim()
-                if (trimmed.isEmpty()) continue
-                if (current.length + trimmed.length + 1 <= maxChunkChars) {
-                    if (current.isNotEmpty()) current.append(' ')
-                    current.append(trimmed)
+        internal fun splitForSynthesis(text: String, maxChunkChars: Int = 260): List<String> =
+            splitIntoSentences(text, maxChunkChars)
+
+        fun splitIntoSentences(text: String, maxChunkChars: Int = 320): List<String> {
+            val normalized = text.replace(Regex("\\s+"), " ").trim()
+            if (normalized.isEmpty()) return emptyList()
+
+            val rawPieces = normalized
+                .split(SENTENCE_SPLIT_REGEX)
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+
+            if (rawPieces.isEmpty()) return listOf(normalized.take(maxChunkChars))
+
+            val boundedPieces = mutableListOf<String>()
+            for (piece in rawPieces) {
+                if (piece.length <= maxChunkChars) {
+                    boundedPieces.add(piece)
                 } else {
-                    if (current.isNotEmpty()) {
-                        result.add(current.toString())
-                        current.clear()
+                    var remaining = piece
+                    while (remaining.length > maxChunkChars) {
+                        val window = remaining.substring(0, maxChunkChars)
+                        val splitAt = listOf(
+                            window.lastIndexOf('،'),
+                            window.lastIndexOf(','),
+                            window.lastIndexOf(' '),
+                        ).maxOrNull()?.takeIf { it > maxChunkChars / 3 } ?: maxChunkChars
+                        boundedPieces.add(remaining.substring(0, splitAt).trim())
+                        remaining = remaining.substring(splitAt).trim()
                     }
-                    if (trimmed.length <= maxChunkChars) {
-                        current.append(trimmed)
-                    } else {
-                        var start = 0
-                        while (start < trimmed.length) {
-                            val end = (start + maxChunkChars).coerceAtMost(trimmed.length)
-                            result.add(trimmed.substring(start, end))
-                            start = end
-                        }
+                    if (remaining.isNotEmpty()) {
+                        boundedPieces.add(remaining)
                     }
                 }
             }
-            if (current.isNotEmpty()) result.add(current.toString())
-            return result.ifEmpty { listOf(cleaned) }
+
+            val merged = mutableListOf<String>()
+            for (piece in boundedPieces) {
+                val last = merged.lastOrNull()
+                if (last != null && (last.length < 18 || piece.length < 18) &&
+                    last.length + piece.length + 2 <= maxChunkChars
+                ) {
+                    merged[merged.lastIndex] = "$last، $piece"
+                } else {
+                    merged.add(piece)
+                }
+            }
+            return merged
         }
     }
 }
