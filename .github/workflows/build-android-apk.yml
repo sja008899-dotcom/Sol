@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up JDK 21
         uses: actions/setup-java@0f481fcb613427c0f801b606911222b5b6f3083a # v5.5.0
@@ -34,7 +34,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
 
-      - name: Accept Android SDK Licenses & Install SDK 36.1
+      - name: Accept Android SDK Licenses & Install SDK 36 / 36.1
         run: |
           SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
           SDK_MANAGER="$(command -v sdkmanager || find "${SDK_ROOT}" -maxdepth 4 -type f -name sdkmanager 2>/dev/null | head -n 1)"
@@ -44,10 +44,13 @@ jobs:
           fi
           echo "Using sdkmanager: ${SDK_MANAGER}"
           (yes || true) | "${SDK_MANAGER}" --licenses >/dev/null
-          "${SDK_MANAGER}" --install "platform-tools" "build-tools;36.0.0" "platforms;android-36.1"
+          "${SDK_MANAGER}" --install "platform-tools" "build-tools;36.0.0" "platforms;android-36"
+          "${SDK_MANAGER}" --install "platforms;android-36.1" || true
 
       - name: Set up Gradle Wrapper & Cache
-        uses: gradle/actions/setup-gradle@4d9f0ba0025fe599b4ebab900eb7f3a1d93ef4c2 # v5.0.0
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-provider: basic
 
       - name: Prepare Deterministic Debug Keystore & Env
         env:
@@ -64,7 +67,7 @@ jobs:
           elif [ -s debug.keystore ]; then
             echo "Using existing debug.keystore."
           else
-            echo "::warning::Neither DEBUG_KEYSTORE_BASE64 secret nor debug.keystore.base64 was found; generating a CI debug.keystore. Add DEBUG_KEYSTORE_BASE64 secret or commit debug.keystore.base64 for consistent debug signing across runs."
+            echo "::warning::Neither DEBUG_KEYSTORE_BASE64 secret nor debug.keystore.base64 was found; generating a CI debug.keystore."
             keytool -genkeypair -noprompt \
               -keystore debug.keystore \
               -storepass android \
@@ -89,10 +92,9 @@ jobs:
         run: |
           JACOCO_XML="app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml"
           if [ -f "${JACOCO_XML}" ]; then
-            python3 - <<'PY'
+            python3 -c '
           import xml.etree.ElementTree as ET
-          tree = ET.parse("app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml")
-          root = tree.getroot()
+          root = ET.parse("app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml").getroot()
           print("=== JaCoCo Coverage Summary (app/debugUnitTest) ===")
           for c in root.findall("counter"):
               ctype = c.attrib["type"]
@@ -101,7 +103,7 @@ jobs:
               total = missed + covered
               pct = (100.0 * covered / total) if total else 0.0
               print(f"{ctype:12s}: {covered}/{total} ({pct:.2f}%)")
-          PY
+          '
           else
             echo "JaCoCo XML report not found."
           fi
@@ -144,7 +146,7 @@ jobs:
           ls -lh release-apks/
 
       - name: Upload Sol APKs & Checksums
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Sol-Android-APK
           path: |
@@ -154,7 +156,7 @@ jobs:
 
       - name: Upload Test, Lint, Detekt & JaCoCo Reports
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Sol-Verification-Reports
           path: |
@@ -181,7 +183,7 @@ jobs:
           path: release-apks
 
       - name: Publish Release Files
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: |
             release-apks/*.apk
