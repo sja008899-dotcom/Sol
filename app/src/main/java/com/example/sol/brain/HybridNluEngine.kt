@@ -125,8 +125,15 @@ class HybridNluEngine(
         }
 
         // 3. Pure statistical rescue / ambiguity / out-of-scope gate when rules did not fire
+        val ctx = MatchContext.create(raw, lexicon)
+        if (OWNER_NAME_QUERY_REGEX.containsMatchIn(ctx.normalized)) {
+            return NluDecision.LowConfidence(
+                rawText = raw,
+                normalizedText = ctx.normalized,
+                topScore = 0f,
+            )
+        }
         if (topStat == null || (outOfScopeStat >= topStat.score - 0.02f && topStat.score < config.highScoreThreshold)) {
-            val ctx = MatchContext.create(raw, lexicon)
             return NluDecision.LowConfidence(
                 rawText = raw,
                 normalizedText = ctx.normalized,
@@ -161,7 +168,6 @@ class HybridNluEngine(
             )
         }
 
-        val ctx = MatchContext.create(raw, lexicon)
         return NluDecision.LowConfidence(
             rawText = raw,
             normalizedText = ctx.normalized,
@@ -185,6 +191,10 @@ class HybridNluEngine(
     }
 
     companion object {
+        private val OWNER_NAME_QUERY_REGEX = Regex(
+            "(?:اسم\\s+من\\s+(?:چیه|چیست)|نام\\s+من\\s+(?:چیه|چیست)|اسمم\\s+(?:چیه|چیست)|نامم\\s+(?:چیه|چیست)|من\\s+کی\\s*ام|من\\s+کی\\s+هستم)"
+        )
+
         fun actionLabelFa(action: SolAction): String = when (action) {
             SolAction.GREETING -> "احوال‌پرسی"
             SolAction.IDENTITY -> "معرفی Sol"
