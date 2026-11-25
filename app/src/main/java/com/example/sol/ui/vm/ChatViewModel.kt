@@ -298,7 +298,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 val res = c.localSlmEngine.generateReplyStream(
-                    userPrompt = task.userPrompt,
+                    userPrompt = com.example.sol.knowledge.SlmPromptBuilder.buildChatUserPrompt(task.userPrompt),
                     systemInstruction = task.systemInstruction,
                     preferredPath = prefs.slmModelPath,
                     preferGpu = prefs.slmPreferGpu,

@@ -257,8 +257,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun testVoiceSample() {
         viewModelScope.launch {
             val prefs = c.preferencesRepository.getSnapshot()
+            val owner = prefs.ownerName.trim().ifBlank { "دوست عزیز" }
             c.ttsManager.speak(
-                text = "سلام ${prefs.ownerName}. من Sol دستیار شخصی شما هستم.",
+                text = "سلام $owner. من سول، دستیار شخصی شما هستم.",
                 speechRate = prefs.speechRate,
                 persona = prefs.voicePersona,
             )

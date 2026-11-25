@@ -456,4 +456,91 @@ class M9ReliabilityAndAudioTests {
         assertFalse(speakerManager.uiState.value.isModelInstalled)
         speakerManager.deleteAllSpeakerData()
     }
+
+    @Test
+    fun `persian phonemizer achieves full coverage on fa_IR mana medium espeak inventory and splits affricates`() {
+        val manaEspeakKeys = listOf(
+            "_", "^", "$", " ", "!", ",", ".", ";", ":", "?",
+            "a", "b", "d", "e", "f", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r",
+            "s", "t", "u", "v", "x", "z", "ɑ", "ɡ", "ʃ", "ʒ", "ʔ", "ˈ", "ˌ", "ː",
+            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+        )
+        val cfg = PiperConfig(
+            sampleRate = 22_050,
+            numSymbols = 256,
+            numSpeakers = 1,
+            phonemeType = "espeak",
+            phonemeIdMap = manaEspeakKeys.mapIndexed { idx, sym -> sym to listOf(idx) }.toMap(),
+            audio = AudioConfig(quality = "medium", sampleRate = 22_050),
+            noiseScale = 0.667f,
+            lengthScale = 1.0f,
+            noiseW = 0.8f,
+        )
+
+        val samples = listOf(
+            "سلام جواد. من سول، دستیار شخصی شما هستم.",
+            "تقویم فارسی و چراغ‌قوه و ساعت ۱۴:۳۰",
+            "چه خبر؟",
+        )
+        for (sample in samples) {
+            val prepared = com.example.sol.text.PersianNumbers.prepareTextForTts(sample)
+            val report = PersianPhonemizer.toPhonemeIdsWithReport(prepared, cfg)
+            assertTrue("Expected non-empty IDs for '$sample'", report.ids.isNotEmpty())
+            assertTrue("Missing tokens for '$sample': ${report.missingTokens}", report.missingTokens.isEmpty())
+            assertEquals(1.0f, report.coverageRatio, 0.0001f)
+        }
+
+        // Verify affricates 'ج' -> ["d", "ʒ"] and 'چ' -> ["t", "ʃ"] and eSpeak fa vowels 'ɑ'/'a'/'r'/'q'/'ɡ'
+        val introReport = PersianPhonemizer.toPhonemeIdsWithReport("سلام جواد، چراغ", cfg)
+        assertTrue(introReport.missingTokens.isEmpty())
+        val map = cfg.phonemeIdMap
+        val idList = introReport.ids.toList()
+        assertTrue("Expected 'd' ID for ج", idList.contains(map.getValue("d").first().toLong()))
+        assertTrue("Expected 'ʒ' ID for ج", idList.contains(map.getValue("ʒ").first().toLong()))
+        assertTrue("Expected 't' ID for چ", idList.contains(map.getValue("t").first().toLong()))
+        assertTrue("Expected 'ʃ' ID for چ", idList.contains(map.getValue("ʃ").first().toLong()))
+        assertTrue("Expected 'ɑ' ID for آ/ا", idList.contains(map.getValue("ɑ").first().toLong()))
+        assertTrue("Expected 'r' ID for ر", idList.contains(map.getValue("r").first().toLong()))
+        assertTrue("Expected 'q' ID for غ/ق", idList.contains(map.getValue("q").first().toLong()))
+    }
+
+    @Test
+    fun `prepareTextForTts converts Sol branding and technical English terms to spoken Persian`() {
+        val raw = "سلام، من Sol v2 هستم با Piper و Vosk و CAM++ و مدیریت RAM."
+        val prepared = com.example.sol.text.PersianNumbers.prepareTextForTts(raw)
+        assertTrue("Expected سول نسخه دو, got: $prepared", prepared.contains("سول نسخه دو"))
+        assertTrue("Expected پایپر, got: $prepared", prepared.contains("پایپر"))
+        assertTrue("Expected واسک, got: $prepared", prepared.contains("واسک"))
+        assertTrue("Expected رم, got: $prepared", prepared.contains("رم"))
+        assertFalse("Latin Sol should not remain: $prepared", prepared.contains("Sol", ignoreCase = true))
+        assertFalse("Latin Piper should not remain: $prepared", prepared.contains("Piper", ignoreCase = true))
+        assertFalse("Latin Vosk should not remain: $prepared", prepared.contains("Vosk", ignoreCase = true))
+    }
+
+    @Test
+    fun `persian owner name and memory fact learning and recall work end to end`(): Unit = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val app = context.applicationContext as SolApplication
+        val c = app.container
+
+        val initialOwner = c.preferencesRepository.getSnapshot().ownerName
+        try {
+            val teachName = c.commandBrain.processDialogue("اسم من جواد است")
+            assertEquals(com.example.sol.brain.SolAction.LEARN_FACT, teachName.parsedCommand.action)
+            assertTrue("Expected جواد in reply: ${teachName.replyText}", teachName.replyText.contains("جواد"))
+
+            val askName = c.commandBrain.processDialogue("اسم من چیه؟")
+            assertTrue("Expected stored owner name جواد in reply: ${askName.replyText}", askName.replyText.contains("جواد"))
+
+            val teachFact = c.commandBrain.processDialogue("به خاطر بسپار کد درب پارکینگ ۶۵۴۳ است")
+            assertEquals(com.example.sol.brain.SolAction.LEARN_FACT, teachFact.parsedCommand.action)
+
+            val askFact = c.commandBrain.processDialogue("کد درب پارکینگ چنده؟")
+            assertTrue("Expected stored parking code in reply: ${askFact.replyText}", askFact.replyText.contains("۶۵۴۳") || askFact.replyText.contains("6543"))
+        } finally {
+            c.preferencesRepository.setOwnerName(initialOwner)
+            c.learningEngine.forget("کد درب پارکینگ")
+            c.dialogueManager.clearHistory()
+        }
+    }
 }

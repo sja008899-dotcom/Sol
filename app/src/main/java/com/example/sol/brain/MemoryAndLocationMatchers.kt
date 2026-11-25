@@ -47,25 +47,28 @@ internal class LearnFactMatcher : IntentMatcher {
 
     override fun match(ctx: MatchContext): MatchResult? {
         val ownerNameMatch = OWNER_NAME_REGEX.find(ctx.cleaned)
+            ?: OWNER_NAME_CHANGE_REGEX.find(ctx.cleaned)
         if (ownerNameMatch != null) {
             val ownerName = ownerNameMatch.groupValues[1].trim()
-            val slots = mapOf(
-                "alias_key" to SlotValue.Text("owner_name"),
-                "alias_value" to SlotValue.Text(ownerName),
-            )
-            return MatchResult(score = 0.94f, slots = slots, evidence = listOf("owner_name_declaration")) { c, r ->
-                ParsedCommand(
-                    action = action,
-                    rawText = c.rawText,
-                    normalizedText = c.normalized,
-                    aliasKey = "owner_name",
-                    aliasValue = ownerName,
-                    message = c.cleaned,
-                    requireConfirmation = false,
-                    slots = r.slots,
-                    confidence = r.score,
-                    matchedRuleId = id,
+            if (ownerName.isNotBlank() && ownerName !in QUESTION_WORDS) {
+                val slots = mapOf(
+                    "alias_key" to SlotValue.Text("owner_name"),
+                    "alias_value" to SlotValue.Text(ownerName),
                 )
+                return MatchResult(score = 0.94f, slots = slots, evidence = listOf("owner_name_declaration")) { c, r ->
+                    ParsedCommand(
+                        action = action,
+                        rawText = c.rawText,
+                        normalizedText = c.normalized,
+                        aliasKey = "owner_name",
+                        aliasValue = ownerName,
+                        message = c.cleaned,
+                        requireConfirmation = false,
+                        slots = r.slots,
+                        confidence = r.score,
+                        matchedRuleId = id,
+                    )
+                }
             }
         }
 
@@ -90,9 +93,17 @@ internal class LearnFactMatcher : IntentMatcher {
     }
 
     companion object {
-        private val OWNER_NAME_REGEX = Regex("^(?:اسم|نام)\\s+من\\s+(.+?)\\s+(?:است|هست)$")
+        private val QUESTION_WORDS = setOf("چی", "چیه", "چیست", "کی", "کیه", "کیست", "کدام", "کدوم")
+        private val OWNER_NAME_REGEX = Regex(
+            "^(?:(?:لطفاً|لطفا)\\s+)?(?:(?:اسم|نام)(?:\\s+کوچک)?\\s+من|اسمم|نامم)\\s+(.+?)\\s+(?:است|هست)$"
+        )
+        private val OWNER_NAME_CHANGE_REGEX = Regex(
+            "^(?:اسم|نام)(?:\\s+من|م)?\\s*(?:را|رو)?\\s*(?:توی?\\s+تنظیمات\\s+)?به\\s+(.+?)\\s+(?:تغییر بده|عوض کن|بگذار|بذار)$"
+        )
         private val LEARN_FACT_REGEX = Regex(
-            "(?:اینو\\s+|این را\\s+)?(?:یاد بگیر|به خاطر بسپار|ذخیره کن|یادداشت کن|یادت باشه|یادت بمونه|بنویس)\\s*(?:که\\s+)?(.+)$"
+            "(?:اینو\\s+|این را\\s+|این نکته را\\s+|این نکته رو\\s+|این یادداشت شخصی را\\s+|این یادداشت شخصی رو\\s+|توی حافظه\\s+|در حافظه\\s+)?" +
+                "(?:یاد بگیر|به خاطر بسپار|ذخیره کن|یادداشت کن|یادت باشه|یادت بمونه|بنویس|حفظ کن|ثبت کن|نگه دار|به حافظه اضافه کن)" +
+                "\\s*(?:که\\s+)?(.+)$"
         )
     }
 }

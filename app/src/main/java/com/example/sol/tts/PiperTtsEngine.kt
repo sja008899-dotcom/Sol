@@ -24,14 +24,22 @@ class PiperTtsEngine(
     private val modelFile: File,
     private val configFile: File,
 ) {
+    private val engineLock = Any()
+
+    @Volatile
     private var env: OrtEnvironment? = null
+
+    @Volatile
     private var session: OrtSession? = null
+
+    @Volatile
     private var config: PiperConfig? = null
 
     @Volatile
     private var audioTrack: AudioTrack? = null
 
     private val stopRequested = AtomicBoolean(false)
+    private val warmedUp = AtomicBoolean(false)
 
     @Volatile
     var lastErrorFa: String = ""
@@ -72,9 +80,12 @@ class PiperTtsEngine(
     fun initialize(
         trustedCustomHashes: Pair<String, String>? = null,
         allowUnverifiedRisk: Boolean = false,
-    ): Boolean {
+    ): Boolean = synchronized(engineLock) {
+        if (session != null && config != null) {
+            return@synchronized true
+        }
         lastErrorFa = ""
-        return try {
+        return@synchronized try {
             require(modelFile.exists()) { "فایل مدل Piper ONNX یافت نشد." }
             require(configFile.exists()) { "فایل تنظیمات Piper JSON یافت نشد." }
 
@@ -85,48 +96,70 @@ class PiperTtsEngine(
                     is PiperHashCheckResult.VerifiedCustomTrusted -> Unit
                     is PiperHashCheckResult.MismatchNeedsConfirmation -> {
                         lastErrorFa = "اثر انگشت فایل‌های Piper با نسخهٔ تأییدشده مطابقت ندارد."
-                        return false
+                        return@synchronized false
                     }
                     is PiperHashCheckResult.Error -> {
                         lastErrorFa = check.messageFa
-                        return false
+                        return@synchronized false
                     }
                 }
             }
 
             val ortEnv = OrtEnvironment.getEnvironment()
-            val ortSess = ortEnv.createSession(modelFile.absolutePath)
+            val intraThreads = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 4)
+            val ortSess = OrtSession.SessionOptions().use { opts ->
+                opts.setIntraOpNumThreads(intraThreads)
+                opts.setInterOpNumThreads(1)
+                opts.setExecutionMode(OrtSession.SessionOptions.ExecutionMode.SEQUENTIAL)
+                opts.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+                opts.setMemoryPatternOptimization(true)
+                ortEnv.createSession(modelFile.absolutePath, opts)
+            }
             config = parsedCfg
             env = ortEnv
             session = ortSess
-            Log.i(TAG, "Piper engine ready, sampleRate=${parsedCfg.sampleRate}")
+            warmedUp.set(false)
+            Log.i(TAG, "Piper engine ready, sampleRate=${parsedCfg.sampleRate}, threads=$intraThreads")
             true
         } catch (t: Throwable) {
             lastErrorFa = t.localizedMessage ?: "راه‌اندازی موتور Piper ناموفق بود."
             Log.e(TAG, "Piper init failed", t)
-            release()
+            unloadSessionLocked()
             false
         }
     }
 
-    fun synthesize(text: String, speechRate: Float = 1.0f): ShortArray? {
-        val cfg = config ?: return null
-        val sess = session ?: return null
-        val envRef = env ?: return null
-        if (text.isBlank()) return null
+    /**
+     * Runs a short silent synthesis once after session creation to pre-warm ORT buffers/kernels
+     * so first real speech synthesis starts with minimal latency.
+     */
+    fun warmup() {
+        if (!isReady || warmedUp.get()) return
+        val pcm = synthesize("سلام", speechRate = 1.0f)
+        if (pcm != null && pcm.isNotEmpty()) {
+            warmedUp.set(true)
+            Log.i(TAG, "Piper warmup complete (${pcm.size} samples)")
+        }
+    }
+
+    fun synthesize(text: String, speechRate: Float = 1.0f): ShortArray? = synchronized(engineLock) {
+        val cfg = config ?: return@synchronized null
+        val sess = session ?: return@synchronized null
+        val envRef = env ?: return@synchronized null
+        if (text.isBlank()) return@synchronized null
 
         var inputs: Map<String, OnnxTensor> = emptyMap()
         var result: OrtSession.Result? = null
-        return try {
+        return@synchronized try {
             val report = PersianPhonemizer.toPhonemeIdsWithReport(text, cfg)
             if (report.ids.isEmpty()) {
                 lastErrorFa = "تبدیل متن به آواهای Piper نتیجه‌ای نداشت."
-                return null
+                return@synchronized null
             }
 
             inputs = buildInputMap(sess, report.ids, cfg, speechRate, envRef)
             result = sess.run(inputs)
-            val output = result.get(0) as? OnnxTensor ?: return null
+            val output = result.get(0) as? OnnxTensor ?: return@synchronized null
             val floatBuffer = output.floatBuffer
             val pcm = ShortArray(floatBuffer.remaining())
             var idx = 0
@@ -254,6 +287,13 @@ class PiperTtsEngine(
 
     fun unloadSessionOnly() {
         stop()
+        synchronized(engineLock) {
+            unloadSessionLocked()
+        }
+    }
+
+    private fun unloadSessionLocked() {
+        warmedUp.set(false)
         runCatching { session?.close() }
         session = null
         config = null

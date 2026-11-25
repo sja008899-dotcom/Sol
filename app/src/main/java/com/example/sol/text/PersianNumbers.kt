@@ -283,11 +283,39 @@ object PersianNumbers {
         }
     }
 
+    private val LATIN_SOL_V2_REGEX = Regex("\\bsol\\s*v\\s*2\\b", RegexOption.IGNORE_CASE)
+    private val LATIN_SOL_REGEX = Regex("\\bsol\\b", RegexOption.IGNORE_CASE)
+    private val LATIN_SPOKEN_MAP: List<Pair<Regex, String>> = listOf(
+        Regex("\\bvosk\\b", RegexOption.IGNORE_CASE) to "واسک",
+        Regex("\\bpiper\\b", RegexOption.IGNORE_CASE) to "پایپر",
+        Regex("\\bonnx\\b", RegexOption.IGNORE_CASE) to "اونکس",
+        Regex("\\balarmmanager\\b", RegexOption.IGNORE_CASE) to "آلارم منیجر",
+        Regex("\\bworkmanager\\b", RegexOption.IGNORE_CASE) to "ورک منیجر",
+        Regex("\\bbm25\\b", RegexOption.IGNORE_CASE) to "بی ام بیست و پنج",
+        Regex("\\bfts4\\b", RegexOption.IGNORE_CASE) to "اف تی اس چهار",
+        Regex("\\bpdf\\b", RegexOption.IGNORE_CASE) to "پی دی اف",
+        Regex("\\bepub\\b", RegexOption.IGNORE_CASE) to "ایپاب",
+        Regex("\\btxt\\b", RegexOption.IGNORE_CASE) to "متنی",
+        Regex("\\btts\\b", RegexOption.IGNORE_CASE) to "تبدیل متن به گفتار",
+        Regex("\\bram\\b", RegexOption.IGNORE_CASE) to "رم",
+        Regex("\\bcpu\\b", RegexOption.IGNORE_CASE) to "پردازنده",
+        Regex("\\bgpu\\b", RegexOption.IGNORE_CASE) to "گرافیک",
+        Regex("\\bmb\\b", RegexOption.IGNORE_CASE) to "مگابایت",
+        Regex("\\bgb\\b", RegexOption.IGNORE_CASE) to "گیگابایت",
+        Regex("\\bhz\\b", RegexOption.IGNORE_CASE) to "هرتز",
+        Regex("\\bms\\b", RegexOption.IGNORE_CASE) to "میلی‌ثانیه",
+        Regex("cam\\+\\+", RegexOption.IGNORE_CASE) to "کم پلاس",
+        Regex("sha-?256", RegexOption.IGNORE_CASE) to "اس اچ ای دویست و پنجاه و شش",
+        Regex("aes-?256", RegexOption.IGNORE_CASE) to "ای ای اس دویست و پنجاه و شش",
+        Regex("\\.solbackup\\b", RegexOption.IGNORE_CASE) to "فایل پشتیبان سول",
+        Regex("\\.litertlm\\b", RegexOption.IGNORE_CASE) to "فایل مدل زبانی",
+    )
+
     /**
-     * Prepares Persian response text for SherpaTTS / system TTS engines:
-     * strips Markdown, emojis, and URLs, expands percentages, times (14:30),
-     * Jalali dates (1404/01/02 -> دو فروردین هزار و چهارصد و چهار), decimals (1.5 -> یک و نیم),
-     * and standalone 1..4 digit numbers into spoken Persian words while keeping 5+ digit phone numbers intact.
+     * Prepares Persian response text for Piper TTS:
+     * strips Markdown, emojis, and URLs, normalizes Latin brand/technical words ("Sol" -> "سول"),
+     * expands percentages, times (14:30), Jalali dates, decimals, and standalone 1..4 digit numbers
+     * into spoken Persian words while keeping 5+ digit phone numbers intact.
      */
     fun prepareTextForTts(text: String): String {
         if (text.isBlank()) return ""
@@ -299,6 +327,12 @@ object PersianNumbers {
             .replace("*", "")
             .replace("•", "،")
             .let(::stripDecorativeEmojis)
+
+        s = LATIN_SOL_V2_REGEX.replace(s, "سول نسخه دو")
+        s = LATIN_SOL_REGEX.replace(s, "سول")
+        for ((regex, replacementFa) in LATIN_SPOKEN_MAP) {
+            s = regex.replace(s, replacementFa)
+        }
 
         // Percentages: "50%" or "%50" -> "پنجاه درصد"
         s = PERCENT_AFTER_REGEX.replace(s) { m ->

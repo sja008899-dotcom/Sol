@@ -518,9 +518,24 @@ class UnknownFallbackSkill(
             )
         }
 
+        val normRaw = PersianNormalizer.normalize(rawInput)
+        if (OWNER_NAME_QUERY_REGEX.containsMatchIn(normRaw)) {
+            val savedOwner = prefs.ownerName.trim()
+            return if (savedOwner.isNotBlank() && savedOwner != "کاربر") {
+                SkillResult(
+                    replyText = "نام شما در حافظه «$savedOwner» ثبت شده است.",
+                    parsedCommand = cmd,
+                )
+            } else {
+                SkillResult(
+                    replyText = "هنوز نام شما را ثبت نکرده‌ام؛ بگویید «اسم من ... است» تا به خاطر بسپارم.",
+                    parsedCommand = cmd,
+                )
+            }
+        }
+
         val queryTokens = bookRagEngine.tokenize(rawInput)
         if (queryTokens.isNotEmpty()) {
-            val normRaw = PersianNormalizer.normalize(rawInput)
             val matchedPerson = learningEngine.findMatchingPersonHint(normRaw)
             if (matchedPerson != null) {
                 val phonePart = if (matchedPerson.phone.isNotBlank()) " — شماره: ${matchedPerson.phone}" else ""
@@ -546,15 +561,26 @@ class UnknownFallbackSkill(
                 )
             }
 
-            val matchedFact = memoryRepository.getAllOnce().firstOrNull { fact ->
-                val factNorm = PersianNormalizer.normalize("${fact.keyText} ${fact.valueText}")
-                queryTokens.any { token -> token.length >= 3 && factNorm.contains(token) }
-            }
-            if (matchedFact != null) {
-                return SkillResult(
-                    replyText = "در حافظهٔ شما ثبت شده: ${matchedFact.valueText}",
-                    parsedCommand = cmd,
-                )
+            val contentQueryTokens = queryTokens
+                .map { PersianNormalizer.normalize(it) }
+                .filter { it.length >= 2 && it !in INTERROGATIVE_STOP_TOKENS }
+                .distinct()
+            if (contentQueryTokens.isNotEmpty()) {
+                val bestFact = memoryRepository.getAllOnce()
+                    .filter { it.kind != "alias" }
+                    .mapNotNull { fact ->
+                        val factNorm = PersianNormalizer.normalize("${fact.keyText} ${fact.valueText}")
+                        val hits = contentQueryTokens.count { tok -> factNorm.contains(tok) }
+                        if (hits > 0) fact to hits else null
+                    }
+                    .maxByOrNull { it.second }
+                    ?.first
+                if (bestFact != null) {
+                    return SkillResult(
+                        replyText = "در حافظهٔ شما ثبت شده: ${bestFact.valueText}",
+                        parsedCommand = cmd,
+                    )
+                }
             }
         }
 
@@ -601,5 +627,15 @@ class UnknownFallbackSkill(
                 parsedCommand = cmd,
             )
         }
+    }
+
+    private companion object {
+        private val OWNER_NAME_QUERY_REGEX = Regex(
+            "(?:اسم\\s+من\\s+(?:چیه|چیست)|نام\\s+من\\s+(?:چیه|چیست)|اسمم\\s+(?:چیه|چیست)|نامم\\s+(?:چیه|چیست)|من\\s+کی\\s*ام|من\\s+کی\\s+هستم)"
+        )
+        private val INTERROGATIVE_STOP_TOKENS = setOf(
+            "چیه", "چیست", "کیه", "کیست", "کجاست", "کجاس", "کدومه", "کدام",
+            "چنده", "چند", "چندم", "بگو", "بده", "هست", "است", "بود", "شد", "من", "تو", "را", "رو",
+        )
     }
 }

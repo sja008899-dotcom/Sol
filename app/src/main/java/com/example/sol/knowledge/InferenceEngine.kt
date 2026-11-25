@@ -430,9 +430,9 @@ internal class InferenceEngine(
             ConversationConfig(
                 systemInstruction = Contents.of(systemInstruction),
                 samplerConfig = SamplerConfig(
-                    topK = 24,
-                    topP = 0.90,
-                    temperature = 0.65,
+                    topK = 20,
+                    topP = 0.85,
+                    temperature = 0.45,
                 ),
             )
         )

@@ -11,9 +11,11 @@ import com.example.sol.network.SolStorageGuard
 import com.example.sol.text.PersianNumbers
 import com.example.sol.voice.SolAudioManager
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -99,7 +101,13 @@ class TtsManager(
 
     init {
         migrateLegacyPiperIfPresent()
-        refreshInstalledPiper()
+        val hasBoth = modelFile.isFile && modelFile.length() > 0L && configFile.isFile && configFile.length() > 0L
+        if (hasBoth) {
+            // Avoid blocking Main thread on 60MB SHA-256 + ONNX load during lazy container init
+            scope.launch { refreshInstalledPiper() }
+        } else {
+            refreshInstalledPiper()
+        }
     }
 
     val isInstalledAndReady: Boolean
@@ -193,6 +201,9 @@ class TtsManager(
                 sizeMb = (totalBytes / (1024L * 1024L)).toInt().coerceAtLeast(1),
                 sha256Summary = if (onnxSha.isNotBlank()) onnxSha.take(16) else "",
             )
+            if (modelFile.length() > 100_000L) {
+                scope.launch { piperEngine.warmup() }
+            }
             true
         } else {
             _piperStatus.value = PiperTtsStatus.Error(
@@ -360,16 +371,7 @@ class TtsManager(
     ) {
         if (text.isBlank()) return
 
-        val readyOrLazyInit = piperEngine.isReady || (
-            _piperStatus.value is PiperTtsStatus.Ready &&
-                piperEngine.initialize(
-                    trustedCustomHashes = runCatching {
-                        kotlinx.coroutines.runBlocking { trustedCustomHashesProvider?.invoke() }
-                    }.getOrNull(),
-                )
-            )
-
-        if (readyOrLazyInit) {
+        if (piperEngine.isReady || _piperStatus.value is PiperTtsStatus.Ready) {
             val cleanText = PersianNumbers.prepareTextForTts(text).ifBlank { text }
             speakWithPiper(cleanText, speechRate, persona)
         } else if (_piperStatus.value is PiperTtsStatus.NotInstalled ||
@@ -403,16 +405,7 @@ class TtsManager(
         }
         _isPiperSpeaking.value = true
         return@withContext try {
-            val segments = splitForSynthesis(cleanText)
-            var ok = true
-            for (segment in segments) {
-                val pcm = piperEngine.synthesize(segment, speechRate = speechRate)
-                if (pcm == null || pcm.isEmpty() || !piperEngine.play(pcm, piperEngine.sampleRate)) {
-                    ok = false
-                    break
-                }
-            }
-            ok
+            playSegmentsPipelined(cleanText, speechRate)
         } catch (t: Throwable) {
             Log.e(TAG, "خطا در تولید یا پخش صدای پس‌زمینه Piper", t)
             false
@@ -446,13 +439,13 @@ class TtsManager(
                 _isPiperSpeaking.value = false
             }
             try {
-                val segments = splitForSynthesis(text)
-                for (segment in segments) {
-                    val pcm = piperEngine.synthesize(segment, speechRate = effectiveRate)
-                    if (pcm == null || pcm.isEmpty() || !piperEngine.play(pcm, piperEngine.sampleRate)) {
-                        break
+                if (!piperEngine.isReady && _piperStatus.value is PiperTtsStatus.Ready) {
+                    val trusted = runCatching { trustedCustomHashesProvider?.invoke() }.getOrNull()
+                    if (!piperEngine.initialize(trustedCustomHashes = trusted, allowUnverifiedRisk = trusted != null)) {
+                        return@launch
                     }
                 }
+                playSegmentsPipelined(text, effectiveRate)
             } catch (t: Throwable) {
                 Log.e(TAG, "خطا در تولید یا پخش صدای Piper", t)
             } finally {
@@ -463,6 +456,43 @@ class TtsManager(
             }
         }
     }
+
+    private suspend fun playSegmentsPipelined(text: String, effectiveRate: Float): Boolean =
+        withContext(Dispatchers.IO) {
+            val segments = splitForSynthesis(text)
+            if (segments.isEmpty()) return@withContext false
+
+            var nextPrefetch: Deferred<ShortArray?>? = null
+            var ok = true
+            try {
+                for (i in segments.indices) {
+                    val pcm = nextPrefetch?.await()
+                        ?: piperEngine.synthesize(segments[i], speechRate = effectiveRate)
+                    nextPrefetch = null
+
+                    if (pcm == null || pcm.isEmpty()) {
+                        ok = false
+                        break
+                    }
+
+                    // Pre-synthesize the next clause concurrently while AudioTrack streams the current clause
+                    if (i + 1 < segments.size) {
+                        val upcoming = segments[i + 1]
+                        nextPrefetch = async(Dispatchers.IO) {
+                            piperEngine.synthesize(upcoming, speechRate = effectiveRate)
+                        }
+                    }
+
+                    if (!piperEngine.play(pcm, piperEngine.sampleRate)) {
+                        ok = false
+                        break
+                    }
+                }
+            } finally {
+                nextPrefetch?.cancel()
+            }
+            ok
+        }
 
     fun stop() {
         pendingAutoSpeakRequest = null
@@ -562,8 +592,26 @@ class TtsManager(
         private const val TAG = "TtsManager"
         private val SENTENCE_SPLIT_REGEX = Regex("(?:(?<!\\d)\\.(?!\\d)|[؟?!؛;\\n])+")
 
-        internal fun splitForSynthesis(text: String, maxChunkChars: Int = 260): List<String> =
-            splitIntoSentences(text, maxChunkChars)
+        internal fun splitForSynthesis(text: String, maxChunkChars: Int = 220): List<String> {
+            val base = splitIntoSentences(text, maxChunkChars)
+            if (base.size <= 1 && (base.firstOrNull()?.length ?: 0) <= 110) return base
+            // Keep the first spoken phrase compact so time-to-first-audio is fast
+            val first = base.first()
+            if (first.length <= 110) return base
+            val commaSplit = first.substring(0, 110).let { win ->
+                val idx = maxOf(win.lastIndexOf('،'), win.lastIndexOf(','), win.lastIndexOf(' '))
+                if (idx >= 24) idx else -1
+            }
+            if (commaSplit <= 0) return base
+            val head = first.substring(0, commaSplit).trim()
+            val tail = first.substring(commaSplit).trim().trimStart('،', ',', ' ')
+            if (head.isEmpty() || tail.isEmpty()) return base
+            return buildList(base.size + 1) {
+                add(head)
+                add(tail)
+                for (k in 1 until base.size) add(base[k])
+            }
+        }
 
         fun splitIntoSentences(text: String, maxChunkChars: Int = 320): List<String> {
             val normalized = text.replace(Regex("\\s+"), " ").trim()
