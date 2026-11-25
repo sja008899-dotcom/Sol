@@ -8,19 +8,27 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+data class OwnerCalibrationMetadata(
+    val sampleCount: Int,
+    val calibratedThreshold: Float,
+    val meanSelfSimilarity: Float,
+)
+
 /**
  * Stores the device owner's speaker embedding encrypted at rest via Jetpack Security [EncryptedFile].
  * Never uploaded or logged; remains strictly on-device.
  */
-class OwnerProfile(
+open class OwnerProfile(
     context: Context,
     private val storageFile: File = File(context.applicationContext.filesDir, "speaker/owner.bin"),
 ) {
     private val appContext = context.applicationContext
+    private val metadataFile: File
+        get() = File(storageFile.parentFile ?: appContext.filesDir, "${storageFile.nameWithoutExtension}_meta.txt")
 
-    fun exists(): Boolean = storageFile.exists() && storageFile.isFile && storageFile.length() > 0L
+    open fun exists(): Boolean = storageFile.exists() && storageFile.isFile && storageFile.length() > 0L
 
-    fun save(embedding: FloatArray): Boolean {
+    open fun save(embedding: FloatArray): Boolean {
         if (embedding.isEmpty()) return false
         return try {
             storageFile.parentFile?.mkdirs()
@@ -43,7 +51,7 @@ class OwnerProfile(
         }
     }
 
-    fun load(): FloatArray? {
+    open fun load(): FloatArray? {
         if (!exists()) return null
         return try {
             val masterKey = buildMasterKey()
@@ -64,7 +72,35 @@ class OwnerProfile(
         }
     }
 
-    fun clear(): Boolean {
+    fun saveCalibrationMetadata(meta: OwnerCalibrationMetadata): Boolean {
+        return runCatching {
+            metadataFile.parentFile?.mkdirs()
+            metadataFile.writeText(
+                "${meta.sampleCount}|${meta.calibratedThreshold}|${meta.meanSelfSimilarity}",
+                Charsets.UTF_8,
+            )
+            true
+        }.getOrDefault(false)
+    }
+
+    fun loadCalibrationMetadata(): OwnerCalibrationMetadata? {
+        if (!metadataFile.isFile) return null
+        return runCatching {
+            val parts = metadataFile.readText(Charsets.UTF_8).trim().split('|')
+            if (parts.size < 3) return null
+            val count = parts[0].toIntOrNull() ?: return null
+            val threshold = parts[1].toFloatOrNull() ?: return null
+            val meanSim = parts[2].toFloatOrNull() ?: return null
+            OwnerCalibrationMetadata(
+                sampleCount = count.coerceAtLeast(1),
+                calibratedThreshold = threshold.coerceIn(0.55f, 0.90f),
+                meanSelfSimilarity = meanSim.coerceIn(0f, 1f),
+            )
+        }.getOrNull()
+    }
+
+    open fun clear(): Boolean {
+        runCatching { if (metadataFile.exists()) metadataFile.delete() }
         return runCatching { !storageFile.exists() || storageFile.delete() }.getOrDefault(false)
     }
 

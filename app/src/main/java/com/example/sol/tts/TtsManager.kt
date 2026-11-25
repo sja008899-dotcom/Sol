@@ -16,9 +16,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -52,6 +54,115 @@ sealed interface PiperTtsStatus {
     data class Error(
         val messageFa: String,
     ) : PiperTtsStatus
+}
+
+class StreamingSpeechSession internal constructor(
+    private val channel: Channel<String>,
+    private val job: Job,
+    private val onCancelPlayback: () -> Unit,
+) {
+    fun enqueue(sentence: String) {
+        val trimmed = sentence.trim()
+        if (trimmed.isNotEmpty() && job.isActive) {
+            channel.trySend(trimmed)
+        }
+    }
+
+    fun finish() {
+        channel.close()
+    }
+
+    fun cancel() {
+        channel.close()
+        job.cancel()
+        onCancelPlayback()
+    }
+}
+
+/**
+ * Pure-Kotlin incremental buffer for SLM token streams so complete Persian/English sentences
+ * are flushed immediately to Piper TTS without waiting for the entire LLM response to complete.
+ */
+class SlmSpeechStreamBuffer(
+    private val minSentenceChars: Int = 10,
+    private val maxClauseChars: Int = 95,
+) {
+    private var consumedLength: Int = 0
+
+    fun appendAndDrainReadySentences(latestFullText: String): List<String> {
+        if (latestFullText.isEmpty()) return emptyList()
+        if (consumedLength > latestFullText.length) {
+            consumedLength = latestFullText.length
+        }
+
+        val ready = mutableListOf<String>()
+        while (consumedLength < latestFullText.length) {
+            val splitEnd = findNextBoundaryEnd(latestFullText, consumedLength) ?: break
+            val segment = latestFullText.substring(consumedLength, splitEnd).trim()
+            consumedLength = splitEnd
+            if (segment.isNotEmpty()) {
+                ready.add(segment)
+            }
+        }
+        return ready
+    }
+
+    fun flushRemaining(finalFullText: String): String? {
+        if (consumedLength > finalFullText.length) {
+            consumedLength = finalFullText.length
+        }
+        val tail = finalFullText.substring(consumedLength).trim()
+        consumedLength = finalFullText.length
+        return tail.takeIf { it.isNotEmpty() }
+    }
+
+    private fun findNextBoundaryEnd(text: String, start: Int): Int? {
+        val len = text.length
+        var i = start
+        while (i < len) {
+            val ch = text[i]
+            val candidateLen = (i - start + 1)
+            val isNewline = ch == '\n'
+            val isStrongPunct = ch == '؟' || ch == '?' || ch == '!' || ch == '؛' || ch == ';'
+            val isPeriod = ch == '.'
+
+            if (isPeriod) {
+                val prevDigit = i > start && isAnyDigit(text[i - 1])
+                val atEnd = i + 1 >= len
+                val nextDigit = !atEnd && isAnyDigit(text[i + 1])
+                // Hold off on trailing digit+dot so decimals (e.g., 12.5) and list numbers ("1.") don't split mid-token
+                val isDecimal = prevDigit && (nextDigit || atEnd)
+                val nonWhitespaceLen = text.substring(start, i + 1).trim().length
+                if (!isDecimal && nonWhitespaceLen >= minSentenceChars) {
+                    return i + 1
+                }
+            } else if (isNewline || isStrongPunct) {
+                val nonWhitespaceLen = text.substring(start, i + 1).trim().length
+                if (nonWhitespaceLen >= 4) {
+                    return i + 1
+                }
+            }
+
+            // Soft clause split for long unpunctuated streams so playback starts quickly
+            if (candidateLen >= maxClauseChars) {
+                val searchStart = (start + 32).coerceAtMost(i)
+                for (j in i downTo searchStart) {
+                    val c = text[j]
+                    if (c == '،' || c == ',' || c.isWhitespace()) {
+                        val trimmedLen = text.substring(start, j + 1).trim().length
+                        if (trimmedLen >= minSentenceChars) {
+                            return j + 1
+                        }
+                    }
+                }
+            }
+            i++
+        }
+        return null
+    }
+
+    private fun isAnyDigit(ch: Char): Boolean =
+        ch in '0'..'9' || ch in '۰'..'۹' || ch in '٠'..'٩'
 }
 
 class TtsManager(
@@ -455,6 +566,93 @@ class TtsManager(
                 }
             }
         }
+    }
+
+    fun beginStreamingSpeech(
+        speechRate: Float = 1.0f,
+        persona: VoicePersona = VoicePersona.FEMALE_CALM,
+    ): StreamingSpeechSession? {
+        if (!piperEngine.isReady && _piperStatus.value !is PiperTtsStatus.Ready) {
+            return null
+        }
+
+        pendingAutoSpeakRequest = null
+        activeSpeakJob?.cancel()
+        piperEngine.stop()
+        _isPiperSpeaking.value = true
+
+        val personaRateOffset = when (persona) {
+            VoicePersona.FEMALE_CALM -> 0.96f
+            VoicePersona.MALE_FORMAL -> 0.92f
+            VoicePersona.NEUTRAL_FRIENDLY -> 1.0f
+        }
+        val effectiveRate = (speechRate * personaRateOffset).coerceIn(0.65f, 1.5f)
+        val channel = Channel<String>(Channel.UNLIMITED)
+
+        val job = scope.launch {
+            val grantedFocus = audioManager.requestSpeakingFocus {
+                channel.close()
+                piperEngine.stop()
+                _isPiperSpeaking.value = false
+            }
+            var prefetched: Deferred<ShortArray?>? = null
+            try {
+                if (!piperEngine.isReady && _piperStatus.value is PiperTtsStatus.Ready) {
+                    val trusted = runCatching { trustedCustomHashesProvider?.invoke() }.getOrNull()
+                    if (!piperEngine.initialize(trustedCustomHashes = trusted, allowUnverifiedRisk = trusted != null)) {
+                        return@launch
+                    }
+                }
+
+                var currentRaw: String? = channel.receiveCatching().getOrNull()
+                while (currentRaw != null && isActive) {
+                    val cleanCurrent = PersianNumbers.prepareTextForTts(currentRaw).ifBlank { currentRaw }
+                    val pcm = if (prefetched != null) {
+                        val awaited = prefetched.await()
+                        prefetched = null
+                        awaited
+                    } else {
+                        piperEngine.synthesize(cleanCurrent, speechRate = effectiveRate)
+                    }
+
+                    // If next sentence already arrived while synthesizing, pre-synthesize it in parallel with playback
+                    val queuedNext = channel.tryReceive().getOrNull()
+                    if (queuedNext != null) {
+                        val cleanNext = PersianNumbers.prepareTextForTts(queuedNext).ifBlank { queuedNext }
+                        prefetched = async(Dispatchers.IO) {
+                            piperEngine.synthesize(cleanNext, speechRate = effectiveRate)
+                        }
+                    }
+
+                    if (pcm != null && pcm.isNotEmpty()) {
+                        if (!piperEngine.play(pcm, piperEngine.sampleRate)) {
+                            break
+                        }
+                    }
+
+                    currentRaw = queuedNext ?: channel.receiveCatching().getOrNull()
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "خطا در پخش جمله‌به‌جمله صدای Piper", t)
+            } finally {
+                prefetched?.cancel()
+                channel.close()
+                _isPiperSpeaking.value = false
+                if (grantedFocus) {
+                    audioManager.abandonSpeakingFocus()
+                }
+            }
+        }
+        activeSpeakJob = job
+
+        return StreamingSpeechSession(
+            channel = channel,
+            job = job,
+            onCancelPlayback = {
+                piperEngine.stop()
+                _isPiperSpeaking.value = false
+            },
+        )
     }
 
     private suspend fun playSegmentsPipelined(text: String, effectiveRate: Float): Boolean =

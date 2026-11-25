@@ -222,6 +222,23 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun testOwnerVoice() {
+        viewModelScope.launch {
+            c.voiceEngine.stopListening()
+            c.ttsManager.stop()
+            c.speakerIdManager.testOwnerVoiceVerification().fold(
+                onSuccess = { sim ->
+                    val pct = kotlin.math.round(sim * 100f).toInt()
+                    val thrPct = kotlin.math.round(c.speakerIdManager.uiState.value.calibratedThreshold * 100f).toInt()
+                    c.uiBridge.postBanner("نتیجهٔ تطابق صدای مالک: $pct٪ شباهت (آستانه کالیبره‌شده: $thrPct٪)")
+                },
+                onFailure = { err ->
+                    c.uiBridge.postBanner(err.message ?: "تست تطابق صدای مالک ناموفق بود.")
+                },
+            )
+        }
+    }
+
     fun clearOwnerVoice() {
         viewModelScope.launch(Dispatchers.IO) {
             c.speakerIdManager.clearOwnerProfile()

@@ -1,13 +1,20 @@
 package com.example.sol.voice
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import androidx.core.content.ContextCompat
 import com.example.sol.memory.PersianNormalizer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,10 +25,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.sqrt
 
 enum class VoiceErrorAction(val labelFa: String) {
     OPEN_MIC_PERMISSION_SETTINGS("تنظیمات مجوز"),
@@ -68,6 +77,18 @@ class VoiceEngine(
     @Volatile
     private var maxDurationRunnable: Runnable? = null
 
+    private val systemPcmLock = Any()
+
+    @Volatile
+    private var systemPcmCaptureJob: Job? = null
+
+    @Volatile
+    private var systemCapturedPcm16k: FloatArray? = null
+
+    private var systemPcmRing: FloatArray? = null
+    private var systemPcmRingWritePos: Int = 0
+    private var systemPcmRingCount: Int = 0
+
     private val _state = MutableStateFlow<VoiceListeningState>(VoiceListeningState.Idle)
     val state: StateFlow<VoiceListeningState> = _state.asStateFlow()
 
@@ -111,7 +132,17 @@ class VoiceEngine(
      */
     fun canStartAutomatedWakeWord(): Boolean = !isExternalSpeaking()
 
-    fun consumeLastCapturedPcm16k(): FloatArray? = voskEngine.consumeLastCapturedPcm16k()
+    fun consumeLastCapturedPcm16k(): FloatArray? {
+        voskEngine.consumeLastCapturedPcm16k()?.let {
+            synchronized(systemPcmLock) { systemCapturedPcm16k = null }
+            return it
+        }
+        return synchronized(systemPcmLock) {
+            val out = systemCapturedPcm16k
+            systemCapturedPcm16k = null
+            out
+        }
+    }
 
     fun startListening(
         preferVosk: Boolean = true,
@@ -284,6 +315,7 @@ class VoiceEngine(
 
             override fun onError(error: Int) {
                 if (sessionToken.get() != token) return
+                discardParallelSystemPcmCapture()
                 cancelMaxDurationTimer()
                 cleanupRecognizer()
                 val isLangUnavailable = error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED ||
@@ -313,6 +345,7 @@ class VoiceEngine(
 
             override fun onResults(results: Bundle?) {
                 if (sessionToken.get() != token) return
+                finalizeParallelSystemPcmCapture()
                 cancelMaxDurationTimer()
                 audioManager.abandonListeningFocus()
                 if (playCue) audioManager.playVoiceCue(isStart = false)
@@ -333,6 +366,8 @@ class VoiceEngine(
                 releaseSystemMicLeaseAsync()
                 if (best.isNotBlank()) {
                     onFinalResult(best)
+                } else {
+                    synchronized(systemPcmLock) { systemCapturedPcm16k = null }
                 }
             }
 
@@ -362,7 +397,9 @@ class VoiceEngine(
         runCatching {
             _state.value = VoiceListeningState.Listening
             instance.startListening(intent)
+            startParallelSystemPcmCapture(token)
         }.onFailure { err ->
+            discardParallelSystemPcmCapture()
             cancelMaxDurationTimer()
             audioManager.abandonListeningFocus()
             cleanupRecognizer()
@@ -483,6 +520,7 @@ class VoiceEngine(
     private fun teardownActiveSession(preserveState: Boolean) {
         launchJob?.cancel()
         launchJob = null
+        discardParallelSystemPcmCapture()
         cancelMaxDurationTimer()
         voskEngine.stopListening()
         runCatching { recognizer?.stopListening() }
@@ -496,6 +534,117 @@ class VoiceEngine(
                 _state.value is VoiceListeningState.WakeWordArmed)
         ) {
             _state.value = VoiceListeningState.Idle
+        }
+    }
+
+    /**
+     * Best-effort lightweight 16kHz PCM capture while Android SpeechRecognizer runs.
+     * On devices/ROMs where concurrent AudioRecord is blocked or silenced by OS mic policy,
+     * this exits quietly without disrupting SpeechRecognizer, leaving [systemCapturedPcm16k] null
+     * so N5 safely emits [SpeakerVerificationOutcome.AudioUnavailable].
+     */
+    @SuppressLint("MissingPermission")
+    private fun startParallelSystemPcmCapture(token: Long) {
+        discardParallelSystemPcmCapture()
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) return
+
+        synchronized(systemPcmLock) {
+            systemPcmRing = FloatArray(SYSTEM_PCM_MAX_SAMPLES)
+            systemPcmRingWritePos = 0
+            systemPcmRingCount = 0
+            systemCapturedPcm16k = null
+        }
+
+        systemPcmCaptureJob = scope.launch(Dispatchers.IO) {
+            var recorder: AudioRecord? = null
+            try {
+                val minBuf = AudioRecord.getMinBufferSize(
+                    16_000,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                ).coerceAtLeast(4096)
+                recorder = runCatching {
+                    SafeAudioCapture.createAudioRecorder(sampleRate = 16_000, bufferBytes = minBuf * 2)
+                }.getOrNull()
+                if (recorder == null || recorder.state != AudioRecord.STATE_INITIALIZED) {
+                    return@launch
+                }
+                recorder.startRecording()
+                if (recorder.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                    return@launch
+                }
+
+                val buf = ShortArray(1024)
+                var consecutiveIdleReads = 0
+                while (isActive && sessionToken.get() == token) {
+                    val read = recorder.read(buf, 0, buf.size)
+                    if (read > 0) {
+                        consecutiveIdleReads = 0
+                        synchronized(systemPcmLock) {
+                            val ring = systemPcmRing ?: return@synchronized
+                            for (i in 0 until read) {
+                                ring[systemPcmRingWritePos] = buf[i] / 32768f
+                                systemPcmRingWritePos = (systemPcmRingWritePos + 1) % ring.size
+                                if (systemPcmRingCount < ring.size) systemPcmRingCount++
+                            }
+                        }
+                    } else {
+                        consecutiveIdleReads++
+                        if (read < 0 || consecutiveIdleReads >= 25) {
+                            break
+                        }
+                        delay(15L)
+                    }
+                }
+            } catch (_: Throwable) {
+                // Intentionally swallowed: parallel PCM capture must never disrupt SpeechRecognizer.
+            } finally {
+                runCatching { recorder?.stop() }
+                runCatching { recorder?.release() }
+            }
+        }
+    }
+
+    private fun finalizeParallelSystemPcmCapture() {
+        systemPcmCaptureJob?.cancel()
+        systemPcmCaptureJob = null
+        synchronized(systemPcmLock) {
+            val ring = systemPcmRing
+            val count = systemPcmRingCount
+            val writePos = systemPcmRingWritePos
+            systemPcmRing = null
+            systemPcmRingWritePos = 0
+            systemPcmRingCount = 0
+
+            if (ring == null || count < MIN_PARALLEL_PCM_SAMPLES) {
+                systemCapturedPcm16k = null
+                return
+            }
+            val out = FloatArray(count)
+            val start = if (count < ring.size) 0 else writePos
+            var sumSq = 0.0
+            for (i in 0 until count) {
+                val sample = ring[(start + i) % ring.size]
+                out[i] = sample
+                sumSq += sample.toDouble() * sample.toDouble()
+            }
+            val rms = sqrt(sumSq / count).toFloat()
+            systemCapturedPcm16k = if (rms >= MIN_PARALLEL_PCM_RMS) out else null
+        }
+    }
+
+    private fun discardParallelSystemPcmCapture() {
+        systemPcmCaptureJob?.cancel()
+        systemPcmCaptureJob = null
+        synchronized(systemPcmLock) {
+            systemPcmRing = null
+            systemPcmRingWritePos = 0
+            systemPcmRingCount = 0
+            systemCapturedPcm16k = null
         }
     }
 
@@ -531,6 +680,10 @@ class VoiceEngine(
     }
 
     companion object {
+        private const val SYSTEM_PCM_MAX_SAMPLES = 16_000 * 4
+        private const val MIN_PARALLEL_PCM_SAMPLES = 6_400
+        private const val MIN_PARALLEL_PCM_RMS = 0.003f
+
         fun parseVoiceConfirmationDecision(raw: String): Boolean? {
             val norm = PersianNormalizer.normalize(raw)
             val confirmTokens = listOf("تایید", "تأیید", "بله", "اره", "آره", "اوکی", "انجام بده", "بفرست", "زنگ بزن", "باشه")

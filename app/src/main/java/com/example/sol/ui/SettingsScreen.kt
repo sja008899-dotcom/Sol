@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.AssistChip
@@ -116,6 +117,7 @@ fun SettingsScreen(
     onClearOwnerVoice: () -> Unit,
     onPickSpeakerModel: () -> Unit,
     onTestSpeakerMic: () -> Unit = {},
+    onTestOwnerVoice: () -> Unit = {},
     onInstallAllVoiceModelsNow: () -> Unit = {},
     isMicServiceRunning: Boolean,
     onScreenOffMicToggle: (Boolean) -> Unit,
@@ -1173,7 +1175,11 @@ fun SettingsScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
                                 Text(
-                                    text = "سطح دریافت صدای میکروفون",
+                                    text = if (speakerIdState.enrollmentStepIndex > 0) {
+                                        "نمونهٔ ${speakerIdState.enrollmentStepIndex} از ${speakerIdState.enrollmentTotalSteps} • سطح صدا"
+                                    } else {
+                                        "سطح دریافت صدای میکروفون"
+                                    },
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
                                 )
@@ -1183,12 +1189,87 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.primary,
                                 )
                             }
+                            if (speakerIdState.enrollmentPromptFa.isNotBlank()) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("speaker_enrollment_prompt_card"),
+                                ) {
+                                    Text(
+                                        text = "بگویید: «${speakerIdState.enrollmentPromptFa}»",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(10.dp),
+                                    )
+                                }
+                            }
                             LinearProgressIndicator(
                                 progress = { speakerIdState.liveRmsLevel.coerceIn(0f, 1f) },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .testTag("speaker_enrollment_rms_bar"),
                             )
+                        }
+                    }
+                }
+                if (speakerIdState.isActive && (speakerIdState.lastSimilarityScore != null || speakerIdState.lastVerificationSummaryFa.isNotBlank())) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val lastSim = speakerIdState.lastSimilarityScore
+                    val thresholdPct = (speakerIdState.calibratedThreshold * 100f).roundToInt()
+                    val simPct = lastSim?.let { (it * 100f).roundToInt().coerceIn(0, 100) }
+                    val passed = speakerIdState.lastVerificationPassed
+                    Surface(
+                        color = when (passed) {
+                            true -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f)
+                            false -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f)
+                            null -> MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("speaker_similarity_result_card"),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = if (simPct != null) {
+                                        "میزان شباهت صدا: $simPct٪"
+                                    } else {
+                                        "وضعیت احراز اخیر"
+                                    },
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Text(
+                                    text = "آستانه کالیبره‌شده: $thresholdPct٪",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            if (lastSim != null) {
+                                LinearProgressIndicator(
+                                    progress = { lastSim.coerceIn(0f, 1f) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("speaker_similarity_progress_bar"),
+                                )
+                            }
+                            if (speakerIdState.lastVerificationSummaryFa.isNotBlank()) {
+                                Text(
+                                    text = speakerIdState.lastVerificationSummaryFa,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
                         }
                     }
                 }
@@ -1223,7 +1304,9 @@ fun SettingsScreen(
                     Button(
                         onClick = onRecordOwnerVoice,
                         enabled = !speakerIdState.isRecordingOwner && !speakerIdState.isDownloadingModel,
-                        modifier = Modifier.testTag("record_owner_voice_button"),
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("record_owner_voice_button"),
                     ) {
                         Icon(Icons.Default.RecordVoiceOver, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -1231,14 +1314,29 @@ fun SettingsScreen(
                             when {
                                 speakerIdState.isDownloadingModel -> "در حال دانلود مدل…"
                                 speakerIdState.isRecordingOwner -> "در حال ضبط…"
-                                else -> "ضبط صدای من (نصب خودکار در صورت نیاز)"
+                                else -> "ضبط ۳ جملهٔ کالیبراسیون مالک"
                             }
                         )
+                    }
+                    if (speakerIdState.isActive) {
+                        OutlinedButton(
+                            onClick = onTestOwnerVoice,
+                            enabled = !speakerIdState.isRecordingOwner && !speakerIdState.isDownloadingModel,
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .testTag("test_owner_voice_button"),
+                        ) {
+                            Icon(Icons.Default.VerifiedUser, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("تست تطابق صدای مالک")
+                        }
                     }
                     if (!speakerIdState.isModelInstalled && !speakerIdState.isDownloadingModel) {
                         OutlinedButton(
                             onClick = onDownloadSpeakerModel,
-                            modifier = Modifier.testTag("download_speaker_model_button"),
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .testTag("download_speaker_model_button"),
                         ) {
                             Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
@@ -1248,14 +1346,18 @@ fun SettingsScreen(
                     OutlinedButton(
                         onClick = onTestSpeakerMic,
                         enabled = !speakerIdState.isRecordingOwner && !speakerIdState.isDownloadingModel,
-                        modifier = Modifier.testTag("test_speaker_mic_button"),
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("test_speaker_mic_button"),
                     ) {
                         Text("تست سلامت میکروفون")
                     }
                     OutlinedButton(
                         onClick = onPickSpeakerModel,
                         enabled = !speakerIdState.isDownloadingModel,
-                        modifier = Modifier.testTag("pick_speaker_model_button"),
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("pick_speaker_model_button"),
                     ) {
                         Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
@@ -1264,7 +1366,9 @@ fun SettingsScreen(
                     if (speakerIdState.isOwnerEnrolled) {
                         OutlinedButton(
                             onClick = onClearOwnerVoice,
-                            modifier = Modifier.testTag("clear_owner_voice_button"),
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .testTag("clear_owner_voice_button"),
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))

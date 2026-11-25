@@ -15,6 +15,7 @@ import com.example.sol.voice.SafeAudioCapture
 import com.example.sol.voice.SafeAudioCaptureStop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,9 +36,15 @@ import kotlin.math.sqrt
 class SpeakerVerifier(
     private val threshold: Float = DEFAULT_THRESHOLD,
 ) {
-    fun isOwner(candidate: FloatArray, owner: FloatArray): Boolean {
+    val defaultThreshold: Float
+        get() = threshold
+
+    fun isOwner(candidate: FloatArray, owner: FloatArray): Boolean =
+        isOwner(candidate, owner, threshold)
+
+    fun isOwner(candidate: FloatArray, owner: FloatArray, thresholdOverride: Float): Boolean {
         if (candidate.isEmpty() || owner.isEmpty()) return false
-        return similarity(candidate, owner) >= threshold
+        return similarity(candidate, owner) >= thresholdOverride
     }
 
     fun similarity(candidate: FloatArray, owner: FloatArray): Float {
@@ -61,7 +68,6 @@ class SpeakerVerifier(
     }
 
     companion object {
-        // TODO(verify): calibrate cosine similarity threshold on target phone with real owner voice samples.
         const val DEFAULT_THRESHOLD = 0.75f
     }
 }
@@ -70,6 +76,7 @@ sealed interface SpeakerVerificationOutcome {
     data object InactiveFailSafe : SpeakerVerificationOutcome
     data class VerifiedOwner(val similarity: Float) : SpeakerVerificationOutcome
     data class RejectedNonOwner(val similarity: Float, val politeMessageFa: String) : SpeakerVerificationOutcome
+    data class AudioUnavailable(val reasonFa: String) : SpeakerVerificationOutcome
 }
 
 data class SpeakerIdUiState(
@@ -81,6 +88,13 @@ data class SpeakerIdUiState(
     val isRecordingOwner: Boolean = false,
     val remainingSeconds: Int = 0,
     val liveRmsLevel: Float = 0f,
+    val enrollmentStepIndex: Int = 0,
+    val enrollmentTotalSteps: Int = 3,
+    val enrollmentPromptFa: String = "",
+    val calibratedThreshold: Float = SpeakerVerifier.DEFAULT_THRESHOLD,
+    val lastSimilarityScore: Float? = null,
+    val lastVerificationPassed: Boolean? = null,
+    val lastVerificationSummaryFa: String = "",
     val statusLabelFa: String = "N5 غیرفعال: مدل شناسایی گوینده یا نمونهٔ صدای مالک ثبت نشده است.",
     val feedbackMessageFa: String = "",
     val feedbackIsError: Boolean = false,
@@ -89,9 +103,9 @@ data class SpeakerIdUiState(
 /**
  * Coordinates N5 Speaker ID lifecycle cleanly:
  * - Self-contained: automatically downloads & verifies CAM++ FP32 (campplus_zh_en_fp32.onnx) when needed.
- * - Auto-recovery: automatically replaces outdated/incompatible ONNX files (e.g., legacy int8 ConvInteger models).
+ * - Multi-sample calibration: records 3 short Persian sentences, averages L2-normalized embeddings, and calibrates threshold.
  * - Fail-safe: when either the speaker ONNX model or the encrypted owner profile is absent, N5 reports inactive and never blocks commands.
- * - Active gate: when both exist, voice audio is checked via [verifyVoicePcm] before executing commands in CommandBrain.
+ * - Fallback-safe: when SpeechRecognizer fallback cannot provide raw 16kHz PCM, returns AudioUnavailable instead of locking out the owner.
  */
 class SpeakerIdManager(
     context: Context,
@@ -113,6 +127,24 @@ class SpeakerIdManager(
 
     @Volatile
     private var lastFeedbackIsError: Boolean = false
+
+    @Volatile
+    private var currentEnrollmentStep: Int = 0
+
+    @Volatile
+    private var currentEnrollmentTotal: Int = DEFAULT_ENROLLMENT_PROMPTS_FA.size
+
+    @Volatile
+    private var currentEnrollmentPromptFa: String = ""
+
+    @Volatile
+    private var lastSimilarityScore: Float? = null
+
+    @Volatile
+    private var lastVerificationPassed: Boolean? = null
+
+    @Volatile
+    private var lastVerificationSummaryFa: String = ""
 
     private val _uiState = MutableStateFlow(computeStatus())
     val uiState: StateFlow<SpeakerIdUiState> = _uiState.asStateFlow()
@@ -137,6 +169,9 @@ class SpeakerIdManager(
 
     val isActive: Boolean
         get() = isModelCompatible() && ownerProfile.exists()
+
+    private fun resolveActiveThreshold(): Float =
+        ownerProfile.loadCalibrationMetadata()?.calibratedThreshold ?: verifier.defaultThreshold
 
     fun refreshStatus() {
         val current = _uiState.value
@@ -166,14 +201,21 @@ class SpeakerIdManager(
         val hasOutdatedFile = embedder.isModelPresent && !hasCompatibleModel
         val hasOwner = ownerProfile.exists()
         val active = hasCompatibleModel && hasOwner
+        val activeThreshold = resolveActiveThreshold()
+        val calMeta = if (hasOwner) ownerProfile.loadCalibrationMetadata() else null
+        val thresholdPct = kotlin.math.round(activeThreshold * 100f).toInt()
         val label = when {
             isDownloading -> "در حال دانلود خودکار مدل شناسایی صدا (CAM++ FP32 • $downloadPercent٪)…"
+            isRecording && currentEnrollmentStep > 0 ->
+                "کالیبراسیون نمونهٔ $currentEnrollmentStep از $currentEnrollmentTotal (${remainingSeconds.coerceAtLeast(1)} ثانیه باقی‌مانده)…"
             isRecording -> "در حال ضبط (${remainingSeconds.coerceAtLeast(1)} ثانیه باقی‌مانده — با صدای عادی صحبت کنید)…"
+            active && calMeta != null ->
+                "✅ شناسایی صدای مالک (N5) فعال است (${calMeta.sampleCount} نمونه • آستانه تطابق $thresholdPct٪)."
             active -> "✅ شناسایی صدای مالک (N5) فعال است؛ دستورات صوتی فقط برای صدای مالک اجرا می‌شوند."
             hasOutdatedFile -> "نسخهٔ قبلی مدل گوینده با موتور گوشی ناسازگار است؛ با زدن «ضبط صدای من» یا دانلود، نسخهٔ سازگار CAM++ (~۲۸MB) خودکار جایگزین می‌شود."
-            hasCompatibleModel && !hasOwner -> "✅ مدل CAM++ آماده است؛ دکمه «ضبط صدای من» را بزنید تا N5 فعال شود."
+            hasCompatibleModel && !hasOwner -> "✅ مدل CAM++ آماده است؛ دکمه «ضبط صدای من» را بزنید تا N5 با ۳ جملهٔ کوتاه کالیبره شود."
             !hasCompatibleModel && hasOwner -> "نمونهٔ صدای مالک ذخیره شده؛ با اولین دانلود/ضبط، مدل سازگار CAM++ خودکار نصب می‌شود."
-            else -> "آمادهٔ راه‌اندازی خودکار: با زدن «ضبط صدای من»، مدل CAM++ (~۲۸MB) خودکار دانلود و صدای شما ثبت می‌شود."
+            else -> "آمادهٔ راه‌اندازی خودکار: با زدن «ضبط صدای من»، مدل CAM++ (~۲۸MB) خودکار دانلود و صدای شما با ۳ جملهٔ کوتاه ثبت می‌شود."
         }
         return SpeakerIdUiState(
             isModelInstalled = hasCompatibleModel,
@@ -184,6 +226,13 @@ class SpeakerIdManager(
             isRecordingOwner = isRecording,
             remainingSeconds = if (isRecording) remainingSeconds else 0,
             liveRmsLevel = if (isRecording) liveRmsLevel else 0f,
+            enrollmentStepIndex = if (isRecording) currentEnrollmentStep else 0,
+            enrollmentTotalSteps = currentEnrollmentTotal.coerceAtLeast(1),
+            enrollmentPromptFa = if (isRecording) currentEnrollmentPromptFa else "",
+            calibratedThreshold = activeThreshold,
+            lastSimilarityScore = lastSimilarityScore,
+            lastVerificationPassed = lastVerificationPassed,
+            lastVerificationSummaryFa = lastVerificationSummaryFa,
             statusLabelFa = label,
             feedbackMessageFa = lastFeedbackFa,
             feedbackIsError = lastFeedbackIsError,
@@ -193,15 +242,19 @@ class SpeakerIdManager(
     /**
      * Checks voice PCM before CommandBrain execution.
      * - If N5 is inactive (missing model or enrollment), returns [SpeakerVerificationOutcome.InactiveFailSafe].
-     * - If active and candidate audio does not match owner (or could not be embedded), rejects politely.
+     * - If raw PCM audio was unavailable (e.g., Android SpeechRecognizer fallback denied concurrent AudioRecord),
+     *   returns [SpeakerVerificationOutcome.AudioUnavailable] so the owner is never falsely locked out.
+     * - If active and candidate audio embeds cleanly, compares against calibrated threshold.
      */
     fun verifyVoicePcm(pcm16k: FloatArray?): SpeakerVerificationOutcome {
         if (!isActive) return SpeakerVerificationOutcome.InactiveFailSafe
         if (pcm16k == null || pcm16k.isEmpty()) {
-            return SpeakerVerificationOutcome.RejectedNonOwner(
-                similarity = 0f,
-                politeMessageFa = POLITE_REJECTION_MESSAGE_FA,
-            )
+            val reason = "در حالت تشخیص گفتار سیستم، نمونهٔ صوت خام در دسترس نبود؛ فرمان با وضعیت احرازنشده اجرا شد. برای احراز دائمی N5، موتور آفلاین Vosk را فعال کنید."
+            lastSimilarityScore = null
+            lastVerificationPassed = null
+            lastVerificationSummaryFa = reason
+            refreshStatus()
+            return SpeakerVerificationOutcome.AudioUnavailable(reason)
         }
         if (!embedder.isReady) {
             val initialized = embedder.initialize(verifyOfficialHash = !hasTrustedCustomModel())
@@ -209,12 +262,23 @@ class SpeakerIdManager(
         }
         val ownerEmbedding = ownerProfile.load() ?: return SpeakerVerificationOutcome.InactiveFailSafe
         val candidateEmbedding = embedder.embed(pcm16k)
-            ?: return SpeakerVerificationOutcome.RejectedNonOwner(
-                similarity = 0f,
-                politeMessageFa = POLITE_REJECTION_MESSAGE_FA,
+            ?: return SpeakerVerificationOutcome.AudioUnavailable(
+                "استخراج بردار صدا در این نوبت ممکن نشد؛ فرمان بدون مسدودسازی اجرا شد."
             )
+        val activeThreshold = resolveActiveThreshold()
         val sim = verifier.similarity(candidateEmbedding, ownerEmbedding)
-        return if (verifier.isOwner(candidateEmbedding, ownerEmbedding)) {
+        val passed = sim >= activeThreshold
+        val simPct = kotlin.math.round(sim * 100f).toInt()
+        val thrPct = kotlin.math.round(activeThreshold * 100f).toInt()
+        lastSimilarityScore = sim
+        lastVerificationPassed = passed
+        lastVerificationSummaryFa = if (passed) {
+            "تطابق صدای مالک تأیید شد (شباهت $simPct٪ • آستانه $thrPct٪)"
+        } else {
+            "تطابق صدای مالک رد شد (شباهت $simPct٪ < آستانه $thrPct٪)"
+        }
+        refreshStatus()
+        return if (passed) {
             SpeakerVerificationOutcome.VerifiedOwner(sim)
         } else {
             SpeakerVerificationOutcome.RejectedNonOwner(
@@ -224,7 +288,10 @@ class SpeakerIdManager(
         }
     }
 
-    suspend fun enrollOwnerFromPcm(pcm16k: FloatArray): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun enrollOwnerFromPcm(pcm16k: FloatArray): Result<String> =
+        enrollOwnerFromSamples(listOf(pcm16k))
+
+    suspend fun enrollOwnerFromSamples(samplesPcm: List<FloatArray>): Result<String> = withContext(Dispatchers.IO) {
         if (!isModelCompatible()) {
             val msg = "N5 غیرفعال است: ابتدا فایل مدل ONNX سازگار شناسایی گوینده را دریافت یا انتخاب کنید."
             setFeedback(msg, isError = true)
@@ -235,24 +302,65 @@ class SpeakerIdManager(
             setFeedback(msg, isError = true)
             return@withContext Result.failure(IllegalStateException(msg))
         }
-        if (pcm16k.size < 8_000) {
-            val msg = "صدای ضبط‌شده بسیار کوتاه بود؛ لطفاً حدود ۳ ثانیه صحبت کنید."
+        if (samplesPcm.isEmpty() || samplesPcm.any { it.size < 8_000 }) {
+            val msg = "حداقل یک نمونهٔ صوتی کامل دریافت نشد؛ لطفاً جمله‌ها را واضح‌تر بیان کنید."
             setFeedback(msg, isError = true)
             return@withContext Result.failure(IllegalArgumentException(msg))
         }
-        val embedding = embedder.embed(pcm16k)
+
+        val embeddings = mutableListOf<FloatArray>()
+        for (pcm in samplesPcm) {
+            val emb = embedder.embed(pcm)
+                ?: run {
+                    val detail = embedder.lastErrorFa.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
+                    val msg = "استخراج بردار صدای مالک از مدل گوینده ناموفق بود$detail؛ مطمئن شوید مدل ONNX انتخاب‌شده مخصوص استخراج بردار صوتی گوینده است."
+                    setFeedback(msg, isError = true)
+                    return@withContext Result.failure(IllegalStateException(msg))
+                }
+            embeddings.add(emb)
+        }
+
+        val centroid = SpeakerEmbedder.averageEmbeddings(embeddings)
             ?: run {
-                val detail = embedder.lastErrorFa.takeIf { it.isNotBlank() }?.let { " ($it)" }.orEmpty()
-                val msg = "استخراج بردار صدای مالک از مدل گوینده ناموفق بود$detail؛ مطمئن شوید مدل ONNX انتخاب‌شده مخصوص استخراج بردار صوتی گوینده است."
+                val msg = "تجمیع بردارهای صدای مالک ممکن نشد."
                 setFeedback(msg, isError = true)
                 return@withContext Result.failure(IllegalStateException(msg))
             }
-        if (!ownerProfile.save(embedding)) {
+
+        val selfSims = embeddings.map { verifier.similarity(it, centroid) }
+        val meanSelfSim = selfSims.average().toFloat().coerceIn(0f, 1f)
+        val minSelfSim = (selfSims.minOrNull() ?: meanSelfSim).coerceIn(0f, 1f)
+        val calibratedThreshold = if (embeddings.size >= 2) {
+            (minSelfSim - 0.12f).coerceIn(0.62f, 0.78f)
+        } else {
+            verifier.defaultThreshold
+        }
+
+        if (!ownerProfile.save(centroid)) {
             val msg = "ذخیرهٔ رمزنگاری‌شدهٔ صدای مالک ناموفق بود."
             setFeedback(msg, isError = true)
             return@withContext Result.failure(IllegalStateException(msg))
         }
-        val okMsg = "صدای شما با موفقیت به‌صورت رمزنگاری‌شده در دستگاه ذخیره شد و N5 فعال گردید."
+        ownerProfile.saveCalibrationMetadata(
+            OwnerCalibrationMetadata(
+                sampleCount = embeddings.size,
+                calibratedThreshold = calibratedThreshold,
+                meanSelfSimilarity = meanSelfSim,
+            )
+        )
+
+        val meanPct = kotlin.math.round(meanSelfSim * 100f).toInt()
+        val thrPct = kotlin.math.round(calibratedThreshold * 100f).toInt()
+        lastSimilarityScore = meanSelfSim
+        lastVerificationPassed = true
+        lastVerificationSummaryFa =
+            "کالیبراسیون با ${embeddings.size} نمونه انجام شد (همگرایی $meanPct٪ • آستانه تطابق $thrPct٪)."
+
+        val okMsg = if (embeddings.size >= 2) {
+            "صدای شما با ${embeddings.size} جمله کالیبره و رمزنگاری شد (همگرایی $meanPct٪ • آستانه $thrPct٪). اکنون N5 فعال است."
+        } else {
+            "صدای شما با موفقیت به‌صورت رمزنگاری‌شده در دستگاه ذخیره شد و N5 فعال گردید."
+        }
         setFeedback(okMsg, isError = false)
         Result.success(okMsg)
     }
@@ -379,7 +487,10 @@ class SpeakerIdManager(
     }
 
     @SuppressLint("MissingPermission")
-    suspend fun recordAndEnrollOwner(durationMs: Long = DEFAULT_ENROLLMENT_DURATION_MS): Result<String> = withContext(Dispatchers.IO) {
+    suspend fun recordAndEnrollOwner(
+        durationMsPerSample: Long = DEFAULT_SAMPLE_DURATION_MS,
+        promptsFa: List<String> = DEFAULT_ENROLLMENT_PROMPTS_FA,
+    ): Result<String> = withContext(Dispatchers.IO) {
         if (!hasRecordAudioPermission()) {
             val msg = "مجوز میکروفون صادر نشده است؛ لطفاً ابتدا دسترسی ضبط صدا را بدهید."
             setFeedback(msg, isError = true)
@@ -397,12 +508,16 @@ class SpeakerIdManager(
             }
         }
 
+        val activePrompts = promptsFa.ifEmpty { DEFAULT_ENROLLMENT_PROMPTS_FA }
         val wasMicServiceRunning = com.example.sol.voice.MicForegroundService.isRunning.value
         var leased = false
         lastFeedbackFa = ""
         lastFeedbackIsError = false
-        val totalSeconds = ((durationMs + 999L) / 1000L).toInt().coerceAtLeast(1)
-        _uiState.value = computeStatus(isRecording = true, remainingSeconds = totalSeconds, liveRmsLevel = 0f)
+        currentEnrollmentTotal = activePrompts.size
+        currentEnrollmentStep = 1
+        currentEnrollmentPromptFa = activePrompts.first()
+        val sampleSeconds = ((durationMsPerSample + 999L) / 1000L).toInt().coerceAtLeast(1)
+        _uiState.value = computeStatus(isRecording = true, remainingSeconds = sampleSeconds, liveRmsLevel = 0f)
         var recorderRef: AudioRecord? = null
         try {
             if (micArbiter != null) {
@@ -412,39 +527,51 @@ class SpeakerIdManager(
                 com.example.sol.voice.MicForegroundService.pauseAndAwaitRelease(appContext)
             }
 
-            val capture = capturePcmSamples(
-                durationMs = durationMs,
-                onRecorderSwap = { recorderRef = it },
-                onTelemetry = { remSec, rmsNorm ->
-                    _uiState.value = computeStatus(
-                        isRecording = true,
-                        remainingSeconds = remSec,
-                        liveRmsLevel = rmsNorm,
-                    )
-                },
-            )
-            capture.fold(
-                onSuccess = { samples ->
-                    val meanRms = computeMeanRms(samples)
-                    if (meanRms < MIN_ENROLLMENT_MEAN_RMS) {
-                        val quietMsg = "صدای دریافت‌شده بسیار ضعیف یا ساکت بود؛ لطفاً نزدیک‌تر صحبت کنید و در اتاق ساکت‌تر امتحان کنید."
-                        setFeedback(quietMsg, isError = true)
-                        Result.failure(IllegalStateException(quietMsg))
-                    } else {
-                        enrollOwnerFromPcm(samples)
-                    }
-                },
-                onFailure = { err ->
-                    val errMsg = err.localizedMessage ?: "ضبط صدای مالک ناموفق بود."
+            val capturedSamples = mutableListOf<FloatArray>()
+            for ((idx, prompt) in activePrompts.withIndex()) {
+                currentEnrollmentStep = idx + 1
+                currentEnrollmentPromptFa = prompt
+                _uiState.value = computeStatus(isRecording = true, remainingSeconds = sampleSeconds, liveRmsLevel = 0f)
+
+                val capture = capturePcmSamples(
+                    durationMs = durationMsPerSample,
+                    onRecorderSwap = { recorderRef = it },
+                    onTelemetry = { remSec, rmsNorm ->
+                        _uiState.value = computeStatus(
+                            isRecording = true,
+                            remainingSeconds = remSec,
+                            liveRmsLevel = rmsNorm,
+                        )
+                    },
+                )
+                val samples = capture.getOrElse { err ->
+                    val errMsg = err.localizedMessage ?: "ضبط نمونهٔ ${idx + 1} صدای مالک ناموفق بود."
                     setFeedback(errMsg, isError = true)
-                    Result.failure(err)
-                },
-            )
+                    return@withContext Result.failure(err)
+                }
+                val meanRms = computeMeanRms(samples)
+                if (meanRms < MIN_ENROLLMENT_MEAN_RMS) {
+                    val quietMsg = "صدای جملهٔ ${idx + 1} بسیار ضعیف یا ساکت بود؛ لطفاً نزدیک‌تر و واضح‌تر صحبت کنید."
+                    setFeedback(quietMsg, isError = true)
+                    return@withContext Result.failure(IllegalStateException(quietMsg))
+                }
+                capturedSamples.add(samples)
+
+                if (idx < activePrompts.lastIndex) {
+                    currentEnrollmentPromptFa = "نمونهٔ ${idx + 1} با موفقیت ثبت شد؛ آمادهٔ جملهٔ بعدی باشید…"
+                    _uiState.value = computeStatus(isRecording = true, remainingSeconds = 1, liveRmsLevel = 0f)
+                    delay(650L)
+                }
+            }
+
+            enrollOwnerFromSamples(capturedSamples)
         } catch (t: Throwable) {
             val msg = "خطا در ضبط صدای مالک: ${t.localizedMessage ?: "نامشخص"}"
             setFeedback(msg, isError = true)
             Result.failure(IllegalStateException(msg))
         } finally {
+            currentEnrollmentStep = 0
+            currentEnrollmentPromptFa = ""
             runCatching { recorderRef?.stop() }
             runCatching { recorderRef?.release() }
             withContext(NonCancellable) {
@@ -457,6 +584,114 @@ class SpeakerIdManager(
             _uiState.value = computeStatus(isRecording = false, remainingSeconds = 0, liveRmsLevel = 0f)
         }
     }
+
+    @SuppressLint("MissingPermission")
+    suspend fun testOwnerVoiceVerification(durationMs: Long = DEFAULT_TEST_DURATION_MS): Result<Float> =
+        withContext(Dispatchers.IO) {
+            if (!hasRecordAudioPermission()) {
+                val msg = "مجوز میکروفون صادر نشده است؛ تست تطابق صدا ممکن نیست."
+                setFeedback(msg, isError = true)
+                return@withContext Result.failure(SecurityException(msg))
+            }
+            if (!isActive) {
+                val msg = "ابتدا صدای مالک (N5) را با «ضبط صدای من» ثبت کنید."
+                setFeedback(msg, isError = true)
+                return@withContext Result.failure(IllegalStateException(msg))
+            }
+            if (!embedder.isReady && !embedder.initialize(verifyOfficialHash = !hasTrustedCustomModel())) {
+                val msg = embedder.lastErrorFa.ifBlank { "بارگذاری مدل CAM++ ناموفق بود." }
+                setFeedback(msg, isError = true)
+                return@withContext Result.failure(IllegalStateException(msg))
+            }
+            val ownerEmbedding = ownerProfile.load()
+                ?: run {
+                    val msg = "پروفایل رمزنگاری‌شدهٔ صدای مالک یافت نشد."
+                    setFeedback(msg, isError = true)
+                    return@withContext Result.failure(IllegalStateException(msg))
+                }
+
+            val wasMicServiceRunning = com.example.sol.voice.MicForegroundService.isRunning.value
+            var leased = false
+            lastFeedbackFa = ""
+            lastFeedbackIsError = false
+            currentEnrollmentStep = 0
+            currentEnrollmentPromptFa = DEFAULT_TEST_PROMPT_FA
+            val testSec = ((durationMs + 999L) / 1000L).toInt().coerceAtLeast(1)
+            _uiState.value = computeStatus(isRecording = true, remainingSeconds = testSec, liveRmsLevel = 0f)
+            var recorderRef: AudioRecord? = null
+            try {
+                if (micArbiter != null) {
+                    micArbiter.acquire(MicOwner.MIC_HEALTH_TEST)
+                    leased = true
+                } else if (wasMicServiceRunning) {
+                    com.example.sol.voice.MicForegroundService.pauseAndAwaitRelease(appContext)
+                }
+
+                val capture = capturePcmSamples(
+                    durationMs = durationMs,
+                    onRecorderSwap = { recorderRef = it },
+                    onTelemetry = { remSec, rmsNorm ->
+                        _uiState.value = computeStatus(
+                            isRecording = true,
+                            remainingSeconds = remSec,
+                            liveRmsLevel = rmsNorm,
+                        )
+                    },
+                )
+                val samples = capture.getOrElse { err ->
+                    val msg = err.localizedMessage ?: "ضبط صوت برای تست تطابق ناموفق بود."
+                    setFeedback(msg, isError = true)
+                    return@withContext Result.failure(err)
+                }
+                if (computeMeanRms(samples) < MIN_ENROLLMENT_MEAN_RMS) {
+                    val msg = "صدای دریافت‌شده بسیار ضعیف بود؛ لطفاً یک جمله با صدای عادی بگویید."
+                    setFeedback(msg, isError = true)
+                    return@withContext Result.failure(IllegalStateException(msg))
+                }
+                val candidateEmbedding = embedder.embed(samples)
+                    ?: run {
+                        val msg = embedder.lastErrorFa.ifBlank { "استخراج بردار صدا در تست ناموفق بود." }
+                        setFeedback(msg, isError = true)
+                        return@withContext Result.failure(IllegalStateException(msg))
+                    }
+
+                val activeThreshold = resolveActiveThreshold()
+                val sim = verifier.similarity(candidateEmbedding, ownerEmbedding)
+                val passed = sim >= activeThreshold
+                val simPct = kotlin.math.round(sim * 100f).toInt()
+                val thrPct = kotlin.math.round(activeThreshold * 100f).toInt()
+                lastSimilarityScore = sim
+                lastVerificationPassed = passed
+                lastVerificationSummaryFa = if (passed) {
+                    "✅ تأیید شد • میزان شباهت: $simPct٪ (حداقل مجاز: $thrPct٪)"
+                } else {
+                    "⚠️ مطابقت نداشت • میزان شباهت: $simPct٪ (حداقل مجاز: $thrPct٪)"
+                }
+                val feedback = if (passed) {
+                    "✅ صدای شما با پروفایل مالک تطابق داشت (شباهت $simPct٪ • آستانه $thrPct٪)."
+                } else {
+                    "⚠️ شباهت صدا ($simPct٪) کمتر از آستانهٔ کالیبره‌شده ($thrPct٪) بود؛ در صورت تغییر محیط یا میکروفون، ۳ جملهٔ مالک را دوباره ثبت کنید."
+                }
+                setFeedback(feedback, isError = !passed)
+                Result.success(sim)
+            } catch (t: Throwable) {
+                val msg = "خطا در تست تطابق صدا: ${t.localizedMessage ?: "نامشخص"}"
+                setFeedback(msg, isError = true)
+                Result.failure(IllegalStateException(msg))
+            } finally {
+                currentEnrollmentPromptFa = ""
+                runCatching { recorderRef?.stop() }
+                runCatching { recorderRef?.release() }
+                withContext(NonCancellable) {
+                    if (leased) {
+                        micArbiter?.release(MicOwner.MIC_HEALTH_TEST)
+                    } else if (wasMicServiceRunning) {
+                        com.example.sol.voice.MicForegroundService.resume(appContext)
+                    }
+                }
+                _uiState.value = computeStatus(isRecording = false, remainingSeconds = 0, liveRmsLevel = 0f)
+            }
+        }
 
     @SuppressLint("MissingPermission")
     suspend fun testMicrophoneHealth(durationMs: Long = 1_500L): Result<String> = withContext(Dispatchers.IO) {
@@ -628,6 +863,9 @@ class SpeakerIdManager(
 
     fun clearOwnerProfile() {
         ownerProfile.clear()
+        lastSimilarityScore = null
+        lastVerificationPassed = null
+        lastVerificationSummaryFa = ""
         setFeedback("نمونهٔ صدای مالک پاک شد (N5 غیرفعال).", isError = false)
     }
 
@@ -638,12 +876,25 @@ class SpeakerIdManager(
         runCatching { customTrustedShaFile.delete() }
         lastFeedbackFa = ""
         lastFeedbackIsError = false
+        lastSimilarityScore = null
+        lastVerificationPassed = null
+        lastVerificationSummaryFa = ""
         refreshStatus()
     }
 
     companion object {
-        const val DEFAULT_ENROLLMENT_DURATION_MS = 6_000L
+        const val DEFAULT_SAMPLE_DURATION_MS = 2_800L
+        const val DEFAULT_TEST_DURATION_MS = 2_800L
         const val MIN_ENROLLMENT_MEAN_RMS = 0.005f
+
+        val DEFAULT_ENROLLMENT_PROMPTS_FA = listOf(
+            "سلام سول، امروز حال و هوا چطوره و برنامه‌های من چیه؟",
+            "ساعت و تاریخ دقیق امروز رو بگو و یادآورهای مهم رو چک کن.",
+            "فقط با صدای من دستورات خصوصی رو اجرا کن و حریم شخصی رو نگه دار.",
+        )
+
+        const val DEFAULT_TEST_PROMPT_FA =
+            "جملهٔ آزمایشی: «سلام سول، ساعت چنده و امروز چه خبره؟»"
 
         const val POLITE_REJECTION_MESSAGE_FA =
             "عذرخواهی می‌کنم؛ صدای شما با صدای ثبت‌شدهٔ مالک دستگاه مطابقت نداشت. برای حفظ امنیت، این دستور اجرا نشد."

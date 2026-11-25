@@ -70,4 +70,5 @@ data class DialogueResult(
     val actionChoices: List<DialogueUiChoice> = emptyList(),
     val nluConfidenceLabel: String = "",
     val taughtExampleSaved: Boolean = false,
+    val speakerNoticeFa: String? = null,
 )

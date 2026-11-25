@@ -94,6 +94,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var isContinuousWakeSessionActive = false
     private var continuousRearmJob: Job? = null
 
+    @Volatile
+    private var activeStreamingSpeechSession: com.example.sol.tts.StreamingSpeechSession? = null
+
     init {
         viewModelScope.launch {
             com.example.sol.voice.MicForegroundService.wakeEvents.collect {
@@ -187,6 +190,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 if (result.speakReply && currentPrefs.autoSpeak) {
                     speakText(result.replyText)
                 }
+            }
+            if (result.speakerNoticeFa != null) {
+                c.uiBridge.postBanner(result.speakerNoticeFa)
             }
             c.uiBridge.triggerRefreshSnapshots()
 
@@ -297,6 +303,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
 
+                activeStreamingSpeechSession?.cancel()
+                activeStreamingSpeechSession = null
+                val streamSession = if (prefs.autoSpeak) {
+                    c.ttsManager.beginStreamingSpeech(
+                        speechRate = prefs.speechRate,
+                        persona = prefs.voicePersona,
+                    ).also { activeStreamingSpeechSession = it }
+                } else {
+                    null
+                }
+                val speechBuffer = com.example.sol.tts.SlmSpeechStreamBuffer()
+
                 val res = c.localSlmEngine.generateReplyStream(
                     userPrompt = com.example.sol.knowledge.SlmPromptBuilder.buildChatUserPrompt(task.userPrompt),
                     systemInstruction = task.systemInstruction,
@@ -304,6 +322,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     preferGpu = prefs.slmPreferGpu,
                 ) { partialClean ->
                     updateMessageText(placeholderId, partialClean)
+                    if (streamSession != null) {
+                        for (sentence in speechBuffer.appendAndDrainReadySentences(partialClean)) {
+                            streamSession.enqueue(sentence)
+                        }
+                    }
                 }
 
                 res.fold(
@@ -321,11 +344,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             retentionMode = prefs.historyRetentionMode,
                             privateModeEnabled = prefs.privateModeEnabled,
                         )
-                        if (prefs.autoSpeak) {
+                        if (streamSession != null) {
+                            speechBuffer.flushRemaining(finalText)?.let { tail ->
+                                streamSession.enqueue(tail)
+                            }
+                            streamSession.finish()
+                            activeStreamingSpeechSession = null
+                        } else if (prefs.autoSpeak) {
                             speakText(finalText)
                         }
                     },
                     onFailure = { err ->
+                        streamSession?.cancel()
+                        activeStreamingSpeechSession = null
                         val reason = err.localizedMessage ?: "امکان اجرای مدل زبانی در این لحظه وجود ندارد."
                         val fallbackBlock = if (task.fallbackReplyText.isNotBlank()) {
                             "⚠️ اجرای مدل زبانی ممکن نشد ($reason).\n\n${task.fallbackReplyText}"
@@ -338,6 +369,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                 )
+            } catch (t: Throwable) {
+                activeStreamingSpeechSession?.cancel()
+                activeStreamingSpeechSession = null
+                throw t
             } finally {
                 _isSlmGenerating.value = false
                 c.uiBridge.triggerRefreshSnapshots()
@@ -508,6 +543,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun stopSlmGeneration() {
         c.localSlmEngine.stopGeneration()
+        activeStreamingSpeechSession?.cancel()
+        activeStreamingSpeechSession = null
         _isSlmGenerating.value = false
     }
 

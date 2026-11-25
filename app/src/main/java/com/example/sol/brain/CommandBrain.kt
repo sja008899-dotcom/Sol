@@ -29,6 +29,7 @@ class CommandBrain(
             parsedCommand = result.parsedCommand,
             pendingTask = result.pendingTask,
             speakReply = result.speakReply,
+            speakerNoticeFa = result.speakerNoticeFa,
         )
     }
 
@@ -37,23 +38,35 @@ class CommandBrain(
         audioPcm16k: FloatArray? = null,
         isVoiceCommand: Boolean = audioPcm16k != null,
     ): DialogueResult {
+        var speakerNotice: String? = null
         if (isVoiceCommand && speakerIdManager != null && speakerIdManager.isActive) {
-            val outcome = speakerIdManager.verifyVoicePcm(audioPcm16k)
-            if (outcome is SpeakerVerificationOutcome.RejectedNonOwner) {
-                val blockedCmd = ParsedCommand(
-                    action = SolAction.UNKNOWN,
-                    rawText = rawInput,
-                    normalizedText = PersianTextNormalizer.normalizeForMatching(rawInput),
-                    requireConfirmation = true,
-                )
-                return DialogueResult(
-                    replyText = outcome.politeMessageFa,
-                    parsedCommand = blockedCmd,
-                    pendingTask = null,
-                    speakReply = true,
-                )
+            when (val outcome = speakerIdManager.verifyVoicePcm(audioPcm16k)) {
+                is SpeakerVerificationOutcome.RejectedNonOwner -> {
+                    val blockedCmd = ParsedCommand(
+                        action = SolAction.UNKNOWN,
+                        rawText = rawInput,
+                        normalizedText = PersianTextNormalizer.normalizeForMatching(rawInput),
+                        requireConfirmation = true,
+                    )
+                    return DialogueResult(
+                        replyText = outcome.politeMessageFa,
+                        parsedCommand = blockedCmd,
+                        pendingTask = null,
+                        speakReply = true,
+                    )
+                }
+                is SpeakerVerificationOutcome.AudioUnavailable -> {
+                    speakerNotice = outcome.reasonFa
+                }
+                is SpeakerVerificationOutcome.VerifiedOwner,
+                SpeakerVerificationOutcome.InactiveFailSafe -> Unit
             }
         }
-        return dialogueManager.handleTurn(rawInput)
+        val result = dialogueManager.handleTurn(rawInput)
+        return if (speakerNotice != null) {
+            result.copy(speakerNoticeFa = speakerNotice)
+        } else {
+            result
+        }
     }
 }

@@ -100,6 +100,7 @@ data class BrainExecutionResult(
     val parsedCommand: ParsedCommand,
     val pendingTask: PendingSolTask? = null,
     val speakReply: Boolean = true,
+    val speakerNoticeFa: String? = null,
 )
 
 sealed interface PendingSolTask {

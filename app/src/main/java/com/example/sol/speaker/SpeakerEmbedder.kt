@@ -359,5 +359,24 @@ class SpeakerEmbedder(private val modelFile: File) {
             val norm = sqrt(sumSq).coerceAtLeast(1e-8f)
             return FloatArray(vec.size) { i -> vec[i] / norm }
         }
+
+        fun averageEmbeddings(embeddings: List<FloatArray>): FloatArray? {
+            val valid = embeddings.filter { it.isNotEmpty() }
+            if (valid.isEmpty()) return null
+            val dim = valid.first().size
+            if (valid.any { it.size != dim }) return null
+            val acc = FloatArray(dim)
+            for (vec in valid) {
+                val normed = l2Normalize(vec)
+                for (i in 0 until dim) {
+                    acc[i] += normed[i]
+                }
+            }
+            val n = valid.size.toFloat()
+            for (i in 0 until dim) {
+                acc[i] /= n
+            }
+            return l2Normalize(acc)
+        }
     }
 }

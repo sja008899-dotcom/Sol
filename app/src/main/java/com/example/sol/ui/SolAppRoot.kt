@@ -108,6 +108,7 @@ private enum class PendingMicPermissionAction {
     ROLE_VOICE,
     RECORD_OWNER_VOICE,
     TEST_OWNER_MIC,
+    TEST_OWNER_VOICE,
     SCREEN_OFF_MIC,
 }
 
@@ -163,6 +164,7 @@ fun SolAppRoot(
             when (requested) {
                 PendingMicPermissionAction.RECORD_OWNER_VOICE -> settingsViewModel.recordOwnerVoice()
                 PendingMicPermissionAction.TEST_OWNER_MIC -> settingsViewModel.testSpeakerMicrophone()
+                PendingMicPermissionAction.TEST_OWNER_VOICE -> settingsViewModel.testOwnerVoice()
                 PendingMicPermissionAction.SCREEN_OFF_MIC -> settingsViewModel.setScreenOffMicEnabled(true)
                 PendingMicPermissionAction.WAKE_WORD -> chatViewModel.startWakeWordGuard()
                 PendingMicPermissionAction.CONFIRM_VOICE -> chatViewModel.startVoiceConfirmationListening()
@@ -722,6 +724,14 @@ fun SolAppRoot(
                                                 settingsViewModel.testSpeakerMicrophone()
                                             } else {
                                                 pendingMicAction = PendingMicPermissionAction.TEST_OWNER_MIC
+                                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                            }
+                                        },
+                                        onTestOwnerVoice = {
+                                            if (hasMicPermission) {
+                                                settingsViewModel.testOwnerVoice()
+                                            } else {
+                                                pendingMicAction = PendingMicPermissionAction.TEST_OWNER_VOICE
                                                 micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
                                             }
                                         },

@@ -6,13 +6,17 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.sol.network.SolHttpClient
 import com.example.sol.network.SolNetworkException
 import com.example.sol.security.SolMemoryOptimizer
+import com.example.sol.speaker.OwnerCalibrationMetadata
+import com.example.sol.speaker.OwnerProfile
 import com.example.sol.speaker.SpeakerEmbedder
 import com.example.sol.speaker.SpeakerIdManager
+import com.example.sol.speaker.SpeakerVerificationOutcome
 import com.example.sol.tts.AudioConfig
 import com.example.sol.tts.PersianPhonemizer
 import com.example.sol.tts.PiperConfig
 import com.example.sol.tts.PiperTtsEngine
 import com.example.sol.tts.PiperTtsStatus
+import com.example.sol.tts.SlmSpeechStreamBuffer
 import com.example.sol.tts.TtsManager
 import com.example.sol.voice.MicArbiter
 import com.example.sol.voice.MicOwner
@@ -542,5 +546,146 @@ class M9ReliabilityAndAudioTests {
             c.learningEngine.forget("کد درب پارکینگ")
             c.dialogueManager.clearHistory()
         }
+    }
+
+    private class InMemoryTestOwnerProfile(
+        context: Context,
+        storageFile: File,
+    ) : OwnerProfile(context, storageFile) {
+        private var stored: FloatArray? = null
+        override fun exists(): Boolean = stored != null
+        override fun save(embedding: FloatArray): Boolean {
+            stored = embedding.copyOf()
+            return true
+        }
+        override fun load(): FloatArray? = stored?.copyOf()
+        override fun clear(): Boolean {
+            stored = null
+            return super.clear()
+        }
+    }
+
+    @Test
+    fun `n5 speaker gate allows voice command with AudioUnavailable notice when pcm16k is null during fallback`(): Unit = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val app = context.applicationContext as SolApplication
+        val c = app.container
+
+        val testDir = File(context.filesDir, "speaker_test_fallback").apply { mkdirs() }
+        val modelFile = File(testDir, "speaker_embedder.onnx").apply { writeBytes("CUSTOM_TEST_MODEL".toByteArray()) }
+        val shaHex = SpeakerEmbedder(modelFile).currentSha256()
+        File(testDir, "${modelFile.name}.custom_sha256").writeText(shaHex)
+
+        val ownerFile = File(testDir, "owner_test.bin")
+        val ownerProfile = InMemoryTestOwnerProfile(context, storageFile = ownerFile)
+        assertTrue(ownerProfile.save(floatArrayOf(1f, 0f, 0f, 0f)))
+
+        val speakerManager = SpeakerIdManager(
+            context = context,
+            modelFile = modelFile,
+            ownerProfile = ownerProfile,
+        )
+        try {
+            assertTrue("Expected N5 to be active for fallback verification test", speakerManager.isActive)
+            val outcome = speakerManager.verifyVoicePcm(null)
+            assertTrue("Expected AudioUnavailable outcome, got $outcome", outcome is SpeakerVerificationOutcome.AudioUnavailable)
+
+            val brain = com.example.sol.brain.CommandBrain(
+                dialogueManager = c.dialogueManager,
+                speakerIdManager = speakerManager,
+            )
+            val voiceResult = brain.processDialogue(
+                rawInput = "ساعت چنده؟",
+                audioPcm16k = null,
+                isVoiceCommand = true,
+            )
+            assertFalse(
+                "Owner command should not be blocked during SpeechRecognizer fallback",
+                voiceResult.parsedCommand.action == com.example.sol.brain.SolAction.UNKNOWN,
+            )
+            assertNotNull("Expected informative speakerNoticeFa when PCM is unavailable", voiceResult.speakerNoticeFa)
+            assertTrue(voiceResult.speakerNoticeFa!!.contains("احرازنشده"))
+
+            val textResult = brain.processDialogue(
+                rawInput = "ساعت چنده؟",
+                audioPcm16k = null,
+                isVoiceCommand = false,
+            )
+            assertEquals(null, textResult.speakerNoticeFa)
+        } finally {
+            speakerManager.deleteAllSpeakerData()
+            testDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `speaker embedder averages L2 embeddings and owner calibration metadata persists calibrated threshold`() {
+        val e1 = floatArrayOf(2f, 0f, 0f)
+        val e2 = floatArrayOf(0f, 3f, 0f)
+        val centroid = SpeakerEmbedder.averageEmbeddings(listOf(e1, e2))
+        assertNotNull(centroid)
+        centroid!!
+        assertEquals(3, centroid.size)
+        assertEquals(0.7071f, centroid[0], 0.002f)
+        assertEquals(0.7071f, centroid[1], 0.002f)
+        assertEquals(0f, centroid[2], 0.0001f)
+
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val tempDir = File(context.filesDir, "speaker_cal_meta_test").apply { mkdirs() }
+        val profile = InMemoryTestOwnerProfile(context, storageFile = File(tempDir, "owner_cal.bin"))
+        try {
+            assertTrue(profile.save(centroid))
+            assertTrue(
+                profile.saveCalibrationMetadata(
+                    OwnerCalibrationMetadata(
+                        sampleCount = 3,
+                        calibratedThreshold = 0.68f,
+                        meanSelfSimilarity = 0.87f,
+                    )
+                )
+            )
+            val loaded = profile.loadCalibrationMetadata()
+            assertNotNull(loaded)
+            assertEquals(3, loaded!!.sampleCount)
+            assertEquals(0.68f, loaded.calibratedThreshold, 0.0001f)
+            assertEquals(0.87f, loaded.meanSelfSimilarity, 0.0001f)
+
+            profile.clear()
+            assertEquals(null, profile.loadCalibrationMetadata())
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `slm speech stream buffer extracts persian sentences incrementally without splitting decimals`() {
+        val buffer = SlmSpeechStreamBuffer(minSentenceChars = 10, maxClauseChars = 80)
+
+        assertTrue(buffer.appendAndDrainReadySentences("سلام جو").isEmpty())
+
+        val step2 = buffer.appendAndDrainReadySentences("سلام جواد عزیز. امروز هوا ")
+        assertEquals(listOf("سلام جواد عزیز."), step2)
+
+        // Holds off while trailing decimal "۱۲." might continue with fractional digits
+        assertTrue(buffer.appendAndDrainReadySentences("سلام جواد عزیز. امروز هوا ۱۲.").isEmpty())
+
+        val step4 = buffer.appendAndDrainReadySentences(
+            "سلام جواد عزیز. امروز هوا ۱۲.۵ درجه است؟ فردا چطور!"
+        )
+        assertEquals(listOf("امروز هوا ۱۲.۵ درجه است؟", "فردا چطور!"), step4)
+
+        val tail = buffer.flushRemaining(
+            "سلام جواد عزیز. امروز هوا ۱۲.۵ درجه است؟ فردا چطور! روز خوبی داشته باشی"
+        )
+        assertEquals("روز خوبی داشته باشی", tail)
+
+        // Long unpunctuated sentence splits cleanly on clause boundary without dropping tokens
+        val longBuf = SlmSpeechStreamBuffer(minSentenceChars = 10, maxClauseChars = 50)
+        val longText = "این یک پاسخ طولانی آزمایشی است که بدون نقطه و علامت سوال ادامه پیدا می‌کند تا بخش‌بندی خودکار بررسی شود"
+        val firstPart = longBuf.appendAndDrainReadySentences(longText)
+        val secondPart = longBuf.flushRemaining(longText)
+        assertTrue("Expected long clause to emit >= 1 chunk early", firstPart.isNotEmpty())
+        val reconstructed = (firstPart + listOfNotNull(secondPart)).joinToString(" ").replace(Regex("\\s+"), " ").trim()
+        assertEquals(longText, reconstructed)
     }
 }
