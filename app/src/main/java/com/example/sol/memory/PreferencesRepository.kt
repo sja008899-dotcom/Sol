@@ -86,6 +86,8 @@ data class SolPreferences(
     val trustedVoskBytes: Long = 0L,
     val trustedPiperOnnxSha256: String = "",
     val trustedPiperConfigSha256: String = "",
+    // M10 Offline strict policy: zero outbound sockets and zero cloud ASR fallback
+    val offlineStrictMode: Boolean = false,
 )
 
 class PreferencesRepository(private val context: Context) {
@@ -123,6 +125,7 @@ class PreferencesRepository(private val context: Context) {
         val TRUSTED_VOSK_BYTES = longPreferencesKey("trusted_vosk_bytes")
         val TRUSTED_PIPER_ONNX_SHA256 = stringPreferencesKey("trusted_piper_onnx_sha256")
         val TRUSTED_PIPER_CONFIG_SHA256 = stringPreferencesKey("trusted_piper_config_sha256")
+        val OFFLINE_STRICT_MODE = booleanPreferencesKey("offline_strict_mode")
     }
 
     val preferences: Flow<SolPreferences> = context.solPrefsDataStore.data.map { p ->
@@ -165,6 +168,7 @@ class PreferencesRepository(private val context: Context) {
             trustedVoskBytes = p[Keys.TRUSTED_VOSK_BYTES] ?: 0L,
             trustedPiperOnnxSha256 = p[Keys.TRUSTED_PIPER_ONNX_SHA256] ?: "",
             trustedPiperConfigSha256 = p[Keys.TRUSTED_PIPER_CONFIG_SHA256] ?: "",
+            offlineStrictMode = p[Keys.OFFLINE_STRICT_MODE] ?: false,
         )
     }
 
@@ -318,6 +322,10 @@ class PreferencesRepository(private val context: Context) {
         }
     }
 
+    suspend fun setOfflineStrictMode(enabled: Boolean) {
+        context.solPrefsDataStore.edit { it[Keys.OFFLINE_STRICT_MODE] = enabled }
+    }
+
     suspend fun resetAllPreferences() {
         context.solPrefsDataStore.edit { it.clear() }
     }
@@ -355,6 +363,7 @@ class PreferencesRepository(private val context: Context) {
             p[Keys.TRUSTED_VOSK_BYTES] = restored.trustedVoskBytes
             p[Keys.TRUSTED_PIPER_ONNX_SHA256] = restored.trustedPiperOnnxSha256
             p[Keys.TRUSTED_PIPER_CONFIG_SHA256] = restored.trustedPiperConfigSha256
+            p[Keys.OFFLINE_STRICT_MODE] = restored.offlineStrictMode
         }
     }
 

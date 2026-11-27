@@ -681,6 +681,7 @@ fun SolAppRoot(
                                     val securityAudit by settingsViewModel.securityAudit.collectAsStateWithLifecycle()
                                     val speakerIdState by settingsViewModel.speakerIdState.collectAsStateWithLifecycle()
                                     val isMicServiceRunning by settingsViewModel.isMicServiceRunning.collectAsStateWithLifecycle()
+                                    val lastNetworkEventFa by settingsViewModel.lastNetworkEventFa.collectAsStateWithLifecycle()
 
                                     SettingsScreen(
                                         preferences = preferences,
@@ -802,6 +803,8 @@ fun SolAppRoot(
                                             settingsViewModel.refreshReliabilityStatus()
                                             navController.navigate(ROUTE_RELIABILITY)
                                         },
+                                        lastNetworkEventFa = lastNetworkEventFa,
+                                        onOfflineStrictToggle = settingsViewModel::setOfflineStrictMode,
                                     )
                                 }
 

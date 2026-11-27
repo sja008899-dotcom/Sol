@@ -97,6 +97,7 @@ private data class StagedPreferences(
     val slmPreferGpu: Boolean?,
     val historyRetentionMode: String?,
     val privateModeEnabled: Boolean?,
+    val offlineStrictMode: Boolean? = null,
 )
 
 private data class StagedBackupPayload(
@@ -230,6 +231,7 @@ class EncryptedBackupManager(
                         jw.name("slmPreferGpu").value(prefs.slmPreferGpu)
                         jw.name("historyRetentionMode").value(prefs.historyRetentionMode.name)
                         jw.name("privateModeEnabled").value(prefs.privateModeEnabled)
+                        jw.name("offlineStrictMode").value(prefs.offlineStrictMode)
                         jw.endObject()
 
                         jw.name("memories").beginArray()
@@ -635,6 +637,7 @@ class EncryptedBackupManager(
                         runCatching { HistoryRetentionMode.valueOf(it) }.getOrNull()
                     } ?: current.historyRetentionMode,
                     privateModeEnabled = p.privateModeEnabled ?: current.privateModeEnabled,
+                    offlineStrictMode = p.offlineStrictMode ?: current.offlineStrictMode,
                 )
             )
         }
@@ -843,6 +846,7 @@ class EncryptedBackupManager(
         var slmPreferGpu: Boolean? = null
         var historyRetentionMode: String? = null
         var privateModeEnabled: Boolean? = null
+        var offlineStrictMode: Boolean? = null
 
         jr.beginObject()
         while (jr.hasNext()) {
@@ -865,6 +869,7 @@ class EncryptedBackupManager(
                 "slmPreferGpu" -> slmPreferGpu = nextBooleanOrNull(jr)
                 "historyRetentionMode" -> historyRetentionMode = nextStringOrNull(jr)
                 "privateModeEnabled" -> privateModeEnabled = nextBooleanOrNull(jr)
+                "offlineStrictMode" -> offlineStrictMode = nextBooleanOrNull(jr)
                 else -> jr.skipValue()
             }
         }
@@ -889,6 +894,7 @@ class EncryptedBackupManager(
             slmPreferGpu = slmPreferGpu,
             historyRetentionMode = historyRetentionMode,
             privateModeEnabled = privateModeEnabled,
+            offlineStrictMode = offlineStrictMode,
         )
     }
 

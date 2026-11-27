@@ -74,8 +74,12 @@ class SlmViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun requestDownloadSlmModel(spec: SlmModelSpec) {
+        if (c.networkPolicyCoordinator.isOfflineStrict()) {
+            c.uiBridge.postBanner("حالت آفلاین سخت‌گیرانه فعال است؛ دانلود مدل زبانی مسدود شد.")
+            return
+        }
         if (spec.hasVerifiedIntegrityMetadata()) {
-            downloadSlmModel(spec)
+            downloadSlmModel(spec, allowUnpinnedTierB = false)
         } else {
             _pendingSlmTierBConfirm.value = spec
         }
@@ -84,15 +88,29 @@ class SlmViewModel(application: Application) : AndroidViewModel(application) {
     fun confirmSlmTierBDownload() {
         val spec = _pendingSlmTierBConfirm.value ?: return
         _pendingSlmTierBConfirm.value = null
-        downloadSlmModel(spec)
+        downloadSlmModel(spec, allowUnpinnedTierB = true)
     }
 
     fun dismissSlmTierBDownload() {
         _pendingSlmTierBConfirm.value = null
     }
 
-    fun downloadSlmModel(spec: SlmModelSpec) {
-        c.localSlmEngine.downloadModel(spec) { savedPath ->
+    fun downloadSlmModel(
+        spec: SlmModelSpec,
+        allowUnpinnedTierB: Boolean = false,
+    ) {
+        if (c.networkPolicyCoordinator.isOfflineStrict()) {
+            c.uiBridge.postBanner("حالت آفلاین سخت‌گیرانه فعال است؛ دانلود مدل مسدود شد.")
+            return
+        }
+        if (!spec.hasVerifiedIntegrityMetadata() && !allowUnpinnedTierB) {
+            _pendingSlmTierBConfirm.value = spec
+            return
+        }
+        c.localSlmEngine.downloadModel(
+            spec = spec,
+            allowUnpinnedTierB = allowUnpinnedTierB,
+        ) { savedPath ->
             viewModelScope.launch(Dispatchers.IO) {
                 c.preferencesRepository.setSlmModelPath(savedPath)
                 c.preferencesRepository.setSlmSynthesisEnabled(true)

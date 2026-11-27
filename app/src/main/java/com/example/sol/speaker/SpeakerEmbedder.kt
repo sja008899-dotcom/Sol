@@ -31,7 +31,17 @@ class SpeakerEmbedder(private val modelFile: File) {
 
     val isReady: Boolean get() = session != null
 
-    fun initialize(verifyOfficialHash: Boolean = true): Boolean {
+    @Volatile
+    private var customSha256Provider: () -> String? = { null }
+
+    internal fun attachCustomShaProvider(provider: () -> String?) {
+        customSha256Provider = provider
+    }
+
+    fun initialize(
+        verifyOfficialHash: Boolean = true,
+        expectedCustomSha256: String? = null,
+    ): Boolean {
         lastErrorFa = ""
         return try {
             require(modelFile.exists() && modelFile.isFile && modelFile.length() > 0L) {
@@ -40,7 +50,10 @@ class SpeakerEmbedder(private val modelFile: File) {
 
             if (verifyOfficialHash) {
                 val actualHash = calculateSHA256(modelFile)
-                if (!actualHash.equals(EXPECTED_CAMPP_SHA256, ignoreCase = true)) {
+                val matchesOfficial = actualHash.equals(EXPECTED_CAMPP_SHA256, ignoreCase = true)
+                val matchesCustom = !expectedCustomSha256.isNullOrBlank() &&
+                    actualHash.equals(expectedCustomSha256, ignoreCase = true)
+                if (!matchesOfficial && !matchesCustom) {
                     lastErrorFa = "فایل فعلی مدل شناسایی گوینده قدیمی یا نامعتبر است؛ نسخهٔ سازگار FP32 جایگزین می‌شود."
                     throw SecurityException(lastErrorFa)
                 }
@@ -82,7 +95,8 @@ class SpeakerEmbedder(private val modelFile: File) {
     fun embed(pcm16k: FloatArray): FloatArray? {
         if (pcm16k.isEmpty()) return null
         if (!isReady && isModelPresent) {
-            if (!initialize(verifyOfficialHash = false)) return null
+            val customPin = customSha256Provider()?.trim()?.takeIf { it.isNotBlank() }
+            if (!initialize(verifyOfficialHash = true, expectedCustomSha256 = customPin)) return null
         }
         val ortEnvironment = env ?: return null
         val ortSession = session ?: return null

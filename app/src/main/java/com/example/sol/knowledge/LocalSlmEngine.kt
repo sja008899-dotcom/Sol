@@ -20,12 +20,18 @@ class LocalSlmEngine(
     context: Context,
     httpClient: SolHttpClient = SolHttpClient(),
     availableBytesProvider: (File) -> Long = SolStorageGuard::readAvailableBytes,
+    beforeModelLoad: suspend (requiredRamMb: Long) -> Result<Unit> = { Result.success(Unit) },
 ) {
     private val _runtimeState = MutableStateFlow<SlmRuntimeState>(SlmRuntimeState.NotInstalled)
     val runtimeState: StateFlow<SlmRuntimeState> = _runtimeState.asStateFlow()
 
     private val modelStore = ModelStore(context.applicationContext, availableBytesProvider)
-    private val inferenceEngine = InferenceEngine(context.applicationContext, modelStore, _runtimeState)
+    private val inferenceEngine = InferenceEngine(
+        context = context.applicationContext,
+        modelStore = modelStore,
+        runtimeState = _runtimeState,
+        beforeModelLoad = beforeModelLoad,
+    )
     private val modelDownloader = ModelDownloader(
         modelStore = modelStore,
         httpClient = httpClient,
@@ -97,8 +103,15 @@ class LocalSlmEngine(
         )
     }
 
-    fun downloadModel(spec: SlmModelSpec, onSavedPath: (String) -> Unit) =
-        modelDownloader.downloadModel(spec, onSavedPath)
+    fun downloadModel(
+        spec: SlmModelSpec,
+        allowUnpinnedTierB: Boolean = false,
+        onSavedPath: (String) -> Unit,
+    ) = modelDownloader.downloadModel(
+        spec = spec,
+        allowUnpinnedTierB = allowUnpinnedTierB,
+        onSavedPath = onSavedPath,
+    )
 
     // Keep the callback last so Kotlin trailing-lambda calls remain source-compatible.
     internal suspend fun downloadModelSync(
@@ -171,8 +184,16 @@ class LocalSlmEngine(
     fun unloadFromRam(reasonFa: String = "مدل زبانی از RAM آزاد شد") =
         inferenceEngine.unloadFromRam(reasonFa)
 
+    suspend fun unloadBlockingIfIdle(): Boolean {
+        if (isGenerating()) return false
+        inferenceEngine.unloadBlocking()
+        return true
+    }
+
     fun releaseSessionMemory() {
-        unloadFromRam("آزادسازی خودکار مدل زبانی در onTrimMemory برای حفظ ۴GB RAM")
+        if (!isGenerating()) {
+            unloadFromRam("آزادسازی خودکار مدل زبانی در onTrimMemory برای حفظ ۴GB RAM")
+        }
     }
 
     companion object {

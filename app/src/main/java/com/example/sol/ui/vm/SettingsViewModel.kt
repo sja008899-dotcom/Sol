@@ -47,6 +47,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val piperStatus: StateFlow<com.example.sol.tts.PiperTtsStatus> = c.ttsManager.piperStatus
     val speakerIdState: StateFlow<com.example.sol.speaker.SpeakerIdUiState> = c.speakerIdManager.uiState
     val isMicServiceRunning: StateFlow<Boolean> = com.example.sol.voice.MicForegroundService.isRunning
+    val lastNetworkEventFa: StateFlow<String> = c.networkPolicyCoordinator.lastNetworkEventFa
 
     private val _batteryStatus = MutableStateFlow(c.deviceController.getBatteryStatus())
     val batteryStatus: StateFlow<BatteryStatus> = _batteryStatus.asStateFlow()
@@ -108,6 +109,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 piperTtsReady = c.ttsManager.isInstalledAndReady,
                 historyRetentionMode = prefs.historyRetentionMode,
                 privateModeEnabled = prefs.privateModeEnabled,
+                offlineStrictMode = prefs.offlineStrictMode,
+                lastNetworkEventFa = c.networkPolicyCoordinator.lastNetworkEventFa.value,
+                speakerIdCustomUnverified = c.speakerIdManager.uiState.value.isCustomUnverifiedModel,
             )
             _launchableApps.value = c.deviceController.appLauncher.getLaunchableApps().take(12)
             refreshReliabilityStatus()
@@ -156,7 +160,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    fun downloadVoskPersianModel() = c.voiceEngine.voskEngine.downloadPersianSmallModel()
+    fun downloadVoskPersianModel() {
+        if (c.networkPolicyCoordinator.isOfflineStrict()) {
+            c.uiBridge.postBanner("حالت آفلاین سخت‌گیرانه فعال است؛ دانلود مدل Vosk مسدود شد.")
+            return
+        }
+        c.voiceEngine.voskEngine.downloadPersianSmallModel()
+    }
     fun importVoskModelZip(uri: Uri) = c.voiceEngine.voskEngine.importLocalModelZip(uri)
     fun unloadVoskModelFromRam() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -256,6 +266,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun downloadPiperModel() {
+        if (c.networkPolicyCoordinator.isOfflineStrict()) {
+            c.uiBridge.postBanner("حالت آفلاین سخت‌گیرانه فعال است؛ دانلود صدای Piper مسدود شد.")
+            return
+        }
         c.ttsManager.downloadOfficialPiperModel {
             c.uiBridge.triggerRefreshSnapshots()
             c.uiBridge.postBanner("صدای فارسی خودکفای Piper با موفقیت نصب و فعال شد.")
@@ -263,6 +277,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun downloadSpeakerModel() {
+        if (c.networkPolicyCoordinator.isOfflineStrict()) {
+            c.uiBridge.postBanner("حالت آفلاین سخت‌گیرانه فعال است؛ دانلود مدل CAM++ مسدود شد.")
+            return
+        }
         viewModelScope.launch {
             c.speakerIdManager.ensureAndDownloadSpeakerModel().fold(
                 onSuccess = { msg -> c.uiBridge.postBanner(msg) },
@@ -330,6 +348,19 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         refreshSettingsSnapshots()
     }
     fun setDarkTheme(dark: Boolean) = viewModelScope.launch(Dispatchers.IO) { c.preferencesRepository.setDarkTheme(dark) }
+    fun setOfflineStrictMode(enabled: Boolean) = viewModelScope.launch(Dispatchers.IO) {
+        c.preferencesRepository.setOfflineStrictMode(enabled)
+        c.networkPolicyCoordinator.setPolicy(
+            if (enabled) com.example.sol.runtime.SolNetworkPolicy.OFFLINE_STRICT
+            else com.example.sol.runtime.SolNetworkPolicy.USER_APPROVED_NETWORK
+        )
+        c.voiceEngine.refreshBackend(c.preferencesRepository.getSnapshot().voskOfflineEnabled)
+        refreshSettingsSnapshots()
+        c.uiBridge.postBanner(
+            if (enabled) "حالت آفلاین سخت‌گیرانه فعال شد: همهٔ اتصالات شبکه مسدود هستند."
+            else "حالت شبکه با تأیید کاربر فعال شد."
+        )
+    }
     fun setVoskOfflineEnabled(enabled: Boolean) = viewModelScope.launch(Dispatchers.IO) { c.preferencesRepository.setVoskOfflineEnabled(enabled) }
     fun setWakeWordEnabled(enabled: Boolean) = viewModelScope.launch(Dispatchers.IO) { c.preferencesRepository.setWakeWordEnabled(enabled) }
     fun setVadSilenceTimeoutMs(timeoutMs: Long) = viewModelScope.launch(Dispatchers.IO) { c.preferencesRepository.setVadSilenceTimeoutMs(timeoutMs) }

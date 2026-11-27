@@ -32,6 +32,7 @@ internal class ModelDownloader(
 
     fun downloadModel(
         spec: SlmModelSpec,
+        allowUnpinnedTierB: Boolean = false,
         onSavedPath: (String) -> Unit,
     ) {
         if (activeDownloadJob?.isActive == true) return
@@ -40,7 +41,7 @@ internal class ModelDownloader(
             downloadModelSync(
                 spec = spec,
                 onSavedPath = onSavedPath,
-                allowHttpsWithoutPinnedHash = true,
+                allowHttpsWithoutPinnedHash = allowUnpinnedTierB,
             )
         }
     }

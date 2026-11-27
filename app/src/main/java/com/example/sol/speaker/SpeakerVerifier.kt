@@ -98,6 +98,7 @@ data class SpeakerIdUiState(
     val statusLabelFa: String = "N5 غیرفعال: مدل شناسایی گوینده یا نمونهٔ صدای مالک ثبت نشده است.",
     val feedbackMessageFa: String = "",
     val feedbackIsError: Boolean = false,
+    val isCustomUnverifiedModel: Boolean = false,
 )
 
 /**
@@ -146,8 +147,23 @@ class SpeakerIdManager(
     @Volatile
     private var lastVerificationSummaryFa: String = ""
 
+    @Volatile
+    private var isVerifyingAudio: Boolean = false
+
     private val _uiState = MutableStateFlow(computeStatus())
     val uiState: StateFlow<SpeakerIdUiState> = _uiState.asStateFlow()
+
+    init {
+        embedder.attachCustomShaProvider { readTrustedCustomSha256() }
+    }
+
+    fun isBusy(): Boolean =
+        isVerifyingAudio || _uiState.value.isRecordingOwner || _uiState.value.isDownloadingModel
+
+    fun unloadModelIfIdle() {
+        if (isBusy()) return
+        embedder.release()
+    }
 
     private fun readTrustedCustomSha256(): String? {
         if (!customTrustedShaFile.exists()) return null
@@ -198,22 +214,24 @@ class SpeakerIdManager(
         liveRmsLevel: Float = 0f,
     ): SpeakerIdUiState {
         val hasCompatibleModel = isModelCompatible()
+        val isCustomUnverified = hasCompatibleModel && !embedder.isOfficialModelVerified() && hasTrustedCustomModel()
         val hasOutdatedFile = embedder.isModelPresent && !hasCompatibleModel
         val hasOwner = ownerProfile.exists()
         val active = hasCompatibleModel && hasOwner
         val activeThreshold = resolveActiveThreshold()
         val calMeta = if (hasOwner) ownerProfile.loadCalibrationMetadata() else null
         val thresholdPct = kotlin.math.round(activeThreshold * 100f).toInt()
+        val customNote = if (isCustomUnverified) " • مدل سفارشی (تأییدنشده ناشر)" else ""
         val label = when {
             isDownloading -> "در حال دانلود خودکار مدل شناسایی صدا (CAM++ FP32 • $downloadPercent٪)…"
             isRecording && currentEnrollmentStep > 0 ->
                 "کالیبراسیون نمونهٔ $currentEnrollmentStep از $currentEnrollmentTotal (${remainingSeconds.coerceAtLeast(1)} ثانیه باقی‌مانده)…"
             isRecording -> "در حال ضبط (${remainingSeconds.coerceAtLeast(1)} ثانیه باقی‌مانده — با صدای عادی صحبت کنید)…"
             active && calMeta != null ->
-                "✅ شناسایی صدای مالک (N5) فعال است (${calMeta.sampleCount} نمونه • آستانه تطابق $thresholdPct٪)."
-            active -> "✅ شناسایی صدای مالک (N5) فعال است؛ دستورات صوتی فقط برای صدای مالک اجرا می‌شوند."
+                "✅ شناسایی صدای مالک (N5) فعال است (${calMeta.sampleCount} نمونه • آستانه تطابق $thresholdPct٪$customNote)."
+            active -> "✅ شناسایی صدای مالک (N5) فعال است$customNote؛ دستورات صوتی فقط برای صدای مالک اجرا می‌شوند."
             hasOutdatedFile -> "نسخهٔ قبلی مدل گوینده با موتور گوشی ناسازگار است؛ با زدن «ضبط صدای من» یا دانلود، نسخهٔ سازگار CAM++ (~۲۸MB) خودکار جایگزین می‌شود."
-            hasCompatibleModel && !hasOwner -> "✅ مدل CAM++ آماده است؛ دکمه «ضبط صدای من» را بزنید تا N5 با ۳ جملهٔ کوتاه کالیبره شود."
+            hasCompatibleModel && !hasOwner -> "✅ مدل گوینده آماده است$customNote؛ دکمه «ضبط صدای من» را بزنید تا N5 با ۳ جملهٔ کوتاه کالیبره شود."
             !hasCompatibleModel && hasOwner -> "نمونهٔ صدای مالک ذخیره شده؛ با اولین دانلود/ضبط، مدل سازگار CAM++ خودکار نصب می‌شود."
             else -> "آمادهٔ راه‌اندازی خودکار: با زدن «ضبط صدای من»، مدل CAM++ (~۲۸MB) خودکار دانلود و صدای شما با ۳ جملهٔ کوتاه ثبت می‌شود."
         }
@@ -236,6 +254,7 @@ class SpeakerIdManager(
             statusLabelFa = label,
             feedbackMessageFa = lastFeedbackFa,
             feedbackIsError = lastFeedbackIsError,
+            isCustomUnverifiedModel = isCustomUnverified,
         )
     }
 
@@ -256,35 +275,43 @@ class SpeakerIdManager(
             refreshStatus()
             return SpeakerVerificationOutcome.AudioUnavailable(reason)
         }
-        if (!embedder.isReady) {
-            val initialized = embedder.initialize(verifyOfficialHash = !hasTrustedCustomModel())
-            if (!initialized) return SpeakerVerificationOutcome.InactiveFailSafe
-        }
-        val ownerEmbedding = ownerProfile.load() ?: return SpeakerVerificationOutcome.InactiveFailSafe
-        val candidateEmbedding = embedder.embed(pcm16k)
-            ?: return SpeakerVerificationOutcome.AudioUnavailable(
-                "استخراج بردار صدا در این نوبت ممکن نشد؛ فرمان بدون مسدودسازی اجرا شد."
-            )
-        val activeThreshold = resolveActiveThreshold()
-        val sim = verifier.similarity(candidateEmbedding, ownerEmbedding)
-        val passed = sim >= activeThreshold
-        val simPct = kotlin.math.round(sim * 100f).toInt()
-        val thrPct = kotlin.math.round(activeThreshold * 100f).toInt()
-        lastSimilarityScore = sim
-        lastVerificationPassed = passed
-        lastVerificationSummaryFa = if (passed) {
-            "تطابق صدای مالک تأیید شد (شباهت $simPct٪ • آستانه $thrPct٪)"
-        } else {
-            "تطابق صدای مالک رد شد (شباهت $simPct٪ < آستانه $thrPct٪)"
-        }
-        refreshStatus()
-        return if (passed) {
-            SpeakerVerificationOutcome.VerifiedOwner(sim)
-        } else {
-            SpeakerVerificationOutcome.RejectedNonOwner(
-                similarity = sim,
-                politeMessageFa = POLITE_REJECTION_MESSAGE_FA,
-            )
+        isVerifyingAudio = true
+        return try {
+            if (!embedder.isReady) {
+                val initialized = embedder.initialize(
+                    verifyOfficialHash = true,
+                    expectedCustomSha256 = readTrustedCustomSha256(),
+                )
+                if (!initialized) return SpeakerVerificationOutcome.InactiveFailSafe
+            }
+            val ownerEmbedding = ownerProfile.load() ?: return SpeakerVerificationOutcome.InactiveFailSafe
+            val candidateEmbedding = embedder.embed(pcm16k)
+                ?: return SpeakerVerificationOutcome.AudioUnavailable(
+                    "استخراج بردار صدا در این نوبت ممکن نشد؛ فرمان بدون مسدودسازی اجرا شد."
+                )
+            val activeThreshold = resolveActiveThreshold()
+            val sim = verifier.similarity(candidateEmbedding, ownerEmbedding)
+            val passed = sim >= activeThreshold
+            val simPct = kotlin.math.round(sim * 100f).toInt()
+            val thrPct = kotlin.math.round(activeThreshold * 100f).toInt()
+            lastSimilarityScore = sim
+            lastVerificationPassed = passed
+            lastVerificationSummaryFa = if (passed) {
+                "تطابق صدای مالک تأیید شد (شباهت $simPct٪ • آستانه $thrPct٪)"
+            } else {
+                "تطابق صدای مالک رد شد (شباهت $simPct٪ < آستانه $thrPct٪)"
+            }
+            refreshStatus()
+            if (passed) {
+                SpeakerVerificationOutcome.VerifiedOwner(sim)
+            } else {
+                SpeakerVerificationOutcome.RejectedNonOwner(
+                    similarity = sim,
+                    politeMessageFa = POLITE_REJECTION_MESSAGE_FA,
+                )
+            }
+        } finally {
+            isVerifyingAudio = false
         }
     }
 
@@ -297,7 +324,7 @@ class SpeakerIdManager(
             setFeedback(msg, isError = true)
             return@withContext Result.failure(IllegalStateException(msg))
         }
-        if (!embedder.isReady && !embedder.initialize(verifyOfficialHash = !hasTrustedCustomModel())) {
+        if (!embedder.isReady && !embedder.initialize(verifyOfficialHash = true, expectedCustomSha256 = readTrustedCustomSha256())) {
             val msg = embedder.lastErrorFa.ifBlank { "بارگذاری مدل شناسایی گوینده ناموفق بود." }
             setFeedback(msg, isError = true)
             return@withContext Result.failure(IllegalStateException(msg))
@@ -498,7 +525,7 @@ class SpeakerIdManager(
         }
 
         val readyLocally = isModelCompatible() &&
-            (embedder.isReady || embedder.initialize(verifyOfficialHash = !hasTrustedCustomModel()))
+            (embedder.isReady || embedder.initialize(verifyOfficialHash = true, expectedCustomSha256 = readTrustedCustomSha256()))
         if (!readyLocally) {
             val dlRes = ensureAndDownloadSpeakerModel()
             if (dlRes.isFailure) {
@@ -598,7 +625,7 @@ class SpeakerIdManager(
                 setFeedback(msg, isError = true)
                 return@withContext Result.failure(IllegalStateException(msg))
             }
-            if (!embedder.isReady && !embedder.initialize(verifyOfficialHash = !hasTrustedCustomModel())) {
+            if (!embedder.isReady && !embedder.initialize(verifyOfficialHash = true, expectedCustomSha256 = readTrustedCustomSha256())) {
                 val msg = embedder.lastErrorFa.ifBlank { "بارگذاری مدل CAM++ ناموفق بود." }
                 setFeedback(msg, isError = true)
                 return@withContext Result.failure(IllegalStateException(msg))

@@ -434,7 +434,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             c.refreshVocabularyBias()
-            if (!c.voiceEngine.voskEngine.isModelInstalled() &&
+            if (!c.networkPolicyCoordinator.isOfflineStrict() &&
+                !c.voiceEngine.voskEngine.isModelInstalled() &&
                 c.voiceEngine.voskEngine.modelStatus.value !is VoskModelStatus.Downloading &&
                 c.hasInternetConnection()
             ) {

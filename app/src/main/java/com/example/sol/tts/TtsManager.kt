@@ -224,6 +224,11 @@ class TtsManager(
     val isInstalledAndReady: Boolean
         get() = _piperStatus.value is PiperTtsStatus.Ready
 
+    fun isModelLoadedInRam(): Boolean = piperEngine.isReady
+
+    fun isBusy(): Boolean =
+        _isPiperSpeaking.value || _piperStatus.value is PiperTtsStatus.Downloading
+
     private fun migrateLegacyPiperIfPresent() {
         if (!legacyPiperDir.isDirectory) return
         val legacyModel = File(legacyPiperDir, "persian.onnx")
@@ -485,11 +490,12 @@ class TtsManager(
         if (piperEngine.isReady || _piperStatus.value is PiperTtsStatus.Ready) {
             val cleanText = PersianNumbers.prepareTextForTts(text).ifBlank { text }
             speakWithPiper(cleanText, speechRate, persona)
-        } else if (_piperStatus.value is PiperTtsStatus.NotInstalled ||
-            _piperStatus.value is PiperTtsStatus.Error ||
-            _piperStatus.value is PiperTtsStatus.Downloading
+        } else if (!httpClient.isOfflineStrict() &&
+            (_piperStatus.value is PiperTtsStatus.NotInstalled ||
+                _piperStatus.value is PiperTtsStatus.Error ||
+                _piperStatus.value is PiperTtsStatus.Downloading)
         ) {
-            // 100% self-contained: automatically download official verified Piper model and then speak!
+            // 100% self-contained: automatically download official verified Piper model when online & permitted!
             pendingAutoSpeakRequest = PendingAutoSpeak(text, speechRate, persona)
             if (_piperStatus.value !is PiperTtsStatus.Downloading) {
                 downloadOfficialPiperModel()
@@ -505,6 +511,7 @@ class TtsManager(
         if (!piperEngine.isReady) {
             val ready = refreshInstalledPiper()
             if (!ready) {
+                if (httpClient.isOfflineStrict()) return@withContext false
                 val dl = downloadOfficialPiperModelSync()
                 if (dl.isFailure) return@withContext false
             }

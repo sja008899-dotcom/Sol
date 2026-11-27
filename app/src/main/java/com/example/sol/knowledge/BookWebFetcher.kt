@@ -54,6 +54,9 @@ class BookWebFetcher(
 
     suspend fun fetchBookOrWebpageFromInternet(queryOrUrl: String): Result<FetchedBookResult> =
         withContext(Dispatchers.IO) {
+            if (httpClient.isOfflineStrict()) {
+                return@withContext Result.failure(SolNetworkException.OfflineStrictBlockedException())
+            }
             val trimmed = queryOrUrl.trim()
             if (trimmed.isBlank()) {
                 return@withContext Result.failure(IllegalArgumentException("نام کتاب یا نشانی وب خالی است"))

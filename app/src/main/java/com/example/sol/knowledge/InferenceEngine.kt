@@ -29,6 +29,7 @@ internal class InferenceEngine(
     private val context: Context,
     private val modelStore: ModelStore,
     private val runtimeState: MutableStateFlow<SlmRuntimeState>,
+    private val beforeModelLoad: suspend (requiredRamMb: Long) -> Result<Unit> = { Result.success(Unit) },
 ) {
     private val slmExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "Sol-LiteRT-LM").apply {
@@ -342,8 +343,21 @@ internal class InferenceEngine(
 
         releaseLocked("")
 
-        val availRamMb = modelStore.readAvailableRamMb()
         val requiredRamMb = SlmModelCatalog.minRequiredRamForFile(file.name)
+        val prepRes = beforeModelLoad(requiredRamMb)
+        if (prepRes.isFailure) {
+            val availNow = modelStore.readAvailableRamMb()
+            val errMsg = prepRes.exceptionOrNull()?.localizedMessage
+                ?: "آماده‌سازی RAM برای مدل زبانی ممکن نشد."
+            runtimeState.value = SlmRuntimeState.LowRamBlocked(
+                modelName = file.name,
+                requiredRamMb = requiredRamMb,
+                availableRamMb = availNow,
+            )
+            return Result.failure(IllegalStateException(errMsg, prepRes.exceptionOrNull()))
+        }
+
+        val availRamMb = modelStore.readAvailableRamMb()
         if (!ModelStore.hasEnoughRamForModel(availRamMb, requiredRamMb)) {
             runtimeState.value = SlmRuntimeState.LowRamBlocked(
                 modelName = file.name,

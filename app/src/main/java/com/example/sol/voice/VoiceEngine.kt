@@ -62,6 +62,7 @@ class VoiceEngine(
     private val isExternalSpeaking: () -> Boolean = { false },
     private val onStopExternalSpeech: () -> Unit = {},
     private val micArbiter: MicArbiter? = null,
+    private val isOfflineStrict: () -> Boolean = { false },
 ) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -102,7 +103,7 @@ class VoiceEngine(
     val activeBackend: StateFlow<ActiveAsrBackend> = _activeBackend.asStateFlow()
 
     fun resolvePreferredBackend(preferVosk: Boolean): ActiveAsrBackend {
-        return if (preferVosk && voskEngine.isModelInstalled()) {
+        return if (isOfflineStrict() || (preferVosk && voskEngine.isModelInstalled())) {
             ActiveAsrBackend.VOSK_OFFLINE
         } else {
             ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER
@@ -113,7 +114,8 @@ class VoiceEngine(
         _activeBackend.value = resolvePreferredBackend(preferVosk)
     }
 
-    fun isAvailable(): Boolean = voskEngine.isModelInstalled() || SpeechRecognizer.isRecognitionAvailable(context)
+    fun isAvailable(): Boolean =
+        voskEngine.isModelInstalled() || (!isOfflineStrict() && SpeechRecognizer.isRecognitionAvailable(context))
 
     fun updateVocabularyBias(terms: List<String>) {
         voskEngine.vocabularyBias.updateTerms(terms)
@@ -161,7 +163,17 @@ class VoiceEngine(
 
         val safeVadMs = vadSilenceMs.coerceIn(VoskVoiceEngine.MIN_VAD_SILENCE_MS, VoskVoiceEngine.MAX_VAD_SILENCE_MS)
         val safeMaxDurationMs = maxDurationMs.coerceIn(5_000L, 45_000L)
-        val useVosk = preferVosk && voskEngine.isModelInstalled()
+        val strictOffline = isOfflineStrict()
+        val useVosk = (preferVosk || strictOffline) && voskEngine.isModelInstalled()
+
+        if (!useVosk && strictOffline) {
+            _activeBackend.value = ActiveAsrBackend.VOSK_OFFLINE
+            _state.value = VoiceListeningState.Error(
+                messageFa = "حالت آفلاین سخت‌گیرانه فعال است و تشخیص گفتار سیستم مسدود شد؛ مدل آفلاین Vosk را نصب کنید یا فرمان را تایپ کنید.",
+                action = VoiceErrorAction.OPEN_VOSK_SETTINGS,
+            )
+            return
+        }
 
         if (!useVosk && !SpeechRecognizer.isRecognitionAvailable(context)) {
             _activeBackend.value = ActiveAsrBackend.ANDROID_SPEECH_RECOGNIZER
@@ -255,6 +267,14 @@ class VoiceEngine(
         preferOfflineInSystem: Boolean,
         onFinalResult: (String) -> Unit,
     ) {
+        if (isOfflineStrict()) {
+            _activeBackend.value = ActiveAsrBackend.VOSK_OFFLINE
+            _state.value = VoiceListeningState.Error(
+                messageFa = "حالت آفلاین سخت‌گیرانه فعال است؛ استفاده از سرویس گفتار سیستم مسدود شد.",
+                action = VoiceErrorAction.OPEN_VOSK_SETTINGS,
+            )
+            return
+        }
         if (sessionToken.get() != token) return
         if (!hasSystemMicLease.get() && micArbiter != null) {
             withContext(Dispatchers.IO) {

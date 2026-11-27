@@ -11,6 +11,8 @@ import java.net.Inet4Address
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.URL
+import com.example.sol.runtime.SolNetworkPolicy
+import com.example.sol.runtime.SolNetworkPolicyCoordinator
 import java.nio.charset.Charset
 import java.security.MessageDigest
 import java.util.Locale
@@ -51,6 +53,10 @@ sealed class SolNetworkException(
 
     class TransportException(cause: Throwable? = null) :
         SolNetworkException("ارتباط شبکه برقرار نشد یا با وقفه مواجه شد.", cause)
+
+    class OfflineStrictBlockedException(
+        reasonFa: String = "حالت آفلاین سخت‌گیرانه (Offline Strict) فعال است؛ اتصال اینترنت مسدود شد.",
+    ) : SolNetworkException(reasonFa)
 }
 
 data class DiskCheckResult(
@@ -110,13 +116,36 @@ class SolHttpClient(
     private val dnsResolver: (String) -> Array<InetAddress> = { host -> InetAddress.getAllByName(host) },
     private val connectionOpener: (URL) -> HttpURLConnection = { url -> url.openConnection() as HttpURLConnection },
     private val availableBytesProvider: (File) -> Long = SolStorageGuard::readAvailableBytes,
+    private val networkPolicyCoordinator: SolNetworkPolicyCoordinator? = null,
+    private val networkPolicyProvider: () -> SolNetworkPolicy = {
+        networkPolicyCoordinator?.currentPolicy ?: SolNetworkPolicy.USER_APPROVED_NETWORK
+    },
 ) {
+
+    fun isOfflineStrict(): Boolean = networkPolicyProvider() == SolNetworkPolicy.OFFLINE_STRICT
+
+    private fun ensureNetworkAllowed(categoryFa: String, host: String = "") {
+        if (isOfflineStrict()) {
+            val reason = "حالت آفلاین سخت‌گیرانه فعال است؛ درخواست «$categoryFa» مسدود شد."
+            networkPolicyCoordinator?.recordBlockedAction("$categoryFa${if (host.isNotBlank()) " ($host)" else ""}")
+            throw SolNetworkException.OfflineStrictBlockedException(reason)
+        }
+        val allowed = networkPolicyCoordinator?.checkAndRecordRequest(
+            categoryFa = categoryFa,
+            host = host,
+            userConfirmedThisAction = true,
+        ) ?: true
+        if (!allowed) {
+            throw SolNetworkException.OfflineStrictBlockedException()
+        }
+    }
 
     fun fetchText(
         urlString: String,
         maxBytes: Long = DEFAULT_TEXT_MAX_BYTES,
         allowedHostSuffixes: Set<String>? = null,
     ): String {
+        ensureNetworkAllowed("دریافت متن وب")
         val (conn, _) = openSafeConnection(
             urlString = urlString,
             allowedHostSuffixes = allowedHostSuffixes,
@@ -170,6 +199,7 @@ class SolHttpClient(
         urlString: String,
         allowedHostSuffixes: Set<String>? = DEFAULT_MODEL_ALLOWED_HOSTS,
     ): HeadMetadata {
+        ensureNetworkAllowed("بررسی سربرگ فایل")
         val url = validateUrlForRequest(urlString, allowedHostSuffixes)
         val conn = try {
             connectionOpener(url).apply {
@@ -214,6 +244,7 @@ class SolHttpClient(
         isCancelled: () -> Boolean = { false },
         onProgress: (percent: Int, downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
     ): File {
+        ensureNetworkAllowed("دانلود فایل با اثر انگشت تأییدشده")
         if (!isValidSha256Hex(expectedSha256) || expectedBytes <= 0L) {
             partFile.delete()
             throw SolNetworkException.IntegrityMetadataMissingException()
@@ -387,6 +418,7 @@ class SolHttpClient(
         isCancelled: () -> Boolean = { false },
         onProgress: (percent: Int, downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
     ): DownloadedFileResult {
+        ensureNetworkAllowed("دانلود فایل رسمی HTTPS")
         val checkDir = partFile.parentFile ?: partFile
         checkDir.mkdirs()
 
@@ -632,10 +664,12 @@ class SolHttpClient(
         val url = runCatching { URL(rawUrl.trim()) }
             .getOrElse { throw SolNetworkException.InsecureSchemeException("نشانی نامعتبر") }
 
+        val host = url.host.orEmpty().trim()
+        ensureNetworkAllowed("ارتباط HTTPS", host)
+
         if (!url.protocol.equals("https", ignoreCase = true)) {
             throw SolNetworkException.InsecureSchemeException(url.protocol)
         }
-        val host = url.host.orEmpty().trim()
         if (host.isBlank()) {
             throw SolNetworkException.PrivateHostBlockedException()
         }

@@ -151,6 +151,8 @@ class VoskVoiceEngine(
 
     fun isModelLoadedInRam(): Boolean = voskModel != null
 
+    fun isBusy(): Boolean = isRecording.get() || _modelStatus.value is VoskModelStatus.Downloading
+
     private fun saveVoskShaSidecar(sha256Hex: String) {
         if (!SolHttpClient.isValidSha256Hex(sha256Hex)) return
         runCatching { modelShaSidecarFile.writeText(sha256Hex.trim().lowercase()) }

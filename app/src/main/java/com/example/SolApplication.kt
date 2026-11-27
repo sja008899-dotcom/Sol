@@ -33,10 +33,24 @@ import com.example.sol.security.PrivacyManager
 import com.example.sol.security.SolMemoryOptimizer
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.app.ActivityManager
+import android.content.Context
+import com.example.sol.network.DuckDuckGoSearchProvider
+import com.example.sol.network.SolHttpClient
+import com.example.sol.network.WebSearchClient
+import com.example.sol.runtime.ModelAcquireResult
+import com.example.sol.runtime.ModelResourceCoordinator
+import com.example.sol.runtime.SolModelKind
+import com.example.sol.runtime.SolModelResource
+import com.example.sol.runtime.SolNetworkPolicy
+import com.example.sol.runtime.SolNetworkPolicyCoordinator
 import com.example.sol.tasks.ConfirmationManager
 import com.example.sol.tasks.TaskManager
 import com.example.sol.voice.SolAudioManager
 import com.example.sol.voice.VoiceEngine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class SolAppContainer(private val application: Application) {
     val database: MemoryDatabase by lazy { MemoryDatabase.getInstance(application) }
@@ -50,7 +64,87 @@ class SolAppContainer(private val application: Application) {
     val noteTodoRepository by lazy { NoteTodoRepository(dao) }
     val preferencesRepository: PreferencesRepository by lazy { PreferencesRepository(application) }
 
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     val memoryOptimizer: SolMemoryOptimizer by lazy { SolMemoryOptimizer(application) }
+
+    val networkPolicyCoordinator: SolNetworkPolicyCoordinator by lazy {
+        SolNetworkPolicyCoordinator(
+            initialPolicy = SolNetworkPolicy.USER_APPROVED_NETWORK,
+        ).also { coord ->
+            appScope.launch {
+                val snap = runCatching { preferencesRepository.getSnapshot() }.getOrNull()
+                if (snap != null) {
+                    coord.setPolicy(
+                        if (snap.offlineStrictMode) SolNetworkPolicy.OFFLINE_STRICT
+                        else SolNetworkPolicy.USER_APPROVED_NETWORK
+                    )
+                }
+                preferencesRepository.preferences.collect { prefs ->
+                    coord.setPolicy(
+                        if (prefs.offlineStrictMode) SolNetworkPolicy.OFFLINE_STRICT
+                        else SolNetworkPolicy.USER_APPROVED_NETWORK
+                    )
+                }
+            }
+        }
+    }
+
+    val httpClient: SolHttpClient by lazy {
+        SolHttpClient(networkPolicyCoordinator = networkPolicyCoordinator)
+    }
+
+    val modelResourceCoordinator: ModelResourceCoordinator by lazy {
+        ModelResourceCoordinator(
+            availableRamMbProvider = {
+                val am = application.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                val info = ActivityManager.MemoryInfo()
+                if (am != null) {
+                    am.getMemoryInfo(info)
+                    info.availMem / (1024L * 1024L)
+                } else {
+                    -1L
+                }
+            },
+        ).apply {
+            register(object : SolModelResource {
+                override val kind = SolModelKind.VOSK_ASR
+                override val minRequiredRamMb = 250L
+                override fun isLoaded(): Boolean = voskEngine.isModelLoadedInRam()
+                override fun isBusy(): Boolean = voskEngine.isBusy()
+                override suspend fun load(): Result<Unit> = Result.success(Unit)
+                override suspend fun unload() = voskEngine.unloadModelFromRam("آزادسازی خودکار Vosk توسط هماهنگ‌کننده حافظه")
+            })
+            register(object : SolModelResource {
+                override val kind = SolModelKind.PIPER_TTS
+                override val minRequiredRamMb = 220L
+                override fun isLoaded(): Boolean = ttsManager.isModelLoadedInRam()
+                override fun isBusy(): Boolean = ttsManager.isBusy()
+                override suspend fun load(): Result<Unit> =
+                    if (ttsManager.refreshInstalledPiper()) Result.success(Unit)
+                    else Result.failure(IllegalStateException("مدل Piper نصب نیست."))
+                override suspend fun unload() = ttsManager.unloadFromRamIfIdle()
+            })
+            register(object : SolModelResource {
+                override val kind = SolModelKind.SPEAKER_ID
+                override val minRequiredRamMb = 180L
+                override fun isLoaded(): Boolean = speakerIdManager.embedder.isReady
+                override fun isBusy(): Boolean = speakerIdManager.isBusy()
+                override suspend fun load(): Result<Unit> = Result.success(Unit)
+                override suspend fun unload() = speakerIdManager.unloadModelIfIdle()
+            })
+            register(object : SolModelResource {
+                override val kind = SolModelKind.LOCAL_SLM
+                override val minRequiredRamMb = 1_100L
+                override fun isLoaded(): Boolean = localSlmEngine.isLoadedInRam()
+                override fun isBusy(): Boolean = localSlmEngine.isGenerating()
+                override suspend fun load(): Result<Unit> = Result.success(Unit)
+                override suspend fun unload() {
+                    localSlmEngine.unloadBlockingIfIdle()
+                }
+            })
+        }
+    }
 
     val micArbiter: com.example.sol.voice.MicArbiter by lazy {
         com.example.sol.voice.MicArbiter(
@@ -71,6 +165,7 @@ class SolAppContainer(private val application: Application) {
     val voskEngine: com.example.sol.voice.VoskVoiceEngine by lazy {
         com.example.sol.voice.VoskVoiceEngine(
             context = application,
+            httpClient = httpClient,
             trustedSha256Provider = { preferencesRepository.getSnapshot().trustedVoskSha256.ifBlank { null } },
             onTofuSha256Pinned = { sha, bytes -> preferencesRepository.setTrustedVoskModel(sha, bytes) },
             onClearTofuPin = { preferencesRepository.clearTrustedVoskModel() },
@@ -83,6 +178,7 @@ class SolAppContainer(private val application: Application) {
         com.example.sol.tts.TtsManager(
             context = application,
             audioManager = audioManager,
+            httpClient = httpClient,
             trustedCustomHashesProvider = {
                 val p = preferencesRepository.getSnapshot()
                 if (p.trustedPiperOnnxSha256.isNotBlank() && p.trustedPiperConfigSha256.isNotBlank()) {
@@ -103,6 +199,7 @@ class SolAppContainer(private val application: Application) {
         com.example.sol.speaker.SpeakerIdManager(
             context = application,
             micArbiter = micArbiter,
+            httpClient = httpClient,
         )
     }
     val voiceEngine: VoiceEngine by lazy {
@@ -113,6 +210,7 @@ class SolAppContainer(private val application: Application) {
             isExternalSpeaking = { ttsManager.isPiperSpeaking.value },
             onStopExternalSpeech = { ttsManager.stop() },
             micArbiter = micArbiter,
+            isOfflineStrict = { networkPolicyCoordinator.isOfflineStrict() },
         )
     }
 
@@ -124,10 +222,23 @@ class SolAppContainer(private val application: Application) {
     val messageManager by lazy { MessageManager(application) }
 
     // Heavy parsers, RAG, SLM, exact alarms, and crypto backups are lazy-loaded for 4GB RAM efficiency
-    val bookWebFetcher by lazy { BookWebFetcher(application) }
-    val webSearchClient by lazy { com.example.sol.network.WebSearchClient() }
+    val bookWebFetcher by lazy { BookWebFetcher(application, httpClient = httpClient) }
+    val webSearchClient by lazy { WebSearchClient(DuckDuckGoSearchProvider(httpClient)) }
     val bookRagEngine by lazy { BookRagEngine(knowledgeRepository) }
-    val localSlmEngine by lazy { LocalSlmEngine(application) }
+    val localSlmEngine by lazy {
+        LocalSlmEngine(
+            context = application,
+            httpClient = httpClient,
+            beforeModelLoad = { requiredRamMb ->
+                when (val prep = modelResourceCoordinator.prepareBeforeSlmLoad(requiredRamMb)) {
+                    is ModelAcquireResult.Acquired -> Result.success(Unit)
+                    is ModelAcquireResult.Busy -> Result.failure(IllegalStateException(prep.messageFa))
+                    is ModelAcquireResult.InsufficientMemory -> Result.failure(IllegalStateException(prep.messageFa))
+                    is ModelAcquireResult.Failed -> Result.failure(IllegalStateException(prep.reasonFa))
+                }
+            },
+        )
+    }
     val exactAlarmScheduler by lazy { ExactAlarmScheduler(application, knowledgeRepository, preferencesRepository) }
     val timerController by lazy { com.example.sol.calendar.TimerController(application, exactAlarmScheduler, knowledgeRepository) }
     val encryptedBackupManager by lazy {
@@ -297,6 +408,17 @@ class SolAppContainer(private val application: Application) {
     suspend fun autoEnsureEssentialModelsIfOnline(
         forceRetryOnError: Boolean = false,
     ): Unit = withContext(Dispatchers.IO) {
+        val prefs = preferencesRepository.getSnapshot()
+        networkPolicyCoordinator.setPolicy(
+            if (prefs.offlineStrictMode) SolNetworkPolicy.OFFLINE_STRICT
+            else SolNetworkPolicy.USER_APPROVED_NETWORK
+        )
+        if (networkPolicyCoordinator.isOfflineStrict()) {
+            if (forceRetryOnError) {
+                uiBridge.postBanner("حالت آفلاین سخت‌گیرانه فعال است؛ هیچ دانلود خودکاری انجام نشد.")
+            }
+            return@withContext
+        }
         if (!hasInternetConnection()) {
             if (forceRetryOnError) {
                 uiBridge.postBanner("اینترنت متصل نیست؛ پس از اتصال، مدل‌های صوتی به‌صورت خودکار دانلود می‌شوند.")
@@ -332,6 +454,8 @@ class SolApplication : Application() {
     lateinit var container: SolAppContainer
         private set
 
+    fun isContainerInitialized(): Boolean = ::container.isInitialized
+
     override fun onCreate() {
         super.onCreate()
         if (BuildConfig.DEBUG) {
@@ -352,6 +476,7 @@ class SolApplication : Application() {
         }
         SolNotificationHelper.ensureChannels(this)
         container = SolAppContainer(this)
+        container.networkPolicyCoordinator
     }
 
     override fun onTrimMemory(level: Int) {
@@ -364,6 +489,9 @@ class SolApplication : Application() {
                 releaseSlmCache = { container.localSlmEngine.releaseSessionMemory() },
                 unloadPiperIfIdle = { container.ttsManager.unloadFromRamIfIdle() },
             )
+            CoroutineScope(Dispatchers.IO).launch {
+                container.modelResourceCoordinator.trimOnMemoryPressure(level)
+            }
         }
     }
 }

@@ -11,6 +11,8 @@ import androidx.work.Operation
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.example.sol.memory.PreferencesRepository
+import com.example.sol.runtime.SolNetworkPolicy
 import java.io.File
 
 class DownloadWorker(
@@ -31,6 +33,24 @@ class DownloadWorker(
         val maxBytes = inputData.getLong(KEY_MAX_ALLOWED_BYTES, -1L)
         val tofuSha = inputData.getString(KEY_TOFU_SHA256)?.trim()?.takeIf { it.isNotBlank() }
 
+        val sharedClient = (applicationContext as? com.example.SolApplication)
+            ?.takeIf { it.isContainerInitialized() }
+            ?.container
+            ?.httpClient
+        val effectiveClient = if (sharedClient != null) {
+            sharedClient
+        } else {
+            val offlineStrict = runCatching {
+                PreferencesRepository(applicationContext).getSnapshot().offlineStrictMode
+            }.getOrDefault(false)
+            SolHttpClient(
+                networkPolicyProvider = {
+                    if (offlineStrict) SolNetworkPolicy.OFFLINE_STRICT
+                    else SolNetworkPolicy.USER_APPROVED_NETWORK
+                },
+            )
+        }
+
         val outcome = executeVerifiedDownload(
             urlString = url,
             destinationPath = destinationPath,
@@ -41,7 +61,7 @@ class DownloadWorker(
             maxAllowedBytes = maxBytes,
             tofuExpectedSha256 = tofuSha,
             allowedHostSuffixes = allowedHosts,
-            httpClient = SolHttpClient(),
+            httpClient = effectiveClient,
             isCancelled = { isStopped },
             onProgress = { pct, downloaded, total ->
                 setProgressAsync(
@@ -105,6 +125,12 @@ class DownloadWorker(
             isCancelled: () -> Boolean = { false },
             onProgress: (percent: Int, downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _, _ -> },
         ): DownloadOutcome {
+            if (httpClient.isOfflineStrict()) {
+                return DownloadOutcome(
+                    success = false,
+                    errorMessageFa = "حالت آفلاین سخت‌گیرانه (Offline Strict) فعال است؛ دانلود متوقف شد.",
+                )
+            }
             if (urlString.isBlank() || destinationPath.isBlank()) {
                 return DownloadOutcome(
                     success = false,

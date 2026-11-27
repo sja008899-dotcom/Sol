@@ -157,6 +157,8 @@ fun SettingsScreen(
     onOpenBattery: () -> Unit,
     onLaunchApp: (String) -> Unit,
     onOpenReliability: () -> Unit = {},
+    lastNetworkEventFa: String = "",
+    onOfflineStrictToggle: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var ownerDraft by remember(preferences.ownerName) { mutableStateOf(preferences.ownerName) }
@@ -1132,6 +1134,23 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (speakerIdState.isCustomUnverifiedModel) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.55f),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("speaker_custom_unverified_badge"),
+                    ) {
+                        Text(
+                            text = "⚠️ مدل سفارشی (تأییدنشده ناشر) فعال است؛ در بخش امنیت فقط به‌عنوان سیگنال کمکی استفاده می‌شود.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(10.dp),
+                        )
+                    }
+                }
                 if (speakerIdState.isDownloadingModel) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Surface(
@@ -1505,10 +1524,56 @@ fun SettingsScreen(
             }
         }
 
-        // 9. Security & Privacy Audit (7 Rules)
+        // 9. Security & Privacy Audit (7 Rules + Offline Strict Mode)
         item(key = "settings_security_audit") {
             SectionCard(title = "قوانین امنیتی و حریم خصوصی Sol") {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(
+                        color = if (preferences.offlineStrictMode) {
+                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.55f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "حالت آفلاین سخت‌گیرانه (Offline Strict)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = "مسدودسازی کامل اینترنت و جلوگیری از فالبک گفتار سیستم",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Switch(
+                                checked = preferences.offlineStrictMode,
+                                onCheckedChange = onOfflineStrictToggle,
+                                modifier = Modifier
+                                    .heightIn(min = 48.dp)
+                                    .testTag("offline_strict_switch"),
+                            )
+                        }
+                    }
+                    if (lastNetworkEventFa.isNotBlank()) {
+                        Text(
+                            text = "آخرین وضعیت شبکه: $lastNetworkEventFa",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag("network_event_summary"),
+                        )
+                    }
                     securityAudit.forEach { item ->
                         Row(verticalAlignment = Alignment.Top) {
                             Icon(
