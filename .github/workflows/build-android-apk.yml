@@ -20,6 +20,8 @@ jobs:
     name: Build, Lint, Evaluation & Test Sol APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      version_name: ${{ steps.derive_version.outputs.version_name }}
 
     steps:
       - name: Checkout repository
@@ -115,6 +117,7 @@ jobs:
             -Dorg.gradle.workers.max=2
 
       - name: Derive Version & Package APKs + SHA256SUMS
+        id: derive_version
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
@@ -127,6 +130,7 @@ jobs:
             exit 1
           fi
           echo "Derived VERSION_NAME=${VERSION_NAME}"
+          echo "version_name=${VERSION_NAME}" >> "${GITHUB_OUTPUT}"
           mkdir -p release-apks
           cp app/build/outputs/apk/debug/app-debug.apk "release-apks/Sol-v${VERSION_NAME}-debug.apk"
 
@@ -169,7 +173,7 @@ jobs:
   publish-release:
     name: Publish GitHub Release
     needs: build-apk
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -185,6 +189,10 @@ jobs:
       - name: Publish Release Files
         uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', needs.build-apk.outputs.version_name) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('Sol v{0}', needs.build-apk.outputs.version_name) }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
           files: |
             release-apks/*.apk
             release-apks/SHA256SUMS
